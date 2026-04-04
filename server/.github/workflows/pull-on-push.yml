@@ -11,6 +11,6 @@ jobs:
     steps:
       - name: Update repo on server
         run: |
-          cd /home/opc/repos/CashFlowArc
+          cd /home/opc/CashFlowArc
           git fetch origin
           git reset --hard origin/main
