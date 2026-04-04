@@ -40,7 +40,7 @@ HTML = """
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Trading Terminal1</title>
+    <title>Trading Terminal</title>
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
