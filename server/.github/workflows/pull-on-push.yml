@@ -1,0 +1,16 @@
+name: Pull latest code on OEL
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  pull:
+    runs-on: [self-hosted, linux, x64]
+
+    steps:
+      - name: Update repo on server
+        run: |
+          cd /home/opc/repos/CashFlowArc
+          git fetch origin
+          git reset --hard origin/main
