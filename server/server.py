@@ -19,7 +19,7 @@ SETTINGS_FILE = DATA_DIR / "ui_settings.json"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_SETTINGS = {
-    "refresh_interval": 28,
+    "refresh_interval": 29,
     "chart_interval": "5min",
 }
 
