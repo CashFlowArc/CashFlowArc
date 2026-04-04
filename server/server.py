@@ -128,7 +128,7 @@ HTML = """
 <div class="wrap">
     <div class="topbar">
         <div class="title">
-            <h1>Trading Terminal1</h1>
+            <h1>Trading Terminal</h1>
             <p>SPX dashboard • Auto-refresh {{ data.refresh_interval }}s • Last update: {{ data.time }}</p>
         </div>
         <div class="top-right">
