@@ -6,7 +6,7 @@ on:
 
 jobs:
   pull:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, linux, ARM64]
 
     steps:
       - name: Update repo on server
