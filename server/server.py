@@ -449,16 +449,6 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     ))
     fig.add_trace(go.Scatter(
         x=spx_resampled["xpos"],
-        y=spx_resampled["close_price"],
-        mode="markers",
-        name="SPX Hover",
-        showlegend=False,
-        marker=dict(size=16, color="rgba(0,0,0,0)"),
-        customdata=spx_resampled[["hover_time"]],
-        hovertemplate="Time: %{customdata[0]}<br>SPX: %{y:.0f}<extra></extra>",
-    ))
-    fig.add_trace(go.Scatter(
-        x=spx_resampled["xpos"],
         y=spx_resampled["vwap_spy_x10"],
         mode="lines",
         name="VWAP(SPY)x10",
@@ -574,11 +564,98 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         hovermode="closest",
         hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
-        hoverdistance=30,
+        hoverdistance=20,
     )
     fig.update_xaxes(showspikes=False)
     fig.update_yaxes(showspikes=False)
-    return plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False, "responsive": True})
+
+    chart_div = plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False, "responsive": True})
+    hover_times = spx_resampled["hover_time"].tolist()
+    hover_script = f"""
+<script>
+(function() {{
+    const gd = document.currentScript.previousElementSibling;
+    if (!gd || !gd.classList.contains('plotly-graph-div')) return;
+
+    const hoverTimes = {json.dumps(hover_times)};
+    let nativeHoverActive = false;
+    let customHover = gd.parentElement.querySelector('.custom-spx-hover');
+    if (!customHover) {{
+        customHover = document.createElement('div');
+        customHover.className = 'custom-spx-hover';
+        customHover.style.position = 'fixed';
+        customHover.style.pointerEvents = 'none';
+        customHover.style.display = 'none';
+        customHover.style.background = '#0f141b';
+        customHover.style.border = '1px solid #273244';
+        customHover.style.color = '#e8eef7';
+        customHover.style.padding = '8px 10px';
+        customHover.style.borderRadius = '6px';
+        customHover.style.fontSize = '12px';
+        customHover.style.lineHeight = '1.35';
+        customHover.style.whiteSpace = 'nowrap';
+        customHover.style.zIndex = '9999';
+        document.body.appendChild(customHover);
+    }}
+
+    function hideCustomHover() {{
+        customHover.style.display = 'none';
+    }}
+
+    gd.on('plotly_hover', function(evt) {{
+        if (evt && evt.points && evt.points.length && evt.points[0].curveNumber === 0) {{
+            nativeHoverActive = true;
+            hideCustomHover();
+        }}
+    }});
+
+    gd.on('plotly_unhover', function() {{
+        nativeHoverActive = false;
+    }});
+
+    gd.addEventListener('mouseleave', function() {{
+        nativeHoverActive = false;
+        hideCustomHover();
+    }});
+
+    gd.addEventListener('mousemove', function(e) {{
+        if (nativeHoverActive || !gd._fullLayout || !gd._fullLayout.xaxis || !gd._fullLayout.yaxis) return;
+
+        const dragLayer = gd.querySelector('.nsewdrag');
+        if (!dragLayer) {{
+            hideCustomHover();
+            return;
+        }}
+
+        const rect = dragLayer.getBoundingClientRect();
+        const px = e.clientX - rect.left;
+        const py = e.clientY - rect.top;
+
+        if (px < 0 || py < 0 || px > rect.width || py > rect.height) {{
+            hideCustomHover();
+            return;
+        }}
+
+        const xaxis = gd._fullLayout.xaxis;
+        const yaxis = gd._fullLayout.yaxis;
+        const rawX = xaxis.p2l(px);
+        const idx = Math.max(0, Math.min(hoverTimes.length - 1, Math.round(rawX)));
+        const yVal = yaxis.p2l(py);
+
+        if (!Number.isFinite(idx) || !Number.isFinite(yVal) || !hoverTimes[idx]) {{
+            hideCustomHover();
+            return;
+        }}
+
+        customHover.innerHTML = 'Time: ' + hoverTimes[idx] + '<br>SPX: ' + Math.round(yVal).toLocaleString();
+        customHover.style.left = (e.clientX + 14) + 'px';
+        customHover.style.top = (e.clientY + 14) + 'px';
+        customHover.style.display = 'block';
+    }});
+}})();
+</script>
+"""
+    return chart_div + hover_script
 
 
 def run_web_service(settings: dict) -> dict:
