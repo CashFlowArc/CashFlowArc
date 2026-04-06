@@ -449,6 +449,16 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     ))
     fig.add_trace(go.Scatter(
         x=spx_resampled["xpos"],
+        y=spx_resampled["close_price"],
+        mode="markers",
+        name="SPX Hover",
+        showlegend=False,
+        marker=dict(size=16, color="rgba(0,0,0,0)"),
+        customdata=spx_resampled[["hover_time"]],
+        hovertemplate="Time: %{customdata[0]}<br>SPX: %{y:.0f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=spx_resampled["xpos"],
         y=spx_resampled["vwap_spy_x10"],
         mode="lines",
         name="VWAP(SPY)x10",
@@ -564,23 +574,10 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         hovermode="closest",
         hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
+        hoverdistance=30,
     )
-    fig.update_xaxes(
-        showspikes=True,
-        spikecolor="#8fa2b7",
-        spikesnap="cursor",
-        spikemode="across",
-        spikethickness=1,
-        hoverformat="%Y-%m-%d %H:%M",
-    )
-    fig.update_yaxes(
-        showspikes=True,
-        spikecolor="#8fa2b7",
-        spikesnap="cursor",
-        spikemode="across",
-        spikethickness=1,
-        hoverformat=".0f",
-    )
+    fig.update_xaxes(showspikes=False)
+    fig.update_yaxes(showspikes=False)
     return plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False, "responsive": True})
 
 
