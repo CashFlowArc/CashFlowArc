@@ -351,14 +351,37 @@ def last_valid_number(series: pd.Series, label: str) -> float:
         raise ValueError(f"No valid numeric values found for {label}.")
     return float(valid.iloc[-1])
 
+def filter_last_visible_hours(df: pd.DataFrame, hours: float = 24.0, session_start: dt.time = dt.time(9, 0), session_end: dt.time = dt.time(16, 30)) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+
+    out = df.sort_values("ts").copy()
+    ts = pd.to_datetime(out["ts"])
+
+    session_start_minutes = session_start.hour * 60 + session_start.minute
+    session_end_minutes = session_end.hour * 60 + session_end.minute
+    session_minutes = session_end_minutes - session_start_minutes
+    if session_minutes <= 0:
+        return out
+
+    minutes_of_day = ts.dt.hour * 60 + ts.dt.minute
+    visible_minutes = (minutes_of_day - session_start_minutes).clip(lower=0, upper=session_minutes)
+    day_index = (ts.dt.normalize() - ts.dt.normalize().min()).dt.days
+    out["_visible_clock_minutes"] = day_index * session_minutes + visible_minutes
+
+    max_visible = out["_visible_clock_minutes"].max()
+    min_visible = max_visible - hours * 60.0
+    out = out[out["_visible_clock_minutes"] >= min_visible].copy()
+    return out.drop(columns=["_visible_clock_minutes"], errors="ignore")
+
+
 def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp, chart_end: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
     resample_rule = interval_map.get(chart_interval, "5min")
     chart_label = label_map.get(chart_interval, "5 Minute")
 
-    chart_start = chart_end - pd.Timedelta(hours=24)
-    spx_1m = spx_1m[spx_1m["ts"] >= chart_start].copy()
+    spx_1m = filter_last_visible_hours(spx_1m, hours=24.0)
 
     spx_resampled = (
         spx_1m[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spy_x10"]]
