@@ -406,22 +406,10 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
 
     tickvals = []
     ticktext = []
-    seen_dates = set()
-    for row in spx_resampled.itertuples(index=False):
-        ts = row.ts
-        xpos = row.xpos
-        date_key = ts.date()
-        minutes = ts.hour * 60 + ts.minute
-        if date_key not in seen_dates:
-            tickvals.append(xpos)
-            ticktext.append(f"{ts.strftime('%b %d')}<br>{ts.strftime('%H:%M')}")
-            seen_dates.add(date_key)
-        elif minutes % label_every == 0:
-            tickvals.append(xpos)
-            ticktext.append(ts.strftime('%H:%M'))
-
-    start_matches = spx_resampled.index[spx_resampled["ts"] == pd.Timestamp(start_of_day)].tolist()
-    start_x = start_matches[0] if start_matches else int(spx_resampled[spx_resampled["ts"].dt.date == pd.Timestamp(start_of_day).date()]["xpos"].min())
+    session_starts = spx_resampled.groupby(spx_resampled["ts"].dt.date, sort=True).first().reset_index(drop=True)
+    for row in session_starts.itertuples(index=False):
+        tickvals.append(int(row.xpos))
+        ticktext.append(f"{row.ts.strftime('%b %d')}<br>09:30")
 
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
@@ -462,41 +450,35 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         line=dict(color="#ffd166", width=1.8),
     ))
 
-    fig.add_shape(
-        type="line",
-        x0=start_x,
-        x1=start_x,
-        y0=0,
-        y1=1,
-        xref="x",
-        yref="paper",
-        line=dict(color="#4da3ff", width=2, dash="dash"),
-    )
-    fig.add_annotation(
-        x=start_x,
-        y=1,
-        xref="x",
-        yref="paper",
-        text="Start of Day",
-        showarrow=False,
-        xanchor="left",
-        yanchor="bottom",
-        font=dict(color="#4da3ff"),
-    )
-
-    for y, name, color, dash in [
-        (range_high, "OR High", "#00cc96", "dash"),
-        (range_low, "OR Low", "#ef553b", "dash"),
+    reference_lines = [
+        (range_high, "Opening Range High", "#00cc96", "dash"),
+        (range_low, "Opening Range Low", "#ef553b", "dash"),
         (prev_day_high, "Prev Day High", "#ffd166", "dot"),
         (prev_day_low, "Prev Day Low", "#4da3ff", "dot"),
-    ]:
-        fig.add_hline(
+    ]
+    for y, name, color, dash in reference_lines:
+        fig.add_shape(
+            type="line",
+            x0=0,
+            x1=1,
+            xref="paper",
+            y0=y,
+            y1=y,
+            yref="y",
+            line=dict(color=color, width=1.5, dash=dash),
+        )
+        fig.add_annotation(
+            x=0.08,
             y=y,
-            line_width=1.5,
-            line_dash=dash,
-            line_color=color,
-            annotation_text=name,
-            annotation_position="top left",
+            xref="paper",
+            yref="y",
+            text=name,
+            showarrow=False,
+            xanchor="left",
+            yanchor="bottom",
+            font=dict(color=color, size=12),
+            bgcolor="#17202b",
+            borderpad=2,
         )
 
     fig.update_layout(
@@ -511,12 +493,14 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             rangeslider=dict(visible=False),
             title=f"Time ({chart_label})",
             title_standoff=4,
-            range=[-0.5, len(spx_resampled) - 0.5],
+            range=[-0.75, len(spx_resampled) - 0.25],
             tickmode="array",
             tickvals=tickvals,
             ticktext=ticktext,
             automargin=True,
             fixedrange=False,
+            showline=False,
+            zeroline=False,
         ),
         yaxis=dict(
             showgrid=True,
@@ -525,6 +509,8 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             title_standoff=4,
             automargin=True,
             fixedrange=False,
+            showline=False,
+            zeroline=False,
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
     )
