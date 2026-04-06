@@ -338,64 +338,54 @@ def calculate_vwap(df: pd.DataFrame) -> pd.Series:
 
 
 
-def first_valid_number(series: pd.Series, label: str) -> float:
-    valid = pd.to_numeric(series, errors="coerce").dropna()
-    if valid.empty:
-        raise ValueError(f"No valid numeric values found for {label}.")
-    return float(valid.iloc[0])
+
+def first_valid_number(series: pd.Series):
+    s = pd.to_numeric(series, errors="coerce").dropna()
+    if s.empty:
+        return None
+    return float(s.iloc[0])
 
 
-def last_valid_number(series: pd.Series, label: str) -> float:
-    valid = pd.to_numeric(series, errors="coerce").dropna()
-    if valid.empty:
-        raise ValueError(f"No valid numeric values found for {label}.")
-    return float(valid.iloc[-1])
+def last_valid_number(series: pd.Series):
+    s = pd.to_numeric(series, errors="coerce").dropna()
+    if s.empty:
+        return None
+    return float(s.iloc[-1])
 
-def filter_last_visible_hours(df: pd.DataFrame, hours: float = 24.0, session_start: dt.time = dt.time(9, 0), session_end: dt.time = dt.time(16, 30)) -> pd.DataFrame:
-    if df.empty:
+
+def intraday_session_mask(ts_series: pd.Series) -> pd.Series:
+    times = ts_series.dt.time
+    weekdays = ts_series.dt.weekday < 5
+    return weekdays & (times >= dt.time(9, 0)) & (times <= dt.time(16, 30))
+
+
+def keep_last_visible_hours(df: pd.DataFrame, chart_interval: str, visible_hours: int = 24) -> pd.DataFrame:
+    bars_per_hour = {"5min": 12, "15min": 4, "1h": 1}
+    keep_bars = visible_hours * bars_per_hour.get(chart_interval, 12)
+    if len(df) <= keep_bars:
         return df.copy()
-
-    out = df.sort_values("ts").copy()
-    ts = pd.to_datetime(out["ts"])
-
-    session_start_minutes = session_start.hour * 60 + session_start.minute
-    session_end_minutes = session_end.hour * 60 + session_end.minute
-    session_minutes = session_end_minutes - session_start_minutes
-    if session_minutes <= 0:
-        return out
-
-    minutes_of_day = ts.dt.hour * 60 + ts.dt.minute
-    visible_minutes = (minutes_of_day - session_start_minutes).clip(lower=0, upper=session_minutes)
-    day_index = (ts.dt.normalize() - ts.dt.normalize().min()).dt.days
-    out["_visible_clock_minutes"] = day_index * session_minutes + visible_minutes
-
-    max_visible = out["_visible_clock_minutes"].max()
-    min_visible = max_visible - hours * 60.0
-    out = out[out["_visible_clock_minutes"] >= min_visible].copy()
-    return out.drop(columns=["_visible_clock_minutes"], errors="ignore")
+    return df.tail(keep_bars).copy()
 
 
-def keep_session_hours(df: pd.DataFrame, session_start: dt.time = dt.time(9, 0), session_end: dt.time = dt.time(16, 30)) -> pd.DataFrame:
-    if df.empty:
-        return df.copy()
-
-    out = df.copy()
-    times = out["ts"].dt.time
-    return out[(times >= session_start) & (times <= session_end)].copy()
-
-
-def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp, chart_end: pd.Timestamp) -> str:
+def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
+    padding_map = {
+        "5min": pd.Timedelta(minutes=5),
+        "15min": pd.Timedelta(minutes=15),
+        "1h": pd.Timedelta(hours=1),
+    }
     resample_rule = interval_map.get(chart_interval, "5min")
     chart_label = label_map.get(chart_interval, "5 Minute")
+    pad = padding_map.get(chart_interval, pd.Timedelta(minutes=5))
 
-    spx_1m = keep_session_hours(spx_1m, session_start=dt.time(9, 0), session_end=dt.time(16, 30))
-    spx_1m = filter_last_visible_hours(spx_1m, hours=24.0, session_start=dt.time(9, 0), session_end=dt.time(16, 30))
+    working = spx_1m.copy()
+    working = working.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
+    working = working[intraday_session_mask(working["ts"])].copy()
 
     spx_resampled = (
-        spx_1m[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spy_x10"]]
-        .resample(resample_rule, on="ts")
+        working[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spy_x10"]]
+        .resample(resample_rule, on="ts", label="right", closed="right")
         .agg({
             "open_price": "first",
             "high_price": "max",
@@ -406,11 +396,20 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             "vwap_spy_x10": "last",
         })
         .dropna(subset=["open_price", "high_price", "low_price", "close_price"])
+        .reset_index()
     )
+
+    if spx_resampled.empty:
+        return "<div style='padding:20px;color:#ff5d5d;'>No chart data available.</div>"
+
+    spx_resampled = keep_last_visible_hours(spx_resampled, chart_interval, visible_hours=24)
+
+    x_min = pd.Timestamp(spx_resampled["ts"].min()) - pad
+    x_max = pd.Timestamp(spx_resampled["ts"].max()) + pad
 
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
-        x=spx_resampled.index,
+        x=spx_resampled["ts"],
         open=spx_resampled["open_price"],
         high=spx_resampled["high_price"],
         low=spx_resampled["low_price"],
@@ -419,7 +418,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         hovertemplate="Time: %{x}<br>Open: %{open:.0f}<br>High: %{high:.0f}<br>Low: %{low:.0f}<br>Close: %{close:.0f}<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
-        x=spx_resampled.index,
+        x=spx_resampled["ts"],
         y=spx_resampled["vwap_spy_x10"],
         mode="lines",
         name="VWAP(SPY)x10",
@@ -427,7 +426,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         line=dict(color="#9b87f5", width=2),
     ))
     fig.add_trace(go.Scatter(
-        x=spx_resampled.index,
+        x=spx_resampled["ts"],
         y=spx_resampled["ema9_spx"],
         mode="lines",
         name="EMA9",
@@ -435,7 +434,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         line=dict(color="#00cc96", width=1.8),
     ))
     fig.add_trace(go.Scatter(
-        x=spx_resampled.index,
+        x=spx_resampled["ts"],
         y=spx_resampled["ema21_spx"],
         mode="lines",
         name="EMA21",
@@ -471,11 +470,17 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         (prev_day_high, "Prev Day High", "#ffd166", "dot"),
         (prev_day_low, "Prev Day Low", "#4da3ff", "dot"),
     ]:
-        fig.add_hline(y=y, line_width=1.5, line_dash=dash, line_color=color,
-                      annotation_text=name, annotation_position="top left")
+        fig.add_hline(
+            y=y,
+            line_width=1.5,
+            line_dash=dash,
+            line_color=color,
+            annotation_text=name,
+            annotation_position="top left",
+        )
 
     fig.update_layout(
-        margin=dict(l=20, r=20, t=6, b=6),
+        margin=dict(l=28, r=28, t=20, b=36),
         paper_bgcolor="#17202b",
         plot_bgcolor="#17202b",
         font=dict(color="#e8eef7"),
@@ -485,18 +490,26 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             rangeslider=dict(visible=False),
             title=f"Time ({chart_label})",
             title_standoff=4,
-            range=[spx_resampled.index.min(), spx_resampled.index.max()],
+            range=[x_min, x_max],
+            automargin=True,
             rangebreaks=[
                 dict(bounds=[16.5, 9], pattern="hour"),
                 dict(bounds=["sat", "mon"]),
             ],
         ),
-        yaxis=dict(showgrid=True, gridcolor="#273244", title="SPX", title_standoff=4),
-        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="#273244",
+            title="SPX",
+            title_standoff=4,
+            automargin=True,
+            fixedrange=False,
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
     )
     fig.update_xaxes(showspikes=True, spikecolor="#8fa2b7", spikesnap="cursor", spikemode="across")
     fig.update_yaxes(showspikes=True, spikecolor="#8fa2b7", spikesnap="cursor", spikemode="across")
-    return plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False})
+    return plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False, "responsive": True})
 
 
 def run_web_service(settings: dict) -> dict:
@@ -512,10 +525,13 @@ def run_web_service(settings: dict) -> dict:
     if spy.empty:
         return {"time": now, "error": f"No {SPY_TICKER} rows found in {SOURCE_TABLE}.", **settings}
 
+    spx = spx.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
+    spy = spy.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
+
     current_date = spx["ts"].max().date()
     prior_dates = sorted({x.date() for x in spx["ts"] if x.date() < current_date})
     if not prior_dates:
-        return {"time": now, "error": "Need at least two trading days in TICKER_HISTORY.", **settings}
+        return {"time": now, "error": f"Need at least two trading days in {SOURCE_TABLE}.", **settings}
     prev_date = prior_dates[-1]
 
     spx_current = spx[spx["ts"].dt.date == current_date].copy()
@@ -524,57 +540,52 @@ def run_web_service(settings: dict) -> dict:
     spy_prev = spy[spy["ts"].dt.date == prev_date].copy()
 
     if spx_current.empty or spy_current.empty or spx_prev.empty or spy_prev.empty:
-        return {"time": now, "error": "Could not separate current/prior session data from TICKER_HISTORY.", **settings}
-
-    spy_prev = spy_prev.sort_values("ts").reset_index(drop=True).copy()
-    spy_current = spy_current.sort_values("ts").reset_index(drop=True).copy()
+        return {"time": now, "error": f"Could not separate current/prior session data from {SOURCE_TABLE}.", **settings}
 
     spy["trade_date"] = spy["ts"].dt.date
-    spy = spy.sort_values("ts").reset_index(drop=True).copy()
-    spy["vwap_spy"] = (
-        spy.groupby("trade_date", group_keys=False)
-        .apply(calculate_vwap)
-        .reset_index(level=0, drop=True)
-    )
+    spy["vwap_spy"] = spy.groupby("trade_date", group_keys=False).apply(calculate_vwap).reset_index(level=0, drop=True)
     spy["vwap_spy_x10"] = spy["vwap_spy"] * 10.0
 
-    spx = spx.sort_values("ts").drop_duplicates(subset=["ts"]).reset_index(drop=True).copy()
     spx["ema9_spx"] = spx["close_price"].ewm(span=9, adjust=False).mean()
     spx["ema21_spx"] = spx["close_price"].ewm(span=21, adjust=False).mean()
 
-    spx_current = spx[spx["ts"].dt.date == current_date].copy().reset_index(drop=True)
+    chart_spx = spx.merge(spy[["ts", "vwap_spy_x10"]], on="ts", how="left")
+    chart_spx = chart_spx.dropna(subset=["open_price", "high_price", "low_price", "close_price"]).copy()
 
-    chart_spx = spx.merge(
-        spy[["ts", "vwap_spy_x10"]].drop_duplicates(subset=["ts"], keep="last"),
-        on="ts",
-        how="left",
-    )
-    chart_spx = chart_spx.sort_values("ts").reset_index(drop=True)
+    spx_current = spx[spx["ts"].dt.date == current_date].copy()
+    spy_current = spy[spy["ts"].dt.date == current_date].copy()
 
-    latest_price = last_valid_number(spx_current["close_price"], "latest SPX close")
-    latest_ema9 = last_valid_number(spx_current["ema9_spx"], "latest EMA9")
-    latest_ema21 = last_valid_number(spx_current["ema21_spx"], "latest EMA21")
-    open_price = first_valid_number(spx_current["open_price"], "session open")
-    latest_vwap = last_valid_number(spy[spy["ts"].dt.date == current_date]["vwap_spy"], "latest SPY VWAP") * 10.0
+    latest_price = last_valid_number(spx_current["close_price"])
+    latest_ema9 = last_valid_number(spx_current["ema9_spx"])
+    latest_ema21 = last_valid_number(spx_current["ema21_spx"])
+    open_price = first_valid_number(spx_current["open_price"])
+    latest_vwap = last_valid_number(spy_current["vwap_spy_x10"])
 
-    opening_df = spx_current[(spx_current["ts"].dt.time >= dt.time(9, 30)) & (spx_current["ts"].dt.time <= dt.time(10, 0))].copy()
+    if None in {latest_price, latest_ema9, latest_ema21, open_price, latest_vwap}:
+        return {"time": now, "error": f"Missing current-session values in {SOURCE_TABLE}.", **settings}
+
+    opening_df = spx_current[
+        (spx_current["ts"].dt.time >= dt.time(9, 30)) &
+        (spx_current["ts"].dt.time <= dt.time(10, 0))
+    ].copy()
+    opening_df = opening_df.dropna(subset=["high_price", "low_price"])
     if opening_df.empty:
-        return {"time": now, "error": "No opening range rows found in TICKER_HISTORY.", **settings}
+        return {"time": now, "error": f"No opening range rows found in {SOURCE_TABLE}.", **settings}
 
     range_high = float(opening_df["high_price"].max())
     range_low = float(opening_df["low_price"].min())
 
-    prev_day_high = float(spx_prev["high_price"].max())
-    prev_day_low = float(spx_prev["low_price"].min())
-    current_day_high = float(spx_current["high_price"].max())
-    current_day_low = float(spx_current["low_price"].min())
+    prev_day_high = float(pd.to_numeric(spx_prev["high_price"], errors="coerce").max())
+    prev_day_low = float(pd.to_numeric(spx_prev["low_price"], errors="coerce").min())
+    current_day_high = float(pd.to_numeric(spx_current["high_price"], errors="coerce").max())
+    current_day_low = float(pd.to_numeric(spx_current["low_price"], errors="coerce").min())
 
     outside_range = (latest_price > range_high) or (latest_price < range_low)
-    vwap_distance_pct = abs(latest_price - latest_vwap) / latest_price * 100.0 if latest_price else 0.0
-    open_distance_pct = abs(latest_price - open_price) / open_price * 100.0 if open_price else 0.0
+    vwap_distance_pct = abs(latest_price - latest_vwap) / latest_price * 100.0 if latest_price else float("nan")
+    open_distance_pct = abs(latest_price - open_price) / open_price * 100.0 if open_price else float("nan")
 
-    vwap_distance = vwap_distance_pct >= 0.15
-    open_distance = open_distance_pct > 0.30
+    vwap_distance = pd.notna(vwap_distance_pct) and vwap_distance_pct >= 0.15
+    open_distance = pd.notna(open_distance_pct) and open_distance_pct > 0.30
 
     bullish = (latest_price > open_price) and (latest_price > latest_vwap) and (latest_ema9 > latest_ema21)
     bearish = (latest_price < open_price) and (latest_price < latest_vwap) and (latest_ema9 < latest_ema21)
@@ -597,7 +608,6 @@ def run_web_service(settings: dict) -> dict:
         prev_day_low,
         settings["chart_interval"],
         pd.Timestamp(spx_current["ts"].min()),
-        pd.Timestamp(chart_spx["ts"].max()),
     )
 
     return {
@@ -612,8 +622,8 @@ def run_web_service(settings: dict) -> dict:
         "prev_day_low": int(round(prev_day_low, 0)),
         "current_day_high": int(round(current_day_high, 0)),
         "current_day_low": int(round(current_day_low, 0)),
-        "vwap_distance_pct": round(vwap_distance_pct, 3),
-        "open_distance_pct": round(open_distance_pct, 3),
+        "vwap_distance_pct": "N/A" if pd.isna(vwap_distance_pct) else round(vwap_distance_pct, 3),
+        "open_distance_pct": "N/A" if pd.isna(open_distance_pct) else round(open_distance_pct, 3),
         "outside_range": outside_range,
         "vwap_distance": vwap_distance,
         "open_distance": open_distance,
