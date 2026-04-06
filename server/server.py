@@ -406,28 +406,10 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
 
     tickvals = []
     ticktext = []
-    for trade_date, session_df in spx_resampled.groupby(spx_resampled["ts"].dt.date, sort=True):
-        session_df = session_df.sort_values("ts")
-        session_open_rows = session_df[session_df["ts"].dt.strftime("%H:%M") == "09:30"]
-        if not session_open_rows.empty:
-            open_row = session_open_rows.iloc[0]
-        else:
-            open_row = session_df.iloc[0]
-        tickvals.append(int(open_row["xpos"]))
-        ticktext.append(f"{open_row['ts'].strftime('%b %d')}<br>09:30")
-
-        hourly_rows = session_df[
-            (session_df["ts"].dt.minute == 0) &
-            (session_df["ts"].dt.hour >= 10) &
-            (session_df["ts"].dt.hour <= 15)
-        ]
-        for row in hourly_rows.itertuples(index=False):
-            tickvals.append(int(row.xpos))
-            ticktext.append(row.ts.strftime("%H:%M"))
-
-    tick_pairs = sorted(zip(tickvals, ticktext), key=lambda x: x[0])
-    tickvals = [x for x, _ in tick_pairs]
-    ticktext = [t for _, t in tick_pairs]
+    session_starts = spx_resampled.groupby(spx_resampled["ts"].dt.date, sort=True).first().reset_index(drop=True)
+    for row in session_starts.itertuples(index=False):
+        tickvals.append(int(row.xpos))
+        ticktext.append(f"{row.ts.strftime('%b %d')}<br>09:30")
 
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
@@ -486,7 +468,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             line=dict(color=color, width=1.5, dash=dash),
         )
         fig.add_annotation(
-            x=0.02,
+            x=0.08,
             y=y,
             xref="paper",
             yref="y",
@@ -590,14 +572,7 @@ def run_web_service(settings: dict) -> dict:
     spx["ema9_spx"] = spx["close_price"].ewm(span=9, adjust=False).mean()
     spx["ema21_spx"] = spx["close_price"].ewm(span=21, adjust=False).mean()
 
-    chart_spx = pd.merge_asof(
-        spx.sort_values("ts"),
-        spy[["ts", "vwap_spy_x10"]].dropna(subset=["vwap_spy_x10"]).sort_values("ts"),
-        on="ts",
-        direction="backward",
-        tolerance=pd.Timedelta(minutes=30),
-    )
-    chart_spx["vwap_spy_x10"] = pd.to_numeric(chart_spx["vwap_spy_x10"], errors="coerce").ffill()
+    chart_spx = spx.merge(spy[["ts", "vwap_spy_x10"]], on="ts", how="left")
     chart_spx = chart_spx.dropna(subset=["open_price", "high_price", "low_price", "close_price"]).copy()
 
     spx_current = spx[spx["ts"].dt.date == current_date].copy()
