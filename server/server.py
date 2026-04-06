@@ -437,6 +437,17 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         start_of_day_x = int(current_session.iloc[0]["xpos"])
 
     fig = go.Figure()
+    candle_hover = [
+        f"Time: {t}<br>Open: {o:.0f}<br>High: {h:.0f}<br>Low: {l:.0f}<br>Close: {c:.0f}"
+        for t, o, h, l, c in zip(
+            spx_resampled["hover_time"],
+            spx_resampled["open_price"],
+            spx_resampled["high_price"],
+            spx_resampled["low_price"],
+            spx_resampled["close_price"],
+        )
+    ]
+
     fig.add_trace(go.Candlestick(
         x=spx_resampled["xpos"],
         open=spx_resampled["open_price"],
@@ -444,8 +455,9 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         low=spx_resampled["low_price"],
         close=spx_resampled["close_price"],
         name="SPX",
-        customdata=spx_resampled[["hover_time"]],
-        hovertemplate="Time: %{customdata[0]}<br>Open: %{open:.0f}<br>High: %{high:.0f}<br>Low: %{low:.0f}<br>Close: %{close:.0f}<extra></extra>",
+        text=candle_hover,
+        hoverinfo="text",
+        hovertemplate=None,
     ))
     fig.add_trace(go.Scatter(
         x=spx_resampled["xpos"],
@@ -570,92 +582,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     fig.update_yaxes(showspikes=False)
 
     chart_div = plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False, "responsive": True})
-    hover_times = spx_resampled["hover_time"].tolist()
-    hover_script = f"""
-<script>
-(function() {{
-    const gd = document.currentScript.previousElementSibling;
-    if (!gd || !gd.classList.contains('plotly-graph-div')) return;
-
-    const hoverTimes = {json.dumps(hover_times)};
-    let nativeHoverActive = false;
-    let customHover = gd.parentElement.querySelector('.custom-spx-hover');
-    if (!customHover) {{
-        customHover = document.createElement('div');
-        customHover.className = 'custom-spx-hover';
-        customHover.style.position = 'fixed';
-        customHover.style.pointerEvents = 'none';
-        customHover.style.display = 'none';
-        customHover.style.background = '#0f141b';
-        customHover.style.border = '1px solid #273244';
-        customHover.style.color = '#e8eef7';
-        customHover.style.padding = '8px 10px';
-        customHover.style.borderRadius = '6px';
-        customHover.style.fontSize = '12px';
-        customHover.style.lineHeight = '1.35';
-        customHover.style.whiteSpace = 'nowrap';
-        customHover.style.zIndex = '9999';
-        document.body.appendChild(customHover);
-    }}
-
-    function hideCustomHover() {{
-        customHover.style.display = 'none';
-    }}
-
-    gd.on('plotly_hover', function(evt) {{
-        if (evt && evt.points && evt.points.length && evt.points[0].curveNumber === 0) {{
-            nativeHoverActive = true;
-            hideCustomHover();
-        }}
-    }});
-
-    gd.on('plotly_unhover', function() {{
-        nativeHoverActive = false;
-    }});
-
-    gd.addEventListener('mouseleave', function() {{
-        nativeHoverActive = false;
-        hideCustomHover();
-    }});
-
-    gd.addEventListener('mousemove', function(e) {{
-        if (nativeHoverActive || !gd._fullLayout || !gd._fullLayout.xaxis || !gd._fullLayout.yaxis) return;
-
-        const dragLayer = gd.querySelector('.nsewdrag');
-        if (!dragLayer) {{
-            hideCustomHover();
-            return;
-        }}
-
-        const rect = dragLayer.getBoundingClientRect();
-        const px = e.clientX - rect.left;
-        const py = e.clientY - rect.top;
-
-        if (px < 0 || py < 0 || px > rect.width || py > rect.height) {{
-            hideCustomHover();
-            return;
-        }}
-
-        const xaxis = gd._fullLayout.xaxis;
-        const yaxis = gd._fullLayout.yaxis;
-        const rawX = xaxis.p2l(px);
-        const idx = Math.max(0, Math.min(hoverTimes.length - 1, Math.round(rawX)));
-        const yVal = yaxis.p2l(py);
-
-        if (!Number.isFinite(idx) || !Number.isFinite(yVal) || !hoverTimes[idx]) {{
-            hideCustomHover();
-            return;
-        }}
-
-        customHover.innerHTML = 'Time: ' + hoverTimes[idx] + '<br>SPX: ' + Math.round(yVal).toLocaleString();
-        customHover.style.left = (e.clientX + 14) + 'px';
-        customHover.style.top = (e.clientY + 14) + 'px';
-        customHover.style.display = 'block';
-    }});
-}})();
-</script>
-"""
-    return chart_div + hover_script
+    return chart_div
 
 
 def run_web_service(settings: dict) -> dict:
