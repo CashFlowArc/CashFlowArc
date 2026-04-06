@@ -2,6 +2,7 @@ from flask import Flask, render_template_string, request
 import datetime as dt
 import json
 import os
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -582,7 +583,119 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     fig.update_yaxes(showspikes=False)
 
     chart_div = plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False, "responsive": True})
-    return chart_div
+
+    div_match = re.search(r'<div id="([^"]+)"', chart_div)
+    if not div_match:
+        return chart_div
+
+    plot_div_id = div_match.group(1)
+    x_positions = [int(x) for x in spx_resampled["xpos"].tolist()]
+    hover_times = spx_resampled["hover_time"].tolist()
+
+    hover_script = f"""
+<script>
+(function() {{
+    var gd = document.getElementById({json.dumps(plot_div_id)});
+    if (!gd) return;
+
+    var xPositions = {json.dumps(x_positions)};
+    var hoverTimes = {json.dumps(hover_times)};
+    var overCandle = false;
+    var tooltip = null;
+
+    function ensureTooltip() {{
+        if (tooltip) return tooltip;
+        tooltip = document.createElement('div');
+        tooltip.style.position = 'fixed';
+        tooltip.style.pointerEvents = 'none';
+        tooltip.style.zIndex = '9999';
+        tooltip.style.background = '#0f141b';
+        tooltip.style.border = '1px solid #273244';
+        tooltip.style.borderRadius = '6px';
+        tooltip.style.padding = '8px 10px';
+        tooltip.style.color = '#e8eef7';
+        tooltip.style.fontFamily = 'Segoe UI, Arial, sans-serif';
+        tooltip.style.fontSize = '12px';
+        tooltip.style.lineHeight = '1.35';
+        tooltip.style.whiteSpace = 'nowrap';
+        tooltip.style.boxShadow = '0 4px 14px rgba(0,0,0,0.35)';
+        tooltip.style.display = 'none';
+        document.body.appendChild(tooltip);
+        return tooltip;
+    }}
+
+    function hideTooltip() {{
+        if (tooltip) tooltip.style.display = 'none';
+    }}
+
+    function nearestIndex(xVal) {{
+        if (!xPositions.length) return -1;
+        var bestIdx = 0;
+        var bestDist = Math.abs(xPositions[0] - xVal);
+        for (var i = 1; i < xPositions.length; i++) {{
+            var d = Math.abs(xPositions[i] - xVal);
+            if (d < bestDist) {{
+                bestDist = d;
+                bestIdx = i;
+            }}
+        }}
+        return bestIdx;
+    }}
+
+    gd.on('plotly_hover', function() {{
+        overCandle = true;
+        hideTooltip();
+    }});
+
+    gd.on('plotly_unhover', function() {{
+        overCandle = false;
+    }});
+
+    gd.addEventListener('mouseleave', function() {{
+        overCandle = false;
+        hideTooltip();
+    }});
+
+    gd.addEventListener('mousemove', function(evt) {{
+        if (overCandle || !gd._fullLayout || !gd._fullLayout.xaxis || !gd._fullLayout.yaxis) {{
+            return;
+        }}
+
+        var fl = gd._fullLayout;
+        var xaxis = fl.xaxis;
+        var yaxis = fl.yaxis;
+        var plotLeft = fl._size.l;
+        var plotTop = fl._size.t;
+        var plotWidth = fl._size.w;
+        var plotHeight = fl._size.h;
+
+        var rect = gd.getBoundingClientRect();
+        var px = evt.clientX - rect.left;
+        var py = evt.clientY - rect.top;
+
+        if (px < plotLeft || px > plotLeft + plotWidth || py < plotTop || py > plotTop + plotHeight) {{
+            hideTooltip();
+            return;
+        }}
+
+        var xVal = xaxis.p2l(px - plotLeft);
+        var yVal = yaxis.p2l(py - plotTop);
+        var idx = nearestIndex(xVal);
+        if (idx < 0) {{
+            hideTooltip();
+            return;
+        }}
+
+        var t = ensureTooltip();
+        t.innerHTML = 'Time: ' + hoverTimes[idx] + '<br>SPX: ' + Math.round(yVal).toLocaleString();
+        t.style.display = 'block';
+        t.style.left = (evt.clientX + 14) + 'px';
+        t.style.top = (evt.clientY + 14) + 'px';
+    }});
+}})();
+</script>
+"""
+    return chart_div + hover_script
 
 
 def run_web_service(settings: dict) -> dict:
