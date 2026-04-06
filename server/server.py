@@ -356,26 +356,34 @@ def last_valid_number(series: pd.Series):
 def intraday_session_mask(ts_series: pd.Series) -> pd.Series:
     times = ts_series.dt.time
     weekdays = ts_series.dt.weekday < 5
-    return weekdays & (times >= dt.time(9, 0)) & (times <= dt.time(16, 30))
-
-
-def keep_last_visible_hours(df: pd.DataFrame, chart_interval: str, visible_hours: int = 24) -> pd.DataFrame:
-    bars_per_hour = {"5min": 12, "15min": 4, "1h": 1}
-    keep_bars = visible_hours * bars_per_hour.get(chart_interval, 12)
-    if len(df) <= keep_bars:
-        return df.copy()
-    return df.tail(keep_bars).copy()
+    return weekdays & (times >= dt.time(9, 30)) & (times <= dt.time(16, 0))
 
 
 def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
+    padding_map = {
+        "5min": pd.Timedelta(minutes=5),
+        "15min": pd.Timedelta(minutes=15),
+        "1h": pd.Timedelta(minutes=30),
+    }
     resample_rule = interval_map.get(chart_interval, "5min")
     chart_label = label_map.get(chart_interval, "5 Minute")
+    pad = padding_map.get(chart_interval, pd.Timedelta(minutes=5))
 
     working = spx_1m.copy()
     working = working.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
     working = working[intraday_session_mask(working["ts"])].copy()
+
+    if working.empty:
+        return "<div style='padding:20px;color:#ff5d5d;'>No chart data available.</div>"
+
+    session_dates = sorted(working["ts"].dt.date.unique())
+    if len(session_dates) >= 2:
+        keep_dates = set(session_dates[-2:])
+        working = working[working["ts"].dt.date.isin(keep_dates)].copy()
+    else:
+        keep_dates = set(session_dates)
 
     spx_resampled = (
         working[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spy_x10"]]
@@ -396,9 +404,8 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     if spx_resampled.empty:
         return "<div style='padding:20px;color:#ff5d5d;'>No chart data available.</div>"
 
-    spx_resampled = keep_last_visible_hours(spx_resampled, chart_interval, visible_hours=24)
-
-    x_values = list(pd.to_datetime(spx_resampled["ts"]))
+    x_min = pd.Timestamp(spx_resampled["ts"].min()) - pad
+    x_max = pd.Timestamp(spx_resampled["ts"].max()) + pad
 
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
@@ -478,15 +485,17 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         plot_bgcolor="#17202b",
         font=dict(color="#e8eef7"),
         xaxis=dict(
-            type="category",
-            categoryorder="array",
-            categoryarray=x_values,
             showgrid=True,
             gridcolor="#273244",
             rangeslider=dict(visible=False),
             title=f"Time ({chart_label})",
             title_standoff=4,
+            range=[x_min, x_max],
             automargin=True,
+            rangebreaks=[
+                dict(bounds=[16, 9.5], pattern="hour"),
+                dict(bounds=["sat", "mon"]),
+            ],
         ),
         yaxis=dict(
             showgrid=True,
