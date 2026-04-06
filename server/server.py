@@ -362,14 +362,10 @@ def intraday_session_mask(ts_series: pd.Series) -> pd.Series:
 def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
-    padding_map = {
-        "5min": pd.Timedelta(minutes=5),
-        "15min": pd.Timedelta(minutes=15),
-        "1h": pd.Timedelta(minutes=30),
-    }
+    tick_minute_step = {"5min": 60, "15min": 60, "1h": 60}
     resample_rule = interval_map.get(chart_interval, "5min")
     chart_label = label_map.get(chart_interval, "5 Minute")
-    pad = padding_map.get(chart_interval, pd.Timedelta(minutes=5))
+    label_every = tick_minute_step.get(chart_interval, 60)
 
     working = spx_1m.copy()
     working = working.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
@@ -382,8 +378,6 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     if len(session_dates) >= 2:
         keep_dates = set(session_dates[-2:])
         working = working[working["ts"].dt.date.isin(keep_dates)].copy()
-    else:
-        keep_dates = set(session_dates)
 
     spx_resampled = (
         working[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spy_x10"]]
@@ -404,48 +398,74 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     if spx_resampled.empty:
         return "<div style='padding:20px;color:#ff5d5d;'>No chart data available.</div>"
 
-    x_min = pd.Timestamp(spx_resampled["ts"].min()) - pad
-    x_max = pd.Timestamp(spx_resampled["ts"].max()) + pad
+    spx_resampled = spx_resampled.sort_values("ts").reset_index(drop=True)
+    spx_resampled["xpos"] = range(len(spx_resampled))
+    spx_resampled["date_str"] = spx_resampled["ts"].dt.strftime("%b %-d")
+    spx_resampled["time_str"] = spx_resampled["ts"].dt.strftime("%H:%M")
+    spx_resampled["hover_time"] = spx_resampled["ts"].dt.strftime("%Y-%m-%d %H:%M")
+
+    tickvals = []
+    ticktext = []
+    seen_dates = set()
+    for row in spx_resampled.itertuples(index=False):
+        ts = row.ts
+        xpos = row.xpos
+        date_key = ts.date()
+        minutes = ts.hour * 60 + ts.minute
+        if date_key not in seen_dates:
+            tickvals.append(xpos)
+            ticktext.append(f"{ts.strftime('%b %d')}<br>{ts.strftime('%H:%M')}")
+            seen_dates.add(date_key)
+        elif minutes % label_every == 0:
+            tickvals.append(xpos)
+            ticktext.append(ts.strftime('%H:%M'))
+
+    start_matches = spx_resampled.index[spx_resampled["ts"] == pd.Timestamp(start_of_day)].tolist()
+    start_x = start_matches[0] if start_matches else int(spx_resampled[spx_resampled["ts"].dt.date == pd.Timestamp(start_of_day).date()]["xpos"].min())
 
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
-        x=spx_resampled["ts"],
+        x=spx_resampled["xpos"],
         open=spx_resampled["open_price"],
         high=spx_resampled["high_price"],
         low=spx_resampled["low_price"],
         close=spx_resampled["close_price"],
         name="SPX",
-        hovertemplate="Time: %{x}<br>Open: %{open:.0f}<br>High: %{high:.0f}<br>Low: %{low:.0f}<br>Close: %{close:.0f}<extra></extra>",
+        customdata=spx_resampled[["hover_time"]],
+        hovertemplate="Time: %{customdata[0]}<br>Open: %{open:.0f}<br>High: %{high:.0f}<br>Low: %{low:.0f}<br>Close: %{close:.0f}<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
-        x=spx_resampled["ts"],
+        x=spx_resampled["xpos"],
         y=spx_resampled["vwap_spy_x10"],
         mode="lines",
         name="VWAP(SPY)x10",
-        hovertemplate="VWAP: %{y:.0f}<extra></extra>",
+        customdata=spx_resampled[["hover_time"]],
+        hovertemplate="Time: %{customdata[0]}<br>VWAP: %{y:.0f}<extra></extra>",
         line=dict(color="#9b87f5", width=2),
     ))
     fig.add_trace(go.Scatter(
-        x=spx_resampled["ts"],
+        x=spx_resampled["xpos"],
         y=spx_resampled["ema9_spx"],
         mode="lines",
         name="EMA9",
-        hovertemplate="EMA9: %{y:.0f}<extra></extra>",
+        customdata=spx_resampled[["hover_time"]],
+        hovertemplate="Time: %{customdata[0]}<br>EMA9: %{y:.0f}<extra></extra>",
         line=dict(color="#00cc96", width=1.8),
     ))
     fig.add_trace(go.Scatter(
-        x=spx_resampled["ts"],
+        x=spx_resampled["xpos"],
         y=spx_resampled["ema21_spx"],
         mode="lines",
         name="EMA21",
-        hovertemplate="EMA21: %{y:.0f}<extra></extra>",
+        customdata=spx_resampled[["hover_time"]],
+        hovertemplate="Time: %{customdata[0]}<br>EMA21: %{y:.0f}<extra></extra>",
         line=dict(color="#ffd166", width=1.8),
     ))
 
     fig.add_shape(
         type="line",
-        x0=start_of_day,
-        x1=start_of_day,
+        x0=start_x,
+        x1=start_x,
         y0=0,
         y1=1,
         xref="x",
@@ -453,7 +473,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         line=dict(color="#4da3ff", width=2, dash="dash"),
     )
     fig.add_annotation(
-        x=start_of_day,
+        x=start_x,
         y=1,
         xref="x",
         yref="paper",
@@ -480,22 +500,23 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         )
 
     fig.update_layout(
-        margin=dict(l=28, r=28, t=20, b=36),
+        margin=dict(l=28, r=28, t=20, b=50),
         paper_bgcolor="#17202b",
         plot_bgcolor="#17202b",
         font=dict(color="#e8eef7"),
         xaxis=dict(
+            type="linear",
             showgrid=True,
             gridcolor="#273244",
             rangeslider=dict(visible=False),
             title=f"Time ({chart_label})",
             title_standoff=4,
-            range=[x_min, x_max],
+            range=[-0.5, len(spx_resampled) - 0.5],
+            tickmode="array",
+            tickvals=tickvals,
+            ticktext=ticktext,
             automargin=True,
-            rangebreaks=[
-                dict(bounds=[16, 9.5], pattern="hour"),
-                dict(bounds=["sat", "mon"]),
-            ],
+            fixedrange=False,
         ),
         yaxis=dict(
             showgrid=True,
