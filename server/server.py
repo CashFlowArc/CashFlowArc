@@ -337,11 +337,28 @@ def calculate_vwap(df: pd.DataFrame) -> pd.Series:
     return pv / vol
 
 
-def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
+
+def first_valid_number(series: pd.Series, label: str) -> float:
+    valid = pd.to_numeric(series, errors="coerce").dropna()
+    if valid.empty:
+        raise ValueError(f"No valid numeric values found for {label}.")
+    return float(valid.iloc[0])
+
+
+def last_valid_number(series: pd.Series, label: str) -> float:
+    valid = pd.to_numeric(series, errors="coerce").dropna()
+    if valid.empty:
+        raise ValueError(f"No valid numeric values found for {label}.")
+    return float(valid.iloc[-1])
+
+def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp, chart_end: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
     resample_rule = interval_map.get(chart_interval, "5min")
     chart_label = label_map.get(chart_interval, "5 Minute")
+
+    chart_start = chart_end - pd.Timedelta(hours=24)
+    spx_1m = spx_1m[spx_1m["ts"] >= chart_start].copy()
 
     spx_resampled = (
         spx_1m[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spy_x10"]]
@@ -436,7 +453,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             title=f"Time ({chart_label})",
             title_standoff=4,
             rangebreaks=[
-                dict(bounds=[16, 9.5], pattern="hour"),
+                dict(bounds=[16.5, 9], pattern="hour"),
                 dict(bounds=["sat", "mon"]),
             ],
         ),
@@ -514,11 +531,11 @@ def run_web_service(settings: dict) -> dict:
 
     chart_spx = chart_spx.merge(vwap_map, on="ts", how="left")
 
-    latest_price = float(spx_current["close_price"].iloc[-1])
-    latest_ema9 = float(spx_current["ema9_spx"].iloc[-1])
-    latest_ema21 = float(spx_current["ema21_spx"].iloc[-1])
-    open_price = float(spx_current["open_price"].iloc[0])
-    latest_vwap = float(spy_current["vwap_spy"].iloc[-1]) * 10.0
+    latest_price = last_valid_number(spx_current["close_price"], "latest SPX close")
+    latest_ema9 = last_valid_number(spx_current["ema9_spx"], "latest EMA9")
+    latest_ema21 = last_valid_number(spx_current["ema21_spx"], "latest EMA21")
+    open_price = first_valid_number(spx_current["open_price"], "session open")
+    latest_vwap = last_valid_number(spy_current["vwap_spy"], "latest SPY VWAP") * 10.0
 
     opening_df = spx_current[(spx_current["ts"].dt.time >= dt.time(9, 30)) & (spx_current["ts"].dt.time <= dt.time(10, 0))].copy()
     if opening_df.empty:
@@ -533,8 +550,8 @@ def run_web_service(settings: dict) -> dict:
     current_day_low = float(spx_current["low_price"].min())
 
     outside_range = (latest_price > range_high) or (latest_price < range_low)
-    vwap_distance_pct = abs(latest_price - latest_vwap) / latest_price * 100.0
-    open_distance_pct = abs(latest_price - open_price) / open_price * 100.0
+    vwap_distance_pct = abs(latest_price - latest_vwap) / latest_price * 100.0 if latest_price else 0.0
+    open_distance_pct = abs(latest_price - open_price) / open_price * 100.0 if open_price else 0.0
 
     vwap_distance = vwap_distance_pct >= 0.15
     open_distance = open_distance_pct > 0.30
@@ -560,6 +577,7 @@ def run_web_service(settings: dict) -> dict:
         prev_day_low,
         settings["chart_interval"],
         pd.Timestamp(spx_current["ts"].min()),
+        pd.Timestamp(chart_spx["ts"].max()),
     )
 
     return {
