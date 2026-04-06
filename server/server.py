@@ -375,13 +375,23 @@ def filter_last_visible_hours(df: pd.DataFrame, hours: float = 24.0, session_sta
     return out.drop(columns=["_visible_clock_minutes"], errors="ignore")
 
 
+def keep_session_hours(df: pd.DataFrame, session_start: dt.time = dt.time(9, 0), session_end: dt.time = dt.time(16, 30)) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+
+    out = df.copy()
+    times = out["ts"].dt.time
+    return out[(times >= session_start) & (times <= session_end)].copy()
+
+
 def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp, chart_end: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
     resample_rule = interval_map.get(chart_interval, "5min")
     chart_label = label_map.get(chart_interval, "5 Minute")
 
-    spx_1m = filter_last_visible_hours(spx_1m, hours=24.0)
+    spx_1m = keep_session_hours(spx_1m, session_start=dt.time(9, 0), session_end=dt.time(16, 30))
+    spx_1m = filter_last_visible_hours(spx_1m, hours=24.0, session_start=dt.time(9, 0), session_end=dt.time(16, 30))
 
     spx_resampled = (
         spx_1m[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spy_x10"]]
@@ -475,6 +485,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             rangeslider=dict(visible=False),
             title=f"Time ({chart_label})",
             title_standoff=4,
+            range=[spx_resampled.index.min(), spx_resampled.index.max()],
             rangebreaks=[
                 dict(bounds=[16.5, 9], pattern="hour"),
                 dict(bounds=["sat", "mon"]),
@@ -515,50 +526,36 @@ def run_web_service(settings: dict) -> dict:
     if spx_current.empty or spy_current.empty or spx_prev.empty or spy_prev.empty:
         return {"time": now, "error": "Could not separate current/prior session data from TICKER_HISTORY.", **settings}
 
-    prev_start_time = dt.time(12, 0)
-    spx_prev_4h = spx_prev[spx_prev["ts"].dt.time >= prev_start_time].copy()
-    spy_prev_4h = spy_prev[spy_prev["ts"].dt.time >= prev_start_time].copy()
-    if spx_prev_4h.empty:
-        spx_prev_4h = spx_prev.tail(min(len(spx_prev), 240)).copy()
-    if spy_prev_4h.empty:
-        spy_prev_4h = spy_prev.tail(min(len(spy_prev), 240)).copy()
-
     spy_prev = spy_prev.sort_values("ts").reset_index(drop=True).copy()
     spy_current = spy_current.sort_values("ts").reset_index(drop=True).copy()
 
-    spy_prev["vwap_spy"] = calculate_vwap(spy_prev)
-    spy_current["vwap_spy"] = calculate_vwap(spy_current)
+    spy["trade_date"] = spy["ts"].dt.date
+    spy = spy.sort_values("ts").reset_index(drop=True).copy()
+    spy["vwap_spy"] = (
+        spy.groupby("trade_date", group_keys=False)
+        .apply(calculate_vwap)
+        .reset_index(level=0, drop=True)
+    )
+    spy["vwap_spy_x10"] = spy["vwap_spy"] * 10.0
 
-    spx_prev_4h = spx_prev_4h.drop_duplicates(subset=["ts"]).copy()
-    spx_current = spx_current.drop_duplicates(subset=["ts"]).copy()
+    spx = spx.sort_values("ts").drop_duplicates(subset=["ts"]).reset_index(drop=True).copy()
+    spx["ema9_spx"] = spx["close_price"].ewm(span=9, adjust=False).mean()
+    spx["ema21_spx"] = spx["close_price"].ewm(span=21, adjust=False).mean()
 
-    spy_prev_4h = spy_prev[spy_prev["ts"].isin(spx_prev_4h["ts"])].copy()
-    spy_prev_4h = spy_prev_4h.drop_duplicates(subset=["ts"]).copy()
-    spy_current = spy_current.drop_duplicates(subset=["ts"]).copy()
+    spx_current = spx[spx["ts"].dt.date == current_date].copy().reset_index(drop=True)
 
-    spy_prev_4h["vwap_spy_x10"] = spy_prev_4h["vwap_spy"] * 10.0
-    spy_current["vwap_spy_x10"] = spy_current["vwap_spy"] * 10.0
-
-    spx_current = spx_current.sort_values("ts").reset_index(drop=True)
-    spx_current["ema9_spx"] = spx_current["close_price"].ewm(span=9, adjust=False).mean()
-    spx_current["ema21_spx"] = spx_current["close_price"].ewm(span=21, adjust=False).mean()
-
-    chart_spx = pd.concat([spx_prev_4h, spx_current], axis=0).sort_values("ts").reset_index(drop=True)
-    chart_spx["ema9_spx"] = chart_spx["close_price"].ewm(span=9, adjust=False).mean()
-    chart_spx["ema21_spx"] = chart_spx["close_price"].ewm(span=21, adjust=False).mean()
-
-    vwap_map = pd.concat([
-        spy_prev_4h[["ts", "vwap_spy_x10"]],
-        spy_current[["ts", "vwap_spy_x10"]],
-    ], axis=0).drop_duplicates(subset=["ts"], keep="last")
-
-    chart_spx = chart_spx.merge(vwap_map, on="ts", how="left")
+    chart_spx = spx.merge(
+        spy[["ts", "vwap_spy_x10"]].drop_duplicates(subset=["ts"], keep="last"),
+        on="ts",
+        how="left",
+    )
+    chart_spx = chart_spx.sort_values("ts").reset_index(drop=True)
 
     latest_price = last_valid_number(spx_current["close_price"], "latest SPX close")
     latest_ema9 = last_valid_number(spx_current["ema9_spx"], "latest EMA9")
     latest_ema21 = last_valid_number(spx_current["ema21_spx"], "latest EMA21")
     open_price = first_valid_number(spx_current["open_price"], "session open")
-    latest_vwap = last_valid_number(spy_current["vwap_spy"], "latest SPY VWAP") * 10.0
+    latest_vwap = last_valid_number(spy[spy["ts"].dt.date == current_date]["vwap_spy"], "latest SPY VWAP") * 10.0
 
     opening_df = spx_current[(spx_current["ts"].dt.time >= dt.time(9, 30)) & (spx_current["ts"].dt.time <= dt.time(10, 0))].copy()
     if opening_df.empty:
