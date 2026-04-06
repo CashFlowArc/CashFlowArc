@@ -370,14 +370,8 @@ def keep_last_visible_hours(df: pd.DataFrame, chart_interval: str, visible_hours
 def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
-    padding_map = {
-        "5min": pd.Timedelta(minutes=5),
-        "15min": pd.Timedelta(minutes=15),
-        "1h": pd.Timedelta(hours=1),
-    }
     resample_rule = interval_map.get(chart_interval, "5min")
     chart_label = label_map.get(chart_interval, "5 Minute")
-    pad = padding_map.get(chart_interval, pd.Timedelta(minutes=5))
 
     working = spx_1m.copy()
     working = working.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
@@ -404,8 +398,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
 
     spx_resampled = keep_last_visible_hours(spx_resampled, chart_interval, visible_hours=24)
 
-    x_min = pd.Timestamp(spx_resampled["ts"].min()) - pad
-    x_max = pd.Timestamp(spx_resampled["ts"].max()) + pad
+    x_values = list(pd.to_datetime(spx_resampled["ts"]))
 
     fig = go.Figure()
     fig.add_trace(go.Candlestick(
@@ -485,17 +478,15 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         plot_bgcolor="#17202b",
         font=dict(color="#e8eef7"),
         xaxis=dict(
+            type="category",
+            categoryorder="array",
+            categoryarray=x_values,
             showgrid=True,
             gridcolor="#273244",
             rangeslider=dict(visible=False),
             title=f"Time ({chart_label})",
             title_standoff=4,
-            range=[x_min, x_max],
             automargin=True,
-            rangebreaks=[
-                dict(bounds=[16.5, 9], pattern="hour"),
-                dict(bounds=["sat", "mon"]),
-            ],
         ),
         yaxis=dict(
             showgrid=True,
