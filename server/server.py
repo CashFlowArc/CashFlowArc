@@ -531,9 +531,25 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             zeroline=False,
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
     )
-    fig.update_xaxes(showspikes=True, spikecolor="#8fa2b7", spikesnap="cursor", spikemode="across")
-    fig.update_yaxes(showspikes=True, spikecolor="#8fa2b7", spikesnap="cursor", spikemode="across")
+    fig.update_xaxes(
+        showspikes=True,
+        spikecolor="#8fa2b7",
+        spikesnap="cursor",
+        spikemode="across",
+        spikethickness=1,
+        showhoverlabels=True,
+    )
+    fig.update_yaxes(
+        showspikes=True,
+        spikecolor="#8fa2b7",
+        spikesnap="cursor",
+        spikemode="across",
+        spikethickness=1,
+        showhoverlabels=True,
+    )
     return plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False, "responsive": True})
 
 
