@@ -452,8 +452,8 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         y=spx_resampled["vwap_spy_x10"],
         mode="lines",
         name="VWAP(SPY)x10",
-        customdata=spx_resampled[["hover_time"]],
-        hovertemplate="Time: %{customdata[0]}<br>VWAP: %{y:.0f}<extra></extra>",
+        hoverinfo="skip",
+        hovertemplate=None,
         line=dict(color="#9b87f5", width=2),
     ))
     fig.add_trace(go.Scatter(
@@ -461,8 +461,8 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         y=spx_resampled["ema9_spx"],
         mode="lines",
         name="EMA9",
-        customdata=spx_resampled[["hover_time"]],
-        hovertemplate="Time: %{customdata[0]}<br>EMA9: %{y:.0f}<extra></extra>",
+        hoverinfo="skip",
+        hovertemplate=None,
         line=dict(color="#00cc96", width=1.8),
     ))
     fig.add_trace(go.Scatter(
@@ -470,8 +470,8 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         y=spx_resampled["ema21_spx"],
         mode="lines",
         name="EMA21",
-        customdata=spx_resampled[["hover_time"]],
-        hovertemplate="Time: %{customdata[0]}<br>EMA21: %{y:.0f}<extra></extra>",
+        hoverinfo="skip",
+        hovertemplate=None,
         line=dict(color="#ffd166", width=1.8),
     ))
 
@@ -562,7 +562,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             zeroline=False,
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        hovermode="x unified",
+        hovermode="closest",
         hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
     )
     fig.update_xaxes(
