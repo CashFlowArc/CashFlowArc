@@ -602,6 +602,8 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     var hoverTimes = {json.dumps(hover_times)};
     var overCandle = false;
     var tooltip = null;
+    var crosshairV = null;
+    var crosshairH = null;
 
     function ensureTooltip() {{
         if (tooltip) return tooltip;
@@ -624,8 +626,53 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         return tooltip;
     }}
 
+    function ensureCrosshair() {{
+        if (!gd) return;
+        if (!gd.style.position) gd.style.position = 'relative';
+
+        if (!crosshairV) {{
+            crosshairV = document.createElement('div');
+            crosshairV.style.position = 'absolute';
+            crosshairV.style.pointerEvents = 'none';
+            crosshairV.style.zIndex = '20';
+            crosshairV.style.borderLeft = '1px dotted #8fa2b7';
+            crosshairV.style.display = 'none';
+            gd.appendChild(crosshairV);
+        }}
+
+        if (!crosshairH) {{
+            crosshairH = document.createElement('div');
+            crosshairH.style.position = 'absolute';
+            crosshairH.style.pointerEvents = 'none';
+            crosshairH.style.zIndex = '20';
+            crosshairH.style.borderTop = '1px dotted #8fa2b7';
+            crosshairH.style.display = 'none';
+            gd.appendChild(crosshairH);
+        }}
+    }}
+
+    function showCrosshair(plotLeft, plotTop, plotWidth, plotHeight, px, py) {{
+        ensureCrosshair();
+        if (!crosshairV || !crosshairH) return;
+
+        crosshairV.style.left = px + 'px';
+        crosshairV.style.top = plotTop + 'px';
+        crosshairV.style.height = plotHeight + 'px';
+        crosshairV.style.display = 'block';
+
+        crosshairH.style.left = plotLeft + 'px';
+        crosshairH.style.top = py + 'px';
+        crosshairH.style.width = plotWidth + 'px';
+        crosshairH.style.display = 'block';
+    }}
+
     function hideTooltip() {{
         if (tooltip) tooltip.style.display = 'none';
+    }}
+
+    function hideCrosshair() {{
+        if (crosshairV) crosshairV.style.display = 'none';
+        if (crosshairH) crosshairH.style.display = 'none';
     }}
 
     function nearestIndex(xVal) {{
@@ -654,10 +701,11 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     gd.addEventListener('mouseleave', function() {{
         overCandle = false;
         hideTooltip();
+        hideCrosshair();
     }});
 
     gd.addEventListener('mousemove', function(evt) {{
-        if (overCandle || !gd._fullLayout || !gd._fullLayout.xaxis || !gd._fullLayout.yaxis) {{
+        if (!gd._fullLayout || !gd._fullLayout.xaxis || !gd._fullLayout.yaxis) {{
             return;
         }}
 
@@ -674,6 +722,14 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         var py = evt.clientY - rect.top;
 
         if (px < plotLeft || px > plotLeft + plotWidth || py < plotTop || py > plotTop + plotHeight) {{
+            hideTooltip();
+            hideCrosshair();
+            return;
+        }}
+
+        showCrosshair(plotLeft, plotTop, plotWidth, plotHeight, px, py);
+
+        if (overCandle) {{
             hideTooltip();
             return;
         }}
