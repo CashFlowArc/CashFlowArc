@@ -40,6 +40,7 @@ TIMEZONE = os.environ.get("TIMEZONE", "America/New_York")
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "5"))
 GEX_CONTRACT_SIZE = int(os.environ.get("GEX_CONTRACT_SIZE", "100"))
 GEX_MIN_TIME_SECONDS = int(os.environ.get("GEX_MIN_TIME_SECONDS", "60"))
+GEX_STRIKE_WINDOW = float(os.environ.get("GEX_STRIKE_WINDOW", "50"))
 
 HTML = """
 <!DOCTYPE html>
@@ -282,29 +283,28 @@ GEX_HTML = """
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <style>
         :root{
-            --bg:#eef5e9;
-            --panel:#f8fbf4;
-            --panel-2:#ffffff;
-            --border:#c8d8c3;
-            --text:#0e1f17;
-            --muted:#4d6358;
+            --panel:#121821;
+            --panel-2:#17202b;
+            --border:#273244;
+            --text:#e8eef7;
+            --muted:#8fa2b7;
             --blue:#1d2ef2;
             --line:#3493ff;
             --green:#00a63f;
             --orange:#ff9800;
-            --grid:#d8e4d3;
+            --grid:#273244;
         }
         *{box-sizing:border-box}
         body{
             margin:0;
-            font-family:Arial, Helvetica, sans-serif;
-            background:linear-gradient(180deg, #f7faf2 0%, #edf5e8 100%);
+            font-family:Segoe UI, Arial, sans-serif;
+            background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
             color:var(--text);
         }
         .wrap{max-width:1280px; margin:0 auto; padding:20px;}
         .topbar{
             display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
-            margin-bottom:16px; padding:14px 18px; background:var(--panel-2);
+            margin-bottom:16px; padding:14px 18px; background:var(--panel);
             border:1px solid var(--border); border-radius:14px;
         }
         .title h1{margin:0; font-size:24px}
@@ -312,21 +312,21 @@ GEX_HTML = """
         .links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
         .links a{
             color:var(--muted); text-decoration:none; font-weight:700; font-size:13px;
-            padding:8px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel);
+            padding:8px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel-2);
         }
         .card{
-            background:var(--panel-2); border:1px solid var(--border); border-radius:14px; padding:16px;
+            background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
         }
         .controls{
             display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;
         }
         .control-form{
             display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-            background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:8px 10px;
+            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:8px 10px;
         }
-        .control-label{font-size:13px; color:var(--muted); font-weight:700}
+        .control-label{font-size:13px; color:var(--text); font-weight:700}
         .text-input{
-            width:90px; background:#fff; color:var(--text);
+            width:90px; background:#0f141b; color:var(--text);
             border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
         }
         .metrics{
@@ -335,13 +335,13 @@ GEX_HTML = """
         @media (max-width: 960px){ .metrics{grid-template-columns:repeat(2,1fr);} }
         @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} }
         .metric{
-            background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px;
+            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:14px;
         }
         .metric .label{font-size:12px; color:var(--muted); text-transform:uppercase}
         .metric .value{margin-top:8px; font-size:24px; font-weight:700}
         .metric .sub{margin-top:4px; font-size:12px; color:var(--muted)}
         .chart-wrap{
-            min-height:520px; background:#edf6e6; border:1px solid var(--border); border-radius:12px; overflow:hidden;
+            min-height:520px; background:var(--panel-2); border:1px solid var(--border); border-radius:12px; overflow:hidden;
         }
         .chart-wrap .plotly-graph-div{width:100% !important; height:520px !important;}
         .error{font-size:18px; color:#b42318; font-weight:700}
@@ -605,16 +605,19 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
         yanchor="bottom",
         xanchor="left",
         font=dict(color="#00a63f", size=12),
-        bgcolor="#edf6e6",
+        bgcolor="#17202b",
+        bordercolor="#273244",
+        borderwidth=1,
     )
 
     fig.update_layout(
-        title=dict(text="$SPX - Gamma Exposure by Strike", x=0.5, xanchor="center", font=dict(size=18, color="#000")),
-        paper_bgcolor="#edf6e6",
-        plot_bgcolor="#edf6e6",
+        title=dict(text="$SPX - Gamma Exposure by Strike", x=0.5, xanchor="center", font=dict(size=18, color="#e8eef7")),
+        paper_bgcolor="#17202b",
+        plot_bgcolor="#17202b",
         margin=dict(l=70, r=70, t=70, b=70),
-        font=dict(color="#0e1f17", family="Arial, Helvetica, sans-serif"),
+        font=dict(color="#e8eef7", family="Segoe UI, Arial, sans-serif"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
         xaxis=dict(
             title="Strike Price",
             showgrid=False,
@@ -624,7 +627,7 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
         yaxis=dict(
             title=None,
             showgrid=True,
-            gridcolor="#d8e4d3",
+            gridcolor="#273244",
             zeroline=False,
             tickformat="~s",
             range=[ymin - ypad, ymax + ypad],
@@ -659,6 +662,16 @@ def run_gex_service(settings: dict) -> dict:
         raise ValueError("Could not determine the current SPX price from the options feed.")
 
     gex_by_strike = build_gex_frame(options, spot_price, now_et, requested_date)
+    strike_min = spot_price - GEX_STRIKE_WINDOW
+    strike_max = spot_price + GEX_STRIKE_WINDOW
+    gex_by_strike = gex_by_strike[
+        (gex_by_strike["strike"] >= strike_min) &
+        (gex_by_strike["strike"] <= strike_max)
+    ].copy()
+    if gex_by_strike.empty:
+        raise ValueError(
+            f"No SPX strikes were available within +/- {int(GEX_STRIKE_WINDOW)} points of spot."
+        )
     chart_html = make_gex_chart(gex_by_strike, spot_price)
 
     put_rows = gex_by_strike[gex_by_strike["net_gex"] < 0]
