@@ -1,14 +1,17 @@
 from flask import Flask, render_template_string, request
 import datetime as dt
 import json
+import math
 import os
 import re
+import tempfile
 from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.offline import plot
 import oracledb
+import yfinance as yf
 
 
 app = Flask(__name__)
@@ -35,6 +38,8 @@ SPY_TICKER = os.environ.get("SPY_TICKER", "SPY")
 INTERVAL_NAME = os.environ.get("INTERVAL_NAME", "1m")
 TIMEZONE = os.environ.get("TIMEZONE", "America/New_York")
 LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "5"))
+GEX_CONTRACT_SIZE = int(os.environ.get("GEX_CONTRACT_SIZE", "100"))
+GEX_MIN_TIME_SECONDS = int(os.environ.get("GEX_MIN_TIME_SECONDS", "60"))
 
 HTML = """
 <!DOCTYPE html>
@@ -133,6 +138,9 @@ HTML = """
             <p>SPX dashboard • Auto-refresh {{ data.refresh_interval }}s • Last update: {{ data.time }}</p>
         </div>
         <div class="top-right">
+            <div class="control-form" style="padding:6px 8px;">
+                <a href="/gex" style="color:var(--text); text-decoration:none; font-size:13px; font-weight:700;">SPX GEX</a>
+            </div>
             <form id="settings-form" method="post" action="/settings" class="control-form">
                 <span class="control-label">Refresh Interval</span>
                 <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
@@ -263,6 +271,155 @@ HTML = """
 </html>
 """
 
+GEX_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>SPX 0DTE Gamma Exposure</title>
+    <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        :root{
+            --bg:#eef5e9;
+            --panel:#f8fbf4;
+            --panel-2:#ffffff;
+            --border:#c8d8c3;
+            --text:#0e1f17;
+            --muted:#4d6358;
+            --blue:#1d2ef2;
+            --line:#3493ff;
+            --green:#00a63f;
+            --orange:#ff9800;
+            --grid:#d8e4d3;
+        }
+        *{box-sizing:border-box}
+        body{
+            margin:0;
+            font-family:Arial, Helvetica, sans-serif;
+            background:linear-gradient(180deg, #f7faf2 0%, #edf5e8 100%);
+            color:var(--text);
+        }
+        .wrap{max-width:1280px; margin:0 auto; padding:20px;}
+        .topbar{
+            display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+            margin-bottom:16px; padding:14px 18px; background:var(--panel-2);
+            border:1px solid var(--border); border-radius:14px;
+        }
+        .title h1{margin:0; font-size:24px}
+        .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
+        .links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+        .links a{
+            color:var(--muted); text-decoration:none; font-weight:700; font-size:13px;
+            padding:8px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel);
+        }
+        .card{
+            background:var(--panel-2); border:1px solid var(--border); border-radius:14px; padding:16px;
+        }
+        .controls{
+            display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;
+        }
+        .control-form{
+            display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+            background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:8px 10px;
+        }
+        .control-label{font-size:13px; color:var(--muted); font-weight:700}
+        .text-input{
+            width:90px; background:#fff; color:var(--text);
+            border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
+        }
+        .metrics{
+            display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px;
+        }
+        @media (max-width: 960px){ .metrics{grid-template-columns:repeat(2,1fr);} }
+        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} }
+        .metric{
+            background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px;
+        }
+        .metric .label{font-size:12px; color:var(--muted); text-transform:uppercase}
+        .metric .value{margin-top:8px; font-size:24px; font-weight:700}
+        .metric .sub{margin-top:4px; font-size:12px; color:var(--muted)}
+        .chart-wrap{
+            min-height:520px; background:#edf6e6; border:1px solid var(--border); border-radius:12px; overflow:hidden;
+        }
+        .chart-wrap .plotly-graph-div{width:100% !important; height:520px !important;}
+        .error{font-size:18px; color:#b42318; font-weight:700}
+        .notes{margin-top:14px; font-size:12px; color:var(--muted); line-height:1.5}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="topbar">
+        <div class="title">
+            <h1>SPX 0DTE Gamma Exposure</h1>
+            <p>{{ data.subtitle }}</p>
+        </div>
+        <div class="links">
+            <a href="/">Trading Terminal</a>
+            <a href="/gex">GEX View</a>
+        </div>
+    </div>
+
+    <div class="card">
+        {% if data.error %}
+        <div class="error">{{ data.error }}</div>
+        {% else %}
+        <div class="controls">
+            <form id="gex-settings-form" method="post" action="/settings" class="control-form">
+                <span class="control-label">Refresh Interval</span>
+                <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
+                <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+            </form>
+            <div class="control-form">
+                <span class="control-label">Expiration</span>
+                <span>{{ data.expiration_date }}</span>
+            </div>
+        </div>
+
+        <div class="chart-wrap">
+            {{ data.chart_html|safe }}
+        </div>
+
+        <div class="metrics">
+            <div class="metric"><div class="label">Spot</div><div class="value">{{ data.spot_price }}</div><div class="sub">Latest SPX price from options feed</div></div>
+            <div class="metric"><div class="label">Net GEX</div><div class="value">{{ data.net_gex_billions }}</div><div class="sub">Per 1% move, billions</div></div>
+            <div class="metric"><div class="label">Call Wall</div><div class="value">{{ data.call_wall }}</div><div class="sub">Largest positive strike GEX</div></div>
+            <div class="metric"><div class="label">Put Wall</div><div class="value">{{ data.put_wall }}</div><div class="sub">Largest negative strike GEX</div></div>
+        </div>
+
+        <div class="notes">
+            Uses the same-day SPX expiration that matches {{ data.requested_date }}. Gamma exposure is estimated from open interest, implied volatility, and Black-Scholes gamma with time capped at a minimum of {{ data.min_time_minutes }} minute(s) to avoid a zero-time singularity.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+(function() {
+    const refresh = document.getElementById('refresh_interval');
+    const form = document.getElementById('gex-settings-form');
+    let timer = null;
+
+    function submit() {
+        const data = new FormData(form);
+        fetch('/settings', { method: 'POST', body: data })
+            .then(() => window.location.reload())
+            .catch(() => {});
+    }
+
+    if (refresh) {
+        refresh.addEventListener('input', function() {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(submit, 250);
+        });
+    }
+})();
+</script>
+</body>
+</html>
+"""
+
 
 def get_connection():
     return oracledb.connect(
@@ -293,6 +450,237 @@ def load_settings() -> dict:
 
 def save_settings(settings: dict) -> None:
     SETTINGS_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+
+def format_billions(value: float) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"{value / 1_000_000_000:.2f}B"
+
+
+def normal_pdf(value: float) -> float:
+    return math.exp(-0.5 * value * value) / math.sqrt(2.0 * math.pi)
+
+
+def black_scholes_gamma(spot: float, strike: float, volatility: float, time_to_expiry: float) -> float:
+    if spot <= 0 or strike <= 0 or volatility <= 0 or time_to_expiry <= 0:
+        return 0.0
+
+    vol_term = volatility * math.sqrt(time_to_expiry)
+    if vol_term <= 0:
+        return 0.0
+
+    d1 = (math.log(spot / strike) + 0.5 * volatility * volatility * time_to_expiry) / vol_term
+    return normal_pdf(d1) / (spot * vol_term)
+
+
+def fetch_spx_same_day_options(target_date: dt.date) -> tuple[pd.DataFrame, dict]:
+    cache_dir = os.path.join(tempfile.gettempdir(), "cashflowarc-yfinance-cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    yf.set_tz_cache_location(cache_dir)
+
+    ticker = yf.Ticker("^SPX")
+    available_expirations = tuple(ticker.options)
+    if not available_expirations:
+        raise ValueError("Yahoo did not return any SPX expirations.")
+
+    expiration_map = {
+        pd.Timestamp(exp).date(): exp
+        for exp in available_expirations
+    }
+    expiration_label = expiration_map.get(target_date)
+    if expiration_label is None:
+        available = ", ".join(sorted(expiration_map.values()))
+        raise ValueError(f"No SPX expiration matched {target_date.isoformat()}. Available expirations: {available}")
+
+    chain = ticker.option_chain(expiration_label)
+    calls = chain.calls.copy() if chain.calls is not None else pd.DataFrame()
+    puts = chain.puts.copy() if chain.puts is not None else pd.DataFrame()
+    calls["option_type"] = "call"
+    puts["option_type"] = "put"
+    options = pd.concat([calls, puts], ignore_index=True, sort=False)
+    if options.empty:
+        raise ValueError(f"Yahoo returned an empty SPX chain for {target_date.isoformat()}.")
+
+    return options, chain.underlying or {}
+
+
+def build_gex_frame(options: pd.DataFrame, spot_price: float, now_et: pd.Timestamp, expiry_date: dt.date) -> pd.DataFrame:
+    expiry_close = pd.Timestamp.combine(expiry_date, dt.time(16, 0)).tz_localize(TIMEZONE)
+    time_to_expiry_years = max(
+        (expiry_close - now_et).total_seconds(),
+        GEX_MIN_TIME_SECONDS,
+    ) / (365.0 * 24.0 * 60.0 * 60.0)
+
+    working = options.copy()
+    working["strike"] = pd.to_numeric(working.get("strike"), errors="coerce")
+    working["openInterest"] = pd.to_numeric(working.get("openInterest"), errors="coerce").fillna(0.0)
+    working["impliedVolatility"] = pd.to_numeric(working.get("impliedVolatility"), errors="coerce")
+    working["volume"] = pd.to_numeric(working.get("volume"), errors="coerce").fillna(0.0)
+    working["lastPrice"] = pd.to_numeric(working.get("lastPrice"), errors="coerce")
+    working = working.dropna(subset=["strike", "impliedVolatility"])
+    working = working[(working["strike"] > 0) & (working["impliedVolatility"] > 0)].copy()
+    if working.empty:
+        raise ValueError("No SPX options had both strike and implied volatility for GEX calculation.")
+
+    working["gamma"] = working.apply(
+        lambda row: black_scholes_gamma(
+            spot=spot_price,
+            strike=float(row["strike"]),
+            volatility=float(row["impliedVolatility"]),
+            time_to_expiry=time_to_expiry_years,
+        ),
+        axis=1,
+    )
+    working["direction"] = working["option_type"].map({"call": 1.0, "put": -1.0}).fillna(0.0)
+    working["gex"] = (
+        working["gamma"]
+        * working["openInterest"]
+        * GEX_CONTRACT_SIZE
+        * (spot_price ** 2)
+        * 0.01
+        * working["direction"]
+    )
+
+    grouped = (
+        working.groupby("strike", as_index=False)
+        .agg(
+            net_gex=("gex", "sum"),
+            call_gex=("gex", lambda values: float(sum(x for x in values if x > 0))),
+            put_gex=("gex", lambda values: float(sum(x for x in values if x < 0))),
+            total_oi=("openInterest", "sum"),
+        )
+        .sort_values("strike")
+        .reset_index(drop=True)
+    )
+    grouped["abs_gex"] = grouped["net_gex"].abs()
+    grouped["cumulative_gex"] = grouped["net_gex"].cumsum()
+    return grouped
+
+
+def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
+    if gex_by_strike.empty:
+        return "<div style='padding:20px;color:#b42318;'>No GEX chart data available.</div>"
+
+    colors = ["#1d2ef2" if value >= 0 else "#ff9800" for value in gex_by_strike["net_gex"]]
+    ymax = max(float(gex_by_strike["net_gex"].max()), 0.0)
+    ymin = min(float(gex_by_strike["net_gex"].min()), 0.0)
+    span = max(ymax - ymin, 1.0)
+    ypad = span * 0.18
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=gex_by_strike["strike"],
+        y=gex_by_strike["net_gex"],
+        name="Gamma Exposure by Strike",
+        marker_color=colors,
+        opacity=0.95,
+        hovertemplate="Strike %{x:,.0f}<br>Net GEX %{y:$,.2f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=gex_by_strike["strike"],
+        y=gex_by_strike["cumulative_gex"],
+        name="Aggregate Gamma Exposure",
+        mode="lines",
+        yaxis="y2",
+        line=dict(color="#3493ff", width=2),
+        hovertemplate="Strike %{x:,.0f}<br>Cumulative GEX %{y:$,.2f}<extra></extra>",
+    ))
+
+    fig.add_shape(
+        type="line",
+        x0=spot_price,
+        x1=spot_price,
+        y0=0,
+        y1=1,
+        yref="paper",
+        line=dict(color="#00a63f", width=1.5),
+    )
+    fig.add_annotation(
+        x=spot_price,
+        y=1,
+        yref="paper",
+        text=f"Last Price: {spot_price:,.2f}",
+        showarrow=False,
+        yanchor="bottom",
+        xanchor="left",
+        font=dict(color="#00a63f", size=12),
+        bgcolor="#edf6e6",
+    )
+
+    fig.update_layout(
+        title=dict(text="$SPX - Gamma Exposure by Strike", x=0.5, xanchor="center", font=dict(size=18, color="#000")),
+        paper_bgcolor="#edf6e6",
+        plot_bgcolor="#edf6e6",
+        margin=dict(l=70, r=70, t=70, b=70),
+        font=dict(color="#0e1f17", family="Arial, Helvetica, sans-serif"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+        xaxis=dict(
+            title="Strike Price",
+            showgrid=False,
+            zeroline=False,
+            tickformat=",.0f",
+        ),
+        yaxis=dict(
+            title=None,
+            showgrid=True,
+            gridcolor="#d8e4d3",
+            zeroline=False,
+            tickformat="~s",
+            range=[ymin - ypad, ymax + ypad],
+        ),
+        yaxis2=dict(
+            title=None,
+            overlaying="y",
+            side="right",
+            showgrid=False,
+            zeroline=False,
+            tickformat="~s",
+        ),
+        bargap=0.7,
+    )
+
+    return plot(fig, output_type="div", include_plotlyjs=False, config={"displayModeBar": False, "responsive": True})
+
+
+def run_gex_service(settings: dict) -> dict:
+    now_et = pd.Timestamp.now(tz=TIMEZONE)
+    requested_date = now_et.date()
+
+    options, underlying = fetch_spx_same_day_options(requested_date)
+    spot_price = float(
+        underlying.get("regularMarketPrice")
+        or underlying.get("postMarketPrice")
+        or underlying.get("preMarketPrice")
+        or underlying.get("previousClose")
+        or 0.0
+    )
+    if spot_price <= 0:
+        raise ValueError("Could not determine the current SPX price from the options feed.")
+
+    gex_by_strike = build_gex_frame(options, spot_price, now_et, requested_date)
+    chart_html = make_gex_chart(gex_by_strike, spot_price)
+
+    put_rows = gex_by_strike[gex_by_strike["net_gex"] < 0]
+    call_rows = gex_by_strike[gex_by_strike["net_gex"] > 0]
+    put_wall = float(put_rows.loc[put_rows["net_gex"].idxmin(), "strike"]) if not put_rows.empty else None
+    call_wall = float(call_rows.loc[call_rows["net_gex"].idxmax(), "strike"]) if not call_rows.empty else None
+    net_gex = float(gex_by_strike["net_gex"].sum())
+
+    return {
+        "subtitle": f"Current date: {requested_date.isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        "requested_date": requested_date.isoformat(),
+        "expiration_date": requested_date.isoformat(),
+        "spot_price": f"{spot_price:,.2f}",
+        "net_gex_billions": format_billions(net_gex),
+        "call_wall": "N/A" if call_wall is None else f"{call_wall:,.0f}",
+        "put_wall": "N/A" if put_wall is None else f"{put_wall:,.0f}",
+        "chart_html": chart_html,
+        "refresh_interval": settings["refresh_interval"],
+        "chart_interval": settings["chart_interval"],
+        "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
+        "error": None,
+    }
 
 
 def query_ticker_history(conn, ticker: str, interval_name: str, start_utc: dt.datetime) -> pd.DataFrame:
@@ -912,6 +1300,30 @@ def index():
     settings = load_settings()
     data = run_web_service(settings)
     return render_template_string(HTML, data=data)
+
+
+@app.route("/gex")
+def gex():
+    settings = load_settings()
+    try:
+        data = run_gex_service(settings)
+    except Exception as exc:
+        now_et = pd.Timestamp.now(tz=TIMEZONE)
+        data = {
+            "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            "requested_date": now_et.date().isoformat(),
+            "expiration_date": now_et.date().isoformat(),
+            "spot_price": "N/A",
+            "net_gex_billions": "N/A",
+            "call_wall": "N/A",
+            "put_wall": "N/A",
+            "chart_html": "",
+            "refresh_interval": settings["refresh_interval"],
+            "chart_interval": settings["chart_interval"],
+            "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
+            "error": str(exc),
+        }
+    return render_template_string(GEX_HTML, data=data)
 
 
 if __name__ == "__main__":
