@@ -579,12 +579,21 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
     ypad = span * 0.18
 
     fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=[None],
+        y=[None],
+        name="Gamma Exposure by Strike",
+        mode="markers",
+        marker=dict(color="#1d2ef2", size=10),
+        hoverinfo="skip",
+    ))
     fig.add_trace(go.Bar(
         x=gex_by_strike["strike"],
         y=gex_by_strike["net_gex"],
         name="Gamma Exposure by Strike",
         marker_color=colors,
         opacity=0.95,
+        showlegend=False,
         hovertemplate="Strike %{x:,.0f}<br>Net GEX %{y:$,.2f}<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
