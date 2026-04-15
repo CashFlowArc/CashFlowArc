@@ -124,6 +124,16 @@ HTML = """
         .metric .label{color:var(--muted); font-size:12px; text-transform:uppercase;}
         .metric .value{margin-top:8px; font-size:26px; font-weight:700}
         .metric .sub{margin-top:4px; color:var(--muted); font-size:12px}
+        .metric.gex-positive{
+            background:rgba(31, 206, 122, 0.12);
+            border-color:rgba(31, 206, 122, 0.45);
+        }
+        .metric.gex-negative{
+            background:rgba(255, 93, 93, 0.12);
+            border-color:rgba(255, 93, 93, 0.45);
+        }
+        .metric.gex-positive .value{color:var(--green)}
+        .metric.gex-negative .value{color:var(--red)}
         .pass,.bull{color:var(--green); font-weight:700}
         .fail,.bear{color:var(--red); font-weight:700}
         .neutral{color:var(--yellow); font-weight:700}
@@ -200,7 +210,7 @@ HTML = """
 
                 <div class="metric"><div class="label">VWAP(SPY)</div><div class="value">{{ data.vwap }}</div><div class="sub">SPY VWAP x 10</div></div>
                 <div class="metric"><div class="label">VWAP Distance</div><div class="value {{ 'pass' if data.vwap_distance else 'fail' }}">{{ data.vwap_distance_pct }}%</div><div class="sub">≥ 0.15%</div></div>
-                <div class="metric" aria-hidden="true"></div>
+                <div class="metric {{ data.net_gex_class }}"><div class="label">Net GEX</div><div class="value">{{ data.net_gex_billions }}</div><div class="sub">{{ data.net_gex_subtext }}</div></div>
 
                 <div class="metric"><div class="label">Current Day High</div><div class="value">{{ data.current_day_high }}</div><div class="sub">Today's high</div></div>
                 <div class="metric"><div class="label">Current Day Low</div><div class="value">{{ data.current_day_low }}</div><div class="sub">Today's low</div></div>
@@ -649,6 +659,36 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
 def run_gex_service(settings: dict) -> dict:
     now_et = pd.Timestamp.now(tz=TIMEZONE)
     requested_date = now_et.date()
+    gex_snapshot = get_net_gex_snapshot()
+    spot_price = gex_snapshot["spot_price"]
+    gex_by_strike = gex_snapshot["gex_by_strike"]
+    chart_html = make_gex_chart(gex_by_strike, spot_price)
+
+    put_rows = gex_by_strike[gex_by_strike["net_gex"] < 0]
+    call_rows = gex_by_strike[gex_by_strike["net_gex"] > 0]
+    put_wall = float(put_rows.loc[put_rows["net_gex"].idxmin(), "strike"]) if not put_rows.empty else None
+    call_wall = float(call_rows.loc[call_rows["net_gex"].idxmax(), "strike"]) if not call_rows.empty else None
+    net_gex = gex_snapshot["net_gex"]
+
+    return {
+        "subtitle": f"Current date: {requested_date.isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        "requested_date": requested_date.isoformat(),
+        "expiration_date": requested_date.isoformat(),
+        "spot_price": f"{spot_price:,.2f}",
+        "net_gex_billions": format_billions(net_gex),
+        "call_wall": "N/A" if call_wall is None else f"{call_wall:,.0f}",
+        "put_wall": "N/A" if put_wall is None else f"{put_wall:,.0f}",
+        "chart_html": chart_html,
+        "refresh_interval": settings["refresh_interval"],
+        "chart_interval": settings["chart_interval"],
+        "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
+        "error": None,
+    }
+
+
+def get_net_gex_snapshot() -> dict:
+    now_et = pd.Timestamp.now(tz=TIMEZONE)
+    requested_date = now_et.date()
 
     options, underlying = fetch_spx_same_day_options(requested_date)
     spot_price = float(
@@ -672,27 +712,12 @@ def run_gex_service(settings: dict) -> dict:
         raise ValueError(
             f"No SPX strikes were available within +/- {int(GEX_STRIKE_WINDOW)} points of spot."
         )
-    chart_html = make_gex_chart(gex_by_strike, spot_price)
 
-    put_rows = gex_by_strike[gex_by_strike["net_gex"] < 0]
-    call_rows = gex_by_strike[gex_by_strike["net_gex"] > 0]
-    put_wall = float(put_rows.loc[put_rows["net_gex"].idxmin(), "strike"]) if not put_rows.empty else None
-    call_wall = float(call_rows.loc[call_rows["net_gex"].idxmax(), "strike"]) if not call_rows.empty else None
     net_gex = float(gex_by_strike["net_gex"].sum())
-
     return {
-        "subtitle": f"Current date: {requested_date.isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
-        "requested_date": requested_date.isoformat(),
-        "expiration_date": requested_date.isoformat(),
-        "spot_price": f"{spot_price:,.2f}",
-        "net_gex_billions": format_billions(net_gex),
-        "call_wall": "N/A" if call_wall is None else f"{call_wall:,.0f}",
-        "put_wall": "N/A" if put_wall is None else f"{put_wall:,.0f}",
-        "chart_html": chart_html,
-        "refresh_interval": settings["refresh_interval"],
-        "chart_interval": settings["chart_interval"],
-        "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
-        "error": None,
+        "spot_price": spot_price,
+        "gex_by_strike": gex_by_strike,
+        "net_gex": net_gex,
     }
 
 
@@ -1158,6 +1183,9 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
 def run_web_service(settings: dict) -> dict:
     now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     start_utc = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=LOOKBACK_DAYS)
+    net_gex_billions = "N/A"
+    net_gex_class = ""
+    net_gex_subtext = "Live options feed unavailable"
 
     with get_connection() as conn:
         spx = query_ticker_history(conn, SPX_TICKER, INTERVAL_NAME, start_utc)
@@ -1250,6 +1278,20 @@ def run_web_service(settings: dict) -> dict:
             trade = "SELL CALL SPREAD"
             structure = "Sell 10 call credit spreads, 20 points wide, short strike near 0.10 delta, stop at 2x credit received."
 
+    try:
+        net_gex = get_net_gex_snapshot()["net_gex"]
+        net_gex_billions = format_billions(net_gex)
+        if net_gex > 0:
+            net_gex_class = "gex-positive"
+            net_gex_subtext = "Positive gamma regime"
+        elif net_gex < 0:
+            net_gex_class = "gex-negative"
+            net_gex_subtext = "Negative gamma regime"
+        else:
+            net_gex_subtext = "Flat gamma regime"
+    except Exception:
+        pass
+
     chart_html = make_chart(
         chart_spx,
         range_high,
@@ -1277,6 +1319,9 @@ def run_web_service(settings: dict) -> dict:
         "outside_range": outside_range,
         "vwap_distance": vwap_distance,
         "open_distance": open_distance,
+        "net_gex_billions": net_gex_billions,
+        "net_gex_class": net_gex_class,
+        "net_gex_subtext": net_gex_subtext,
         "bullish": bullish,
         "bearish": bearish,
         "trade": trade,
