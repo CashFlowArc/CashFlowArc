@@ -123,6 +123,14 @@ HTML = """
         }
         .metric .label{color:var(--muted); font-size:12px; text-transform:uppercase;}
         .metric .value{margin-top:8px; font-size:26px; font-weight:700}
+        .metric .value.compact{font-size:22px; line-height:1.15}
+        .metric .value .value-date{
+            display:block;
+            margin-top:4px;
+            font-size:14px;
+            font-weight:600;
+            color:var(--muted);
+        }
         .metric .sub{margin-top:4px; color:var(--muted); font-size:12px}
         .metric.gex-positive{
             background:rgba(31, 206, 122, 0.12);
@@ -210,7 +218,7 @@ HTML = """
 
                 <div class="metric"><div class="label">VWAP(SPY)</div><div class="value">{{ data.vwap }}</div><div class="sub">SPY VWAP x 10</div></div>
                 <div class="metric"><div class="label">VWAP Distance</div><div class="value {{ 'pass' if data.vwap_distance else 'fail' }}">{{ data.vwap_distance_pct }}%</div><div class="sub">≥ 0.15%</div></div>
-                <div class="metric {{ data.net_gex_class }}"><div class="label">Net GEX</div><div class="value">{{ data.net_gex_display }}</div><div class="sub">{{ data.net_gex_subtext }}</div></div>
+                <div class="metric {{ data.net_gex_class }}"><div class="label">Net GEX</div><div class="value {{ 'compact' if data.net_gex_date else '' }}">{{ data.net_gex_billions }}{% if data.net_gex_date %}<span class="value-date">{{ data.net_gex_date }}</span>{% endif %}</div><div class="sub">{{ data.net_gex_subtext }}</div></div>
 
                 <div class="metric"><div class="label">Current Day High</div><div class="value">{{ data.current_day_high }}</div><div class="sub">Today's high</div></div>
                 <div class="metric"><div class="label">Current Day Low</div><div class="value">{{ data.current_day_low }}</div><div class="sub">Today's low</div></div>
@@ -1216,7 +1224,7 @@ def run_web_service(settings: dict) -> dict:
     start_utc = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=LOOKBACK_DAYS)
     current_et_date = pd.Timestamp.now(tz=TIMEZONE).date()
     net_gex_billions = "N/A"
-    net_gex_display = "N/A"
+    net_gex_date = ""
     net_gex_class = ""
     net_gex_subtext = "Live options feed unavailable"
 
@@ -1317,9 +1325,7 @@ def run_web_service(settings: dict) -> dict:
         net_gex_billions = format_billions(net_gex)
         expiration_date = gex_snapshot["expiration_date"]
         if expiration_date > current_et_date:
-            net_gex_display = f"{net_gex_billions} {expiration_date.isoformat()}"
-        else:
-            net_gex_display = net_gex_billions
+            net_gex_date = expiration_date.isoformat()
         if net_gex > 0:
             net_gex_class = "gex-positive"
             net_gex_subtext = "Positive gamma regime"
@@ -1359,7 +1365,7 @@ def run_web_service(settings: dict) -> dict:
         "vwap_distance": vwap_distance,
         "open_distance": open_distance,
         "net_gex_billions": net_gex_billions,
-        "net_gex_display": net_gex_display,
+        "net_gex_date": net_gex_date,
         "net_gex_class": net_gex_class,
         "net_gex_subtext": net_gex_subtext,
         "bullish": bullish,
