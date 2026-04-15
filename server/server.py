@@ -399,7 +399,7 @@ GEX_HTML = """
         </div>
 
         <div class="notes">
-            Uses the same-day SPX expiration that matches {{ data.requested_date }}. Gamma exposure is estimated from open interest, implied volatility, and Black-Scholes gamma with time capped at a minimum of {{ data.min_time_minutes }} minute(s) to avoid a zero-time singularity.
+            Uses the SPX expiration shown above. During market hours it prefers the current session's expiration, and after 4:00 PM Eastern it rolls forward to the next available expiration. Gamma exposure is estimated from open interest, implied volatility, and Black-Scholes gamma with time capped at a minimum of {{ data.min_time_minutes }} minute(s) to avoid a zero-time singularity.
         </div>
         {% endif %}
     </div>
@@ -484,7 +484,26 @@ def black_scholes_gamma(spot: float, strike: float, volatility: float, time_to_e
     return normal_pdf(d1) / (spot * vol_term)
 
 
-def fetch_spx_same_day_options(target_date: dt.date) -> tuple[pd.DataFrame, dict]:
+def resolve_gex_expiration_date(now_et: pd.Timestamp, available_dates: list[dt.date]) -> dt.date:
+    if not available_dates:
+        raise ValueError("Yahoo did not return any SPX expirations.")
+
+    current_date = now_et.date()
+    market_close = dt.time(16, 0)
+
+    if now_et.time() >= market_close:
+        for expiration_date in available_dates:
+            if expiration_date > current_date:
+                return expiration_date
+
+    for expiration_date in available_dates:
+        if expiration_date >= current_date:
+            return expiration_date
+
+    return available_dates[-1]
+
+
+def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, dict, dt.date]:
     cache_dir = os.path.join(tempfile.gettempdir(), "cashflowarc-yfinance-cache")
     os.makedirs(cache_dir, exist_ok=True)
     yf.set_tz_cache_location(cache_dir)
@@ -498,10 +517,13 @@ def fetch_spx_same_day_options(target_date: dt.date) -> tuple[pd.DataFrame, dict
         pd.Timestamp(exp).date(): exp
         for exp in available_expirations
     }
-    expiration_label = expiration_map.get(target_date)
+    selected_expiration_date = resolve_gex_expiration_date(now_et, sorted(expiration_map))
+    expiration_label = expiration_map.get(selected_expiration_date)
     if expiration_label is None:
         available = ", ".join(sorted(expiration_map.values()))
-        raise ValueError(f"No SPX expiration matched {target_date.isoformat()}. Available expirations: {available}")
+        raise ValueError(
+            f"No SPX expiration matched {selected_expiration_date.isoformat()}. Available expirations: {available}"
+        )
 
     chain = ticker.option_chain(expiration_label)
     calls = chain.calls.copy() if chain.calls is not None else pd.DataFrame()
@@ -510,9 +532,9 @@ def fetch_spx_same_day_options(target_date: dt.date) -> tuple[pd.DataFrame, dict
     puts["option_type"] = "put"
     options = pd.concat([calls, puts], ignore_index=True, sort=False)
     if options.empty:
-        raise ValueError(f"Yahoo returned an empty SPX chain for {target_date.isoformat()}.")
+        raise ValueError(f"Yahoo returned an empty SPX chain for {selected_expiration_date.isoformat()}.")
 
-    return options, chain.underlying or {}
+    return options, chain.underlying or {}, selected_expiration_date
 
 
 def build_gex_frame(options: pd.DataFrame, spot_price: float, now_et: pd.Timestamp, expiry_date: dt.date) -> pd.DataFrame:
@@ -667,10 +689,10 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
 
 def run_gex_service(settings: dict) -> dict:
     now_et = pd.Timestamp.now(tz=TIMEZONE)
-    requested_date = now_et.date()
     gex_snapshot = get_net_gex_snapshot()
     spot_price = gex_snapshot["spot_price"]
     gex_by_strike = gex_snapshot["gex_by_strike"]
+    expiration_date = gex_snapshot["expiration_date"]
     chart_html = make_gex_chart(gex_by_strike, spot_price)
 
     put_rows = gex_by_strike[gex_by_strike["net_gex"] < 0]
@@ -680,9 +702,9 @@ def run_gex_service(settings: dict) -> dict:
     net_gex = gex_snapshot["net_gex"]
 
     return {
-        "subtitle": f"Current date: {requested_date.isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
-        "requested_date": requested_date.isoformat(),
-        "expiration_date": requested_date.isoformat(),
+        "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        "requested_date": now_et.date().isoformat(),
+        "expiration_date": expiration_date.isoformat(),
         "spot_price": f"{spot_price:,.2f}",
         "net_gex_billions": format_billions(net_gex),
         "call_wall": "N/A" if call_wall is None else f"{call_wall:,.0f}",
@@ -697,9 +719,8 @@ def run_gex_service(settings: dict) -> dict:
 
 def get_net_gex_snapshot() -> dict:
     now_et = pd.Timestamp.now(tz=TIMEZONE)
-    requested_date = now_et.date()
 
-    options, underlying = fetch_spx_same_day_options(requested_date)
+    options, underlying, expiration_date = fetch_spx_options_for_session(now_et)
     spot_price = float(
         underlying.get("regularMarketPrice")
         or underlying.get("postMarketPrice")
@@ -710,7 +731,7 @@ def get_net_gex_snapshot() -> dict:
     if spot_price <= 0:
         raise ValueError("Could not determine the current SPX price from the options feed.")
 
-    gex_by_strike = build_gex_frame(options, spot_price, now_et, requested_date)
+    gex_by_strike = build_gex_frame(options, spot_price, now_et, expiration_date)
     strike_min = spot_price - GEX_STRIKE_WINDOW
     strike_max = spot_price + GEX_STRIKE_WINDOW
     gex_by_strike = gex_by_strike[
@@ -725,6 +746,7 @@ def get_net_gex_snapshot() -> dict:
     net_gex = float(gex_by_strike["net_gex"].sum())
     return {
         "spot_price": spot_price,
+        "expiration_date": expiration_date,
         "gex_by_strike": gex_by_strike,
         "net_gex": net_gex,
     }
