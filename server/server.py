@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request
+from flask import Flask, redirect, render_template_string, request, url_for
 import datetime as dt
 import json
 import math
@@ -19,6 +19,7 @@ app = Flask(__name__)
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR / "data"
 SETTINGS_FILE = DATA_DIR / "ui_settings.json"
+FAVICON_VERSION = "2"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -48,7 +49,8 @@ HTML = """
 <head>
     <meta charset="utf-8">
     <title>CashFlowArc</title>
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
+    <link rel="shortcut icon" href="{{ url_for('favicon_ico') }}">
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -297,7 +299,8 @@ GEX_HTML = """
 <head>
     <meta charset="utf-8">
     <title>CashFlowArc</title>
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
+    <link rel="shortcut icon" href="{{ url_for('favicon_ico') }}">
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -1416,11 +1419,16 @@ def update_settings():
     return ("", 204)
 
 
+@app.route("/favicon.ico")
+def favicon_ico():
+    return redirect(url_for("static", filename="favicon.svg", v=FAVICON_VERSION), code=302)
+
+
 @app.route("/")
 def index():
     settings = load_settings()
     data = run_web_service(settings)
-    return render_template_string(HTML, data=data)
+    return render_template_string(HTML, data=data, favicon_version=FAVICON_VERSION)
 
 
 @app.route("/gex")
@@ -1444,7 +1452,7 @@ def gex():
             "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
             "error": str(exc),
         }
-    return render_template_string(GEX_HTML, data=data)
+    return render_template_string(GEX_HTML, data=data, favicon_version=FAVICON_VERSION)
 
 
 if __name__ == "__main__":
