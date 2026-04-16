@@ -48,6 +48,7 @@ HTML = """
 <head>
     <meta charset="utf-8">
     <title>CashFlowArc</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -296,6 +297,7 @@ GEX_HTML = """
 <head>
     <meta charset="utf-8">
     <title>CashFlowArc</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
