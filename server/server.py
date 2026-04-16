@@ -199,8 +199,8 @@ HTML = """
                 <tr><td>Outside 9:30–10:00 Range</td><td class="{{ 'pass' if data.outside_range else 'fail' }}">{{ 'PASS' if data.outside_range else 'FAIL' }}</td><td>{{ data.price }} vs {{ data.range_low }} / {{ data.range_high }}</td></tr>
                 <tr><td>VWAP Distance ≥ 0.15%</td><td class="{{ 'pass' if data.vwap_distance else 'fail' }}">{{ 'PASS' if data.vwap_distance else 'FAIL' }}</td><td>{{ data.vwap_distance_pct }}%</td></tr>
                 <tr><td>Distance from Open > 0.30%</td><td class="{{ 'pass' if data.open_distance else 'fail' }}">{{ 'PASS' if data.open_distance else 'FAIL' }}</td><td>{{ data.open_distance_pct }}%</td></tr>
-                <tr><td>Bullish Setup</td><td class="{{ 'pass' if data.bullish else 'fail' }}">{{ 'Yes' if data.bullish else 'No' }}</td><td><span style="color: {{ 'var(--green)' if data.price > data.vwap else 'var(--red)' }}; font-weight:700;">Price &gt; VWAP(SPY)</span>, <span style="color: {{ 'var(--green)' if data.ema9 > data.ema21 else 'var(--red)' }}; font-weight:700;">EMA9 &gt; EMA21</span></td></tr>
-                <tr><td>Bearish Setup</td><td class="{{ 'pass' if data.bearish else 'fail' }}">{{ 'Yes' if data.bearish else 'No' }}</td><td><span style="color: {{ 'var(--green)' if data.price < data.vwap else 'var(--red)' }}; font-weight:700;">Price &lt; VWAP(SPY)</span>, <span style="color: {{ 'var(--green)' if data.ema9 < data.ema21 else 'var(--red)' }}; font-weight:700;">EMA9 &lt; EMA21</span></td></tr>
+                <tr><td>Bullish Setup</td><td class="{{ 'pass' if data.bullish else 'fail' }}">{{ 'Yes' if data.bullish else 'No' }}</td><td><span style="color: {{ 'var(--green)' if data.price > data.vwap else 'var(--red)' }}; font-weight:700;">Price &gt; SPX VWAP Proxy</span>, <span style="color: {{ 'var(--green)' if data.ema9 > data.ema21 else 'var(--red)' }}; font-weight:700;">EMA9 &gt; EMA21</span></td></tr>
+                <tr><td>Bearish Setup</td><td class="{{ 'pass' if data.bearish else 'fail' }}">{{ 'Yes' if data.bearish else 'No' }}</td><td><span style="color: {{ 'var(--green)' if data.price < data.vwap else 'var(--red)' }}; font-weight:700;">Price &lt; SPX VWAP Proxy</span>, <span style="color: {{ 'var(--green)' if data.ema9 < data.ema21 else 'var(--red)' }}; font-weight:700;">EMA9 &lt; EMA21</span></td></tr>
             </table>
 
             <div class="metrics">
@@ -216,7 +216,7 @@ HTML = """
                 <div class="metric"><div class="label">EMA 9</div><div class="value">{{ data.ema9 }}</div><div class="sub">SPX fast trend</div></div>
                 <div class="metric"><div class="label">EMA 21</div><div class="value">{{ data.ema21 }}</div><div class="sub">SPX slow trend</div></div>
 
-                <div class="metric"><div class="label">VWAP(SPY)</div><div class="value">{{ data.vwap }}</div><div class="sub">SPY VWAP x 10</div></div>
+                <div class="metric"><div class="label">SPX VWAP Proxy</div><div class="value">{{ data.vwap }}</div><div class="sub">SPY VWAP scaled by rolling median SPX/SPY ratio</div></div>
                 <div class="metric"><div class="label">VWAP Distance</div><div class="value {{ 'pass' if data.vwap_distance else 'fail' }}">{{ data.vwap_distance_pct }}%</div><div class="sub">≥ 0.15%</div></div>
                 <div class="metric {{ data.net_gex_class }}"><div class="label">Net GEX</div><div class="value {{ 'compact' if data.net_gex_date else '' }}">{{ data.net_gex_billions }}{% if data.net_gex_date %}<span class="value-date">{{ data.net_gex_date }}</span>{% endif %}</div><div class="sub">{{ data.net_gex_subtext }}</div></div>
 
@@ -803,6 +803,10 @@ def calculate_vwap(df: pd.DataFrame) -> pd.Series:
     return pv / vol
 
 
+def calculate_rolling_median_ratio(series: pd.Series, window: int = 15) -> pd.Series:
+    return series.rolling(window=window, min_periods=1).median()
+
+
 
 
 def first_valid_number(series: pd.Series):
@@ -846,7 +850,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         working = working[working["ts"].dt.date.isin(keep_dates)].copy()
 
     spx_resampled = (
-        working[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spy_x10"]]
+        working[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spx_proxy"]]
         .resample(resample_rule, on="ts", label="right", closed="right")
         .agg({
             "open_price": "first",
@@ -855,7 +859,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             "close_price": "last",
             "ema9_spx": "last",
             "ema21_spx": "last",
-            "vwap_spy_x10": "last",
+            "vwap_spx_proxy": "last",
         })
         .dropna(subset=["open_price", "high_price", "low_price", "close_price"])
         .reset_index()
@@ -927,9 +931,9 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     ))
     fig.add_trace(go.Scatter(
         x=spx_resampled["xpos"],
-        y=spx_resampled["vwap_spy_x10"],
+        y=spx_resampled["vwap_spx_proxy"],
         mode="lines",
-        name="VWAP(SPY)x10",
+        name="SPX VWAP Proxy",
         hoverinfo="skip",
         hovertemplate=None,
         line=dict(color="#9b87f5", width=2),
@@ -1254,31 +1258,42 @@ def run_web_service(settings: dict) -> dict:
     if spx_current.empty or spy_current.empty or spx_prev.empty or spy_prev.empty:
         return {"time": now, "error": f"Could not separate current/prior session data from {SOURCE_TABLE}.", **settings}
 
-    spy["trade_date"] = spy["ts"].dt.date
-    spy["vwap_spy"] = spy.groupby("trade_date", group_keys=False).apply(calculate_vwap).reset_index(level=0, drop=True)
-    spy["vwap_spy_x10"] = spy["vwap_spy"] * 10.0
-
     spx["ema9_spx"] = spx["close_price"].ewm(span=9, adjust=False).mean()
     spx["ema21_spx"] = spx["close_price"].ewm(span=21, adjust=False).mean()
+    spy["trade_date"] = spy["ts"].dt.date
+    spx["trade_date"] = spx["ts"].dt.date
 
-    chart_spx = pd.merge_asof(
-        spx.sort_values("ts"),
-        spy[["ts", "vwap_spy_x10"]].dropna(subset=["vwap_spy_x10"]).sort_values("ts"),
-        on="ts",
-        direction="backward",
-        tolerance=pd.Timedelta(minutes=30),
+    spy_session = spy[intraday_session_mask(spy["ts"])].copy()
+    spx_session = spx[intraday_session_mask(spx["ts"])].copy()
+
+    spy_session["vwap_spy"] = (
+        spy_session.groupby("trade_date", group_keys=False).apply(calculate_vwap).reset_index(level=0, drop=True)
     )
-    chart_spx["vwap_spy_x10"] = pd.to_numeric(chart_spx["vwap_spy_x10"], errors="coerce").ffill()
-    chart_spx = chart_spx.dropna(subset=["open_price", "high_price", "low_price", "close_price"]).copy()
 
-    spx_current = spx[spx["ts"].dt.date == current_date].copy()
-    spy_current = spy[spy["ts"].dt.date == current_date].copy()
+    chart_spx = pd.merge(
+        spx_session.sort_values("ts"),
+        spy_session[["ts", "trade_date", "close_price", "vwap_spy"]]
+        .rename(columns={"close_price": "spy_close"})
+        .sort_values("ts"),
+        on=["ts", "trade_date"],
+        how="inner",
+    )
+    chart_spx["spx_spy_ratio"] = chart_spx["close_price"] / chart_spx["spy_close"].replace(0, pd.NA)
+    chart_spx["spx_spy_ratio"] = pd.to_numeric(chart_spx["spx_spy_ratio"], errors="coerce")
+    chart_spx["spx_spy_ratio_median"] = (
+        chart_spx.groupby("trade_date", group_keys=False)["spx_spy_ratio"].transform(calculate_rolling_median_ratio)
+    )
+    chart_spx["vwap_spx_proxy"] = chart_spx["vwap_spy"] * chart_spx["spx_spy_ratio_median"]
+    chart_spx = chart_spx.dropna(subset=["open_price", "high_price", "low_price", "close_price", "vwap_spx_proxy"]).copy()
+
+    spx_current = chart_spx[chart_spx["ts"].dt.date == current_date].copy()
+    spy_current = spy_session[spy_session["ts"].dt.date == current_date].copy()
 
     latest_price = last_valid_number(spx_current["close_price"])
     latest_ema9 = last_valid_number(spx_current["ema9_spx"])
     latest_ema21 = last_valid_number(spx_current["ema21_spx"])
     open_price = first_valid_number(spx_current["open_price"])
-    latest_vwap = last_valid_number(spy_current["vwap_spy_x10"])
+    latest_vwap = last_valid_number(spx_current["vwap_spx_proxy"])
 
     if None in {latest_price, latest_ema9, latest_ema21, open_price, latest_vwap}:
         return {"time": now, "error": f"Missing current-session values in {SOURCE_TABLE}.", **settings}
