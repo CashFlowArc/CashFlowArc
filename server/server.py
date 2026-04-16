@@ -647,7 +647,7 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
     )
     fig.add_annotation(
         x=spot_price,
-        y=1.06,
+        y=0.965,
         yref="paper",
         text=f"Last Price: {spot_price:,.2f}",
         showarrow=False,
