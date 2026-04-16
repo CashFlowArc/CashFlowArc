@@ -647,7 +647,7 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
     )
     fig.add_annotation(
         x=spot_price,
-        y=1,
+        y=1.06,
         yref="paper",
         text=f"Last Price: {spot_price:,.2f}",
         showarrow=False,
@@ -663,7 +663,7 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
         title=dict(text="$SPX - Gamma Exposure by Strike", x=0.5, xanchor="center", font=dict(size=18, color="#e8eef7")),
         paper_bgcolor="#17202b",
         plot_bgcolor="#17202b",
-        margin=dict(l=70, r=70, t=70, b=70),
+        margin=dict(l=70, r=70, t=100, b=70),
         font=dict(color="#e8eef7", family="Segoe UI, Arial, sans-serif"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
         hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
