@@ -1,4 +1,4 @@
-from flask import Flask, redirect, render_template_string, request, url_for
+from flask import Flask, render_template_string, request, send_from_directory, url_for
 import datetime as dt
 import json
 import math
@@ -49,8 +49,7 @@ HTML = """
 <head>
     <meta charset="utf-8">
     <title>CashFlowArc</title>
-    <link rel="icon" href="{{ url_for('static', filename='favicon.svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
-    <link rel="shortcut icon" href="{{ url_for('favicon_ico') }}">
+    <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -299,8 +298,7 @@ GEX_HTML = """
 <head>
     <meta charset="utf-8">
     <title>CashFlowArc</title>
-    <link rel="icon" href="{{ url_for('static', filename='favicon.svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
-    <link rel="shortcut icon" href="{{ url_for('favicon_ico') }}">
+    <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -1419,9 +1417,14 @@ def update_settings():
     return ("", 204)
 
 
+@app.route("/favicon.svg")
+def favicon_svg():
+    return send_from_directory(app.static_folder, "favicon.svg", mimetype="image/svg+xml")
+
+
 @app.route("/favicon.ico")
 def favicon_ico():
-    return redirect(url_for("static", filename="favicon.svg", v=FAVICON_VERSION), code=302)
+    return ("", 204)
 
 
 @app.route("/")
