@@ -47,7 +47,7 @@ HTML = """
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Trading Terminal</title>
+    <title>CashFlowArc</title>
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -295,7 +295,7 @@ GEX_HTML = """
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>SPX 0DTE Gamma Exposure</title>
+    <title>CashFlowArc</title>
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
