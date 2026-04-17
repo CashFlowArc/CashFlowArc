@@ -410,7 +410,7 @@ GEX_HTML = """
         </div>
 
         <div class="notes">
-            Uses the SPX expiration shown above. During market hours it prefers the current session's expiration. After 4:00 PM Eastern it prefers the next available expiration, but falls back to the nearest chain with usable open interest if Yahoo has not populated the forward chain yet. Gamma exposure is estimated from open interest, implied volatility, and Black-Scholes gamma with time capped at a minimum of {{ data.min_time_minutes }} minute(s) to avoid a zero-time singularity.
+            Uses the SPX expiration shown above. During market hours it prefers the current session's expiration. After 4:00 PM Eastern it prefers the next available expiration, but falls back to the nearest chain with usable near-spot open interest if Yahoo has not populated the forward chain yet. Gamma exposure is estimated from open interest, implied volatility, and Black-Scholes gamma with time capped at a minimum of {{ data.min_time_minutes }} minute(s) to avoid a zero-time singularity.
         </div>
         {% endif %}
     </div>
@@ -562,12 +562,45 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
             )
             continue
 
-        return options, chain.underlying or {}, selected_expiration_date
+        underlying = chain.underlying or {}
+        if not candidate_has_usable_gex_data(options, underlying):
+            last_empty_error = (
+                f"Yahoo returned no usable near-spot SPX open interest for {selected_expiration_date.isoformat()}."
+            )
+            continue
+
+        return options, underlying, selected_expiration_date
 
     available = ", ".join(sorted(expiration_map.values()))
     raise ValueError(
         last_empty_error or f"No SPX expiration matched usable data. Available expirations: {available}"
     )
+
+
+def candidate_has_usable_gex_data(options: pd.DataFrame, underlying: dict) -> bool:
+    spot_price = float(
+        underlying.get("regularMarketPrice")
+        or underlying.get("postMarketPrice")
+        or underlying.get("preMarketPrice")
+        or underlying.get("previousClose")
+        or 0.0
+    )
+    if spot_price <= 0:
+        return False
+
+    working = options.copy()
+    working["strike"] = pd.to_numeric(working.get("strike"), errors="coerce")
+    working["openInterest"] = pd.to_numeric(working.get("openInterest"), errors="coerce").fillna(0.0)
+    working["impliedVolatility"] = pd.to_numeric(working.get("impliedVolatility"), errors="coerce")
+    working = working.dropna(subset=["strike", "impliedVolatility"])
+    working = working[
+        (working["strike"] > 0) &
+        (working["impliedVolatility"] > 0) &
+        (working["openInterest"] > 0) &
+        (working["strike"] >= spot_price - GEX_STRIKE_WINDOW) &
+        (working["strike"] <= spot_price + GEX_STRIKE_WINDOW)
+    ].copy()
+    return not working.empty
 
 
 def build_gex_frame(options: pd.DataFrame, spot_price: float, now_et: pd.Timestamp, expiry_date: dt.date) -> pd.DataFrame:
