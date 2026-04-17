@@ -6,6 +6,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -45,7 +46,7 @@ GEX_STRIKE_WINDOW = float(os.environ.get("GEX_STRIKE_WINDOW", "50"))
 
 
 class NoOpenInterestInFeedError(Exception):
-    def __init__(self, expiration_date: dt.date | None, underlying: dict | None = None):
+    def __init__(self, expiration_date: Optional[dt.date], underlying: Optional[dict] = None):
         super().__init__("No Open Interest In Feed")
         self.expiration_date = expiration_date
         self.underlying = underlying or {}
@@ -545,7 +546,7 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
 
     last_empty_error = ""
     last_underlying: dict = {}
-    last_selected_expiration_date: dt.date | None = None
+    last_selected_expiration_date: Optional[dt.date] = None
     for selected_expiration_date in candidate_dates:
         expiration_label = expiration_map.get(selected_expiration_date)
         if expiration_label is None:
