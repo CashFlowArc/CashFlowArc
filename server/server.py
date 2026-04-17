@@ -410,7 +410,7 @@ GEX_HTML = """
         </div>
 
         <div class="notes">
-            Uses the SPX expiration shown above. During market hours it prefers the current session's expiration, and after 4:00 PM Eastern it rolls forward to the next available expiration. Gamma exposure is estimated from open interest, implied volatility, and Black-Scholes gamma with time capped at a minimum of {{ data.min_time_minutes }} minute(s) to avoid a zero-time singularity.
+            Uses the SPX expiration shown above. During market hours it prefers the current session's expiration. After 4:00 PM Eastern it prefers the next available expiration, but falls back to the nearest chain with usable open interest if Yahoo has not populated the forward chain yet. Gamma exposure is estimated from open interest, implied volatility, and Black-Scholes gamma with time capped at a minimum of {{ data.min_time_minutes }} minute(s) to avoid a zero-time singularity.
         </div>
         {% endif %}
     </div>
@@ -528,24 +528,46 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
         pd.Timestamp(exp).date(): exp
         for exp in available_expirations
     }
-    selected_expiration_date = resolve_gex_expiration_date(now_et, sorted(expiration_map))
-    expiration_label = expiration_map.get(selected_expiration_date)
-    if expiration_label is None:
-        available = ", ".join(sorted(expiration_map.values()))
-        raise ValueError(
-            f"No SPX expiration matched {selected_expiration_date.isoformat()}. Available expirations: {available}"
-        )
+    available_dates = sorted(expiration_map)
+    preferred_expiration_date = resolve_gex_expiration_date(now_et, available_dates)
 
-    chain = ticker.option_chain(expiration_label)
-    calls = chain.calls.copy() if chain.calls is not None else pd.DataFrame()
-    puts = chain.puts.copy() if chain.puts is not None else pd.DataFrame()
-    calls["option_type"] = "call"
-    puts["option_type"] = "put"
-    options = pd.concat([calls, puts], ignore_index=True, sort=False)
-    if options.empty:
-        raise ValueError(f"Yahoo returned an empty SPX chain for {selected_expiration_date.isoformat()}.")
+    candidate_dates: list[dt.date] = [preferred_expiration_date]
+    current_date = now_et.date()
+    if current_date in expiration_map and current_date not in candidate_dates:
+        candidate_dates.append(current_date)
+    for expiration_date in available_dates:
+        if expiration_date not in candidate_dates:
+            candidate_dates.append(expiration_date)
 
-    return options, chain.underlying or {}, selected_expiration_date
+    last_empty_error = ""
+    for selected_expiration_date in candidate_dates:
+        expiration_label = expiration_map.get(selected_expiration_date)
+        if expiration_label is None:
+            continue
+
+        chain = ticker.option_chain(expiration_label)
+        calls = chain.calls.copy() if chain.calls is not None else pd.DataFrame()
+        puts = chain.puts.copy() if chain.puts is not None else pd.DataFrame()
+        calls["option_type"] = "call"
+        puts["option_type"] = "put"
+        options = pd.concat([calls, puts], ignore_index=True, sort=False)
+        if options.empty:
+            last_empty_error = f"Yahoo returned an empty SPX chain for {selected_expiration_date.isoformat()}."
+            continue
+
+        total_open_interest = pd.to_numeric(options.get("openInterest"), errors="coerce").fillna(0.0).sum()
+        if total_open_interest <= 0:
+            last_empty_error = (
+                f"Yahoo returned no usable SPX open interest for {selected_expiration_date.isoformat()}."
+            )
+            continue
+
+        return options, chain.underlying or {}, selected_expiration_date
+
+    available = ", ".join(sorted(expiration_map.values()))
+    raise ValueError(
+        last_empty_error or f"No SPX expiration matched usable data. Available expirations: {available}"
+    )
 
 
 def build_gex_frame(options: pd.DataFrame, spot_price: float, now_et: pd.Timestamp, expiry_date: dt.date) -> pd.DataFrame:
