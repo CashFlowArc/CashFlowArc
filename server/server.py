@@ -43,6 +43,13 @@ GEX_CONTRACT_SIZE = int(os.environ.get("GEX_CONTRACT_SIZE", "100"))
 GEX_MIN_TIME_SECONDS = int(os.environ.get("GEX_MIN_TIME_SECONDS", "60"))
 GEX_STRIKE_WINDOW = float(os.environ.get("GEX_STRIKE_WINDOW", "50"))
 
+
+class NoOpenInterestInFeedError(Exception):
+    def __init__(self, expiration_date: dt.date | None, underlying: dict | None = None):
+        super().__init__("No Open Interest In Feed")
+        self.expiration_date = expiration_date
+        self.underlying = underlying or {}
+
 HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -535,11 +542,10 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
     current_date = now_et.date()
     if current_date in expiration_map and current_date not in candidate_dates:
         candidate_dates.append(current_date)
-    for expiration_date in available_dates:
-        if expiration_date not in candidate_dates:
-            candidate_dates.append(expiration_date)
 
     last_empty_error = ""
+    last_underlying: dict = {}
+    last_selected_expiration_date: dt.date | None = None
     for selected_expiration_date in candidate_dates:
         expiration_label = expiration_map.get(selected_expiration_date)
         if expiration_label is None:
@@ -555,6 +561,10 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
             last_empty_error = f"Yahoo returned an empty SPX chain for {selected_expiration_date.isoformat()}."
             continue
 
+        underlying = chain.underlying or {}
+        last_underlying = underlying
+        last_selected_expiration_date = selected_expiration_date
+
         total_open_interest = pd.to_numeric(options.get("openInterest"), errors="coerce").fillna(0.0).sum()
         if total_open_interest <= 0:
             last_empty_error = (
@@ -562,7 +572,6 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
             )
             continue
 
-        underlying = chain.underlying or {}
         if not candidate_has_usable_gex_data(options, underlying):
             last_empty_error = (
                 f"Yahoo returned no usable near-spot SPX open interest for {selected_expiration_date.isoformat()}."
@@ -570,6 +579,9 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
             continue
 
         return options, underlying, selected_expiration_date
+
+    if "open interest" in last_empty_error.lower():
+        raise NoOpenInterestInFeedError(last_selected_expiration_date or preferred_expiration_date, last_underlying)
 
     available = ", ".join(sorted(expiration_map.values()))
     raise ValueError(
@@ -781,6 +793,15 @@ def run_gex_service(settings: dict) -> dict:
         "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
         "error": None,
     }
+
+
+def make_gex_notice(message: str) -> str:
+    return (
+        "<div style='min-height:520px;display:flex;align-items:center;justify-content:center;"
+        "color:#b42318;font-size:22px;font-weight:700;'>"
+        f"{message}"
+        "</div>"
+    )
 
 
 def get_net_gex_snapshot() -> dict:
@@ -1494,6 +1515,31 @@ def gex():
     settings = load_settings()
     try:
         data = run_gex_service(settings)
+    except NoOpenInterestInFeedError as exc:
+        now_et = pd.Timestamp.now(tz=TIMEZONE)
+        underlying = exc.underlying or {}
+        spot_price = float(
+            underlying.get("regularMarketPrice")
+            or underlying.get("postMarketPrice")
+            or underlying.get("preMarketPrice")
+            or underlying.get("previousClose")
+            or 0.0
+        )
+        expiration_date = exc.expiration_date or now_et.date()
+        data = {
+            "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            "requested_date": now_et.date().isoformat(),
+            "expiration_date": expiration_date.isoformat(),
+            "spot_price": "N/A" if spot_price <= 0 else f"{spot_price:,.2f}",
+            "net_gex_billions": "N/A",
+            "call_wall": "N/A",
+            "put_wall": "N/A",
+            "chart_html": make_gex_notice("No Open Interest In Feed"),
+            "refresh_interval": settings["refresh_interval"],
+            "chart_interval": settings["chart_interval"],
+            "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
+            "error": None,
+        }
     except Exception as exc:
         now_et = pd.Timestamp.now(tz=TIMEZONE)
         data = {
