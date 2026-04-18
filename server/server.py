@@ -3,6 +3,7 @@ import datetime as dt
 import json
 import math
 import os
+import random
 import re
 from pathlib import Path
 from typing import Optional
@@ -183,6 +184,7 @@ HTML = """
                 <a class="nav-link active" href="/">Trading Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
                 <a class="nav-link" href="/option-chain">SPX Option Chain</a>
+                <a class="nav-link" href="/simulator">Simulator</a>
             </div>
             <form id="settings-form" method="post" action="/settings" class="control-form">
                 <span class="control-label">Refresh Interval</span>
@@ -414,6 +416,7 @@ GEX_HTML = """
                 <a class="nav-link" href="/">Trading Terminal</a>
                 <a class="nav-link active" href="/gex">SPX GEX</a>
                 <a class="nav-link" href="/option-chain">SPX Option Chain</a>
+                <a class="nav-link" href="/simulator">Simulator</a>
             </div>
             <form id="gex-settings-form" method="post" action="/settings" class="control-form">
                 <span class="control-label">Refresh Interval</span>
@@ -579,6 +582,7 @@ OPTION_CHAIN_HTML = """
                 <a class="nav-link" href="/">Trading Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
                 <a class="nav-link active" href="/option-chain">SPX Option Chain</a>
+                <a class="nav-link" href="/simulator">Simulator</a>
             </div>
             <form id="option-settings-form" method="post" action="/settings" class="control-form">
                 <span class="control-label">Refresh Interval</span>
@@ -671,6 +675,283 @@ OPTION_CHAIN_HTML = """
     }
 })();
 </script>
+</body>
+</html>
+"""
+
+SIMULATOR_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>CashFlowArc</title>
+    <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        :root{
+            --panel:#121821;
+            --panel-2:#17202b;
+            --border:#273244;
+            --text:#e8eef7;
+            --muted:#8fa2b7;
+            --green:#1fce7a;
+            --red:#ff5d5d;
+            --yellow:#ffcc66;
+        }
+        *{box-sizing:border-box}
+        body{
+            margin:0;
+            font-family:Segoe UI, Arial, sans-serif;
+            background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
+            color:var(--text);
+        }
+        .wrap{max-width:1800px; margin:0 auto; padding:18px;}
+        .topbar{
+            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
+            gap:16px; margin-bottom:16px; padding:14px 18px;
+            background:var(--panel); border:1px solid var(--border); border-radius:14px;
+        }
+        .title h1{margin:0; font-size:28px}
+        .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
+        .top-right{
+            margin-left:auto;
+            display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+        }
+        .nav-links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+        .nav-link{
+            color:var(--muted); text-decoration:none; font-size:13px; font-weight:700;
+            padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
+        }
+        .nav-link.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
+        .control-form{
+            display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:8px 10px;
+        }
+        .control-label{font-size:13px; color:var(--text); font-weight:700}
+        .text-input{
+            width:110px; background:#0f141b; color:var(--text);
+            border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
+        }
+        .text-input.ticker-input{width:120px}
+        .status-pill{
+            padding:10px 14px; border-radius:999px; font-weight:700;
+            border:1px solid var(--border); background:var(--panel-2);
+        }
+        .enter{color:#062b18; background:var(--green); border-color:var(--green)}
+        .no{color:#3b0d0d; background:#ff5d5d; border-color:#ff5d5d}
+        .card{
+            background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
+        }
+        .metrics{
+            display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;
+        }
+        @media (max-width: 1100px){ .metrics{grid-template-columns:repeat(2,1fr);} }
+        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} }
+        .metric{
+            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:14px;
+        }
+        .metric .label{font-size:12px; color:var(--muted); text-transform:uppercase}
+        .metric .value{margin-top:8px; font-size:24px; font-weight:700}
+        .metric .sub{margin-top:4px; font-size:12px; color:var(--muted)}
+        .chart-wrap{
+            min-height:640px; background:var(--panel-2); border:1px solid var(--border); border-radius:12px; overflow:hidden;
+        }
+        .chart-wrap .plotly-graph-div{width:100% !important; height:640px !important;}
+        .button{
+            cursor:pointer; border:1px solid var(--border); border-radius:8px; padding:8px 12px;
+            background:#0f141b; color:var(--text); font-size:13px; font-weight:700;
+        }
+        .error{font-size:18px; color:#b42318; font-weight:700}
+        .notes{margin-top:14px; font-size:12px; color:var(--muted); line-height:1.5}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="topbar">
+        <div class="title">
+            <h1>Simulator</h1>
+            <p>{{ data.subtitle }}</p>
+        </div>
+        <div class="top-right">
+            <div class="nav-links">
+                <a class="nav-link" href="/">Trading Terminal</a>
+                <a class="nav-link" href="/gex">SPX GEX</a>
+                <a class="nav-link" href="/option-chain">SPX Option Chain</a>
+                <a class="nav-link active" href="/simulator">Simulator</a>
+            </div>
+            <div class="status-pill {{ 'enter' if data.trade != 'NO TRADE' else 'no' }}">
+                {{ 'ENTER TRADE' if data.trade != 'NO TRADE' else 'NO TRADE' }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        {% if data.error %}
+        <div class="error">{{ data.error }}</div>
+        {% else %}
+        <form method="get" action="/simulator" class="control-form" style="margin-bottom:16px;">
+            <span class="control-label">Ticker</span>
+            <input class="text-input ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
+            <span class="control-label">Date</span>
+            <input class="text-input" type="date" name="trade_date" value="{{ data.trade_date }}">
+            <span class="control-label">Speed</span>
+            <input class="text-input" type="number" name="speed" min="0.5" max="60" step="0.5" value="{{ data.speed }}">
+            <button class="button" type="submit">Start Simulation</button>
+        </form>
+
+        <div class="metrics">
+            <div class="metric"><div class="label">Ticker</div><div class="value">{{ data.ticker }}</div><div class="sub">Stored Oracle symbol</div></div>
+            <div class="metric"><div class="label">Trade Date</div><div class="value">{{ data.trade_date }}</div><div class="sub">Selected trading session</div></div>
+            <div class="metric"><div class="label">Speed</div><div class="value">{{ data.speed_label }}</div><div class="sub">Simulation rate</div></div>
+            <div class="metric"><div class="label">Status</div><div id="simulator-status" class="value">Starting</div><div class="sub">Simulation clock</div></div>
+        </div>
+
+        <div id="simulator-chart" class="chart-wrap"></div>
+
+        <div class="notes">
+            Simulation uses Oracle 1-minute candles for the selected day. Each candle plays over 60 simulated seconds: 10 seconds at the open, 20 seconds to a random high/low, 20 seconds to the other extreme, and 10 seconds to the close. Rendering stops after the final intraday candle for the session.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if not data.error %}
+<script>
+(function() {
+    const candles = {{ data.simulator_payload|safe }};
+    const speed = {{ data.speed_js }};
+    const chartEl = document.getElementById('simulator-chart');
+    const statusEl = document.getElementById('simulator-status');
+    const totalSimSeconds = candles.length * 60;
+    const config = { displayModeBar: false, responsive: true };
+    const layout = {
+        margin: {l: 28, r: 28, t: 20, b: 50},
+        paper_bgcolor: '#17202b',
+        plot_bgcolor: '#17202b',
+        font: {color: '#e8eef7'},
+        xaxis: {
+            type: 'category',
+            showgrid: true,
+            gridcolor: '#273244',
+            rangeslider: {visible: false},
+            title: 'Time',
+            automargin: true,
+            showline: false,
+            zeroline: false,
+        },
+        yaxis: {
+            showgrid: true,
+            gridcolor: '#273244',
+            title: '{{ data.ticker }}',
+            automargin: true,
+            showline: false,
+            zeroline: false,
+        },
+        hovermode: 'closest',
+        hoverlabel: {bgcolor: '#0f141b', bordercolor: '#273244', font: {color: '#e8eef7'}},
+    };
+
+    function lerp(a, b, t) {
+        return a + ((b - a) * t);
+    }
+
+    function buildActiveCandle(candle, phaseSeconds) {
+        const firstKey = candle.first_move;
+        const secondKey = firstKey === 'high' ? 'low' : 'high';
+        const visited = [candle.open];
+        let current = candle.open;
+
+        if (phaseSeconds < 10) {
+            current = candle.open;
+        } else if (phaseSeconds < 30) {
+            current = lerp(candle.open, candle[firstKey], (phaseSeconds - 10) / 20);
+            visited.push(current);
+        } else if (phaseSeconds < 50) {
+            visited.push(candle[firstKey]);
+            current = lerp(candle[firstKey], candle[secondKey], (phaseSeconds - 30) / 20);
+            visited.push(current);
+        } else {
+            visited.push(candle[firstKey]);
+            visited.push(candle[secondKey]);
+            current = lerp(candle[secondKey], candle.close, (phaseSeconds - 50) / 10);
+            visited.push(current);
+        }
+
+        return {
+            open: candle.open,
+            high: Math.max.apply(null, visited),
+            low: Math.min.apply(null, visited),
+            close: current,
+        };
+    }
+
+    function renderChart(openVals, highVals, lowVals, closeVals, labels) {
+        Plotly.react(chartEl, [{
+            type: 'candlestick',
+            x: labels,
+            open: openVals,
+            high: highVals,
+            low: lowVals,
+            close: closeVals,
+            increasing: {line: {color: '#1fce7a'}, fillcolor: '#1fce7a'},
+            decreasing: {line: {color: '#ff5d5d'}, fillcolor: '#ff5d5d'},
+            hoverinfo: 'x+open+high+low+close',
+        }], layout, config);
+    }
+
+    if (!candles.length) {
+        statusEl.textContent = 'No Data';
+        renderChart([], [], [], [], []);
+        return;
+    }
+
+    const startedAt = Date.now();
+    let timerId = null;
+
+    function tick() {
+        const elapsedSeconds = ((Date.now() - startedAt) / 1000) * speed;
+        const cappedSeconds = Math.min(elapsedSeconds, totalSimSeconds);
+        const completed = Math.floor(cappedSeconds / 60);
+        const phase = cappedSeconds - (completed * 60);
+        const openVals = [];
+        const highVals = [];
+        const lowVals = [];
+        const closeVals = [];
+        const labels = [];
+
+        for (let i = 0; i < Math.min(completed, candles.length); i += 1) {
+            const candle = candles[i];
+            labels.push(candle.label);
+            openVals.push(candle.open);
+            highVals.push(candle.high);
+            lowVals.push(candle.low);
+            closeVals.push(candle.close);
+        }
+
+        if (completed < candles.length && cappedSeconds < totalSimSeconds) {
+            const candle = candles[completed];
+            const active = buildActiveCandle(candle, phase);
+            labels.push(candle.label);
+            openVals.push(active.open);
+            highVals.push(active.high);
+            lowVals.push(active.low);
+            closeVals.push(active.close);
+            statusEl.textContent = candle.label + ' • ' + Math.floor(phase) + 's • ' + speed + 'x';
+        } else {
+            statusEl.textContent = 'Complete • 16:00';
+            clearInterval(timerId);
+        }
+
+        renderChart(openVals, highVals, lowVals, closeVals, labels);
+    }
+
+    renderChart([], [], [], [], []);
+    tick();
+    timerId = setInterval(tick, 200);
+})();
+</script>
+{% endif %}
 </body>
 </html>
 """
@@ -1249,6 +1530,52 @@ def run_option_chain_service(settings: dict) -> dict:
     }
 
 
+def run_simulator_service(settings: dict, raw_ticker: Optional[str], raw_trade_date: Optional[str], raw_speed: Optional[str]) -> dict:
+    ticker = normalize_simulator_ticker(raw_ticker)
+    try:
+        speed = float(raw_speed) if raw_speed not in {None, ""} else 5.0
+    except Exception:
+        speed = 5.0
+    speed = max(0.5, min(60.0, speed))
+
+    with get_connection() as conn:
+        latest_trade_date = get_latest_trade_date(conn, ticker, INTERVAL_NAME)
+        if latest_trade_date is None:
+            raise ValueError(f"No {ticker} rows were found in {SOURCE_TABLE}.")
+
+        if raw_trade_date:
+            try:
+                trade_date = dt.date.fromisoformat(raw_trade_date)
+            except ValueError as exc:
+                raise ValueError("Invalid simulator date. Use YYYY-MM-DD.") from exc
+        else:
+            trade_date = latest_trade_date
+
+        day_rows = query_ticker_day(conn, ticker, INTERVAL_NAME, trade_date)
+
+    payload = build_simulator_payload(day_rows)
+    if not payload:
+        raise ValueError(f"No intraday {ticker} candles were found in {SOURCE_TABLE} for {trade_date.isoformat()}.")
+
+    terminal_snapshot = run_web_service(settings)
+    return {
+        "subtitle": (
+            f"Oracle playback for {ticker} | "
+            f"Date: {trade_date.isoformat()} | "
+            f"Latest available date: {latest_trade_date.isoformat()} | "
+            f"Stops after the 16:00 candle"
+        ),
+        "ticker": ticker,
+        "trade_date": trade_date.isoformat(),
+        "speed": format_option_price(speed),
+        "speed_label": f"{speed:g}x",
+        "speed_js": json.dumps(speed),
+        "simulator_payload": json.dumps(payload),
+        "trade": terminal_snapshot.get("trade", "NO TRADE"),
+        "error": None,
+    }
+
+
 def make_gex_notice(message: str) -> str:
     return (
         "<div style='min-height:520px;display:flex;align-items:center;justify-content:center;"
@@ -1327,6 +1654,102 @@ def query_ticker_history(conn, ticker: str, interval_name: str, start_utc: dt.da
     df["ts_utc"] = pd.to_datetime(df["ts_utc"], utc=True)
     df["ts"] = df["ts_utc"].dt.tz_convert(TIMEZONE).dt.tz_localize(None)
     return df.sort_values("ts").reset_index(drop=True)
+
+
+def normalize_simulator_ticker(raw_ticker: Optional[str]) -> str:
+    ticker = (raw_ticker or "").strip()
+    if not ticker:
+        return SPX_TICKER
+
+    normalized = ticker.upper()
+    aliases = {
+        "SPX": SPX_TICKER,
+        "GSPC": SPX_TICKER,
+    }
+    return aliases.get(normalized, ticker)
+
+
+def get_latest_trade_date(conn, ticker: str, interval_name: str) -> Optional[dt.date]:
+    sql = f"""
+        SELECT MAX(ts_utc)
+        FROM {SOURCE_TABLE}
+        WHERE ticker = :ticker
+          AND interval_name = :interval_name
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute(sql, {"ticker": ticker, "interval_name": interval_name})
+        row = cur.fetchone()
+    finally:
+        cur.close()
+
+    if row is None or row[0] is None:
+        return None
+
+    return pd.Timestamp(row[0], tz="UTC").tz_convert(TIMEZONE).date()
+
+
+def query_ticker_day(conn, ticker: str, interval_name: str, trade_date: dt.date) -> pd.DataFrame:
+    start_et = pd.Timestamp.combine(trade_date, dt.time(0, 0)).tz_localize(TIMEZONE)
+    end_et = start_et + pd.Timedelta(days=1)
+    start_utc = start_et.tz_convert("UTC").tz_localize(None)
+    end_utc = end_et.tz_convert("UTC").tz_localize(None)
+
+    sql = f"""
+        SELECT
+            ticker,
+            interval_name,
+            ts_utc,
+            open_price,
+            high_price,
+            low_price,
+            close_price,
+            volume
+        FROM {SOURCE_TABLE}
+        WHERE ticker = :ticker
+          AND interval_name = :interval_name
+          AND ts_utc >= :start_utc
+          AND ts_utc < :end_utc
+        ORDER BY ts_utc
+    """
+    df = pd.read_sql(
+        sql,
+        conn,
+        params={
+            "ticker": ticker,
+            "interval_name": interval_name,
+            "start_utc": start_utc,
+            "end_utc": end_utc,
+        },
+    )
+    if df.empty:
+        return df
+
+    df.columns = [c.lower() for c in df.columns]
+    df["ts_utc"] = pd.to_datetime(df["ts_utc"], utc=True)
+    df["ts"] = df["ts_utc"].dt.tz_convert(TIMEZONE).dt.tz_localize(None)
+    return df.sort_values("ts").reset_index(drop=True)
+
+
+def build_simulator_payload(df: pd.DataFrame) -> list[dict]:
+    working = df.copy()
+    working = working[intraday_session_mask(working["ts"])].copy()
+    working = working[working["ts"].dt.time <= dt.time(16, 0)].copy()
+    working = working.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
+    if working.empty:
+        return []
+
+    rows: list[dict] = []
+    for row in working.itertuples(index=False):
+        rows.append({
+            "label": row.ts.strftime("%H:%M"),
+            "open": float(row.open_price),
+            "high": float(row.high_price),
+            "low": float(row.low_price),
+            "close": float(row.close_price),
+            "first_move": random.choice(["high", "low"]),
+        })
+    return rows
 
 
 def calculate_vwap(df: pd.DataFrame) -> pd.Series:
@@ -2054,6 +2477,33 @@ def option_chain():
             "error": str(exc),
         }
     return render_template_string(OPTION_CHAIN_HTML, data=data, favicon_version=FAVICON_VERSION)
+
+
+@app.route("/simulator")
+def simulator():
+    settings = load_settings()
+    try:
+        data = run_simulator_service(
+            settings,
+            request.args.get("ticker"),
+            request.args.get("trade_date"),
+            request.args.get("speed"),
+        )
+    except Exception as exc:
+        fallback_ticker = normalize_simulator_ticker(request.args.get("ticker"))
+        fallback_speed = request.args.get("speed") or "5.00"
+        data = {
+            "subtitle": "Oracle playback simulator",
+            "ticker": fallback_ticker,
+            "trade_date": request.args.get("trade_date") or "",
+            "speed": fallback_speed,
+            "speed_label": f"{fallback_speed}x",
+            "speed_js": json.dumps(5.0),
+            "simulator_payload": "[]",
+            "trade": run_web_service(settings).get("trade", "NO TRADE"),
+            "error": str(exc),
+        }
+    return render_template_string(SIMULATOR_HTML, data=data, favicon_version=FAVICON_VERSION)
 
 
 if __name__ == "__main__":
