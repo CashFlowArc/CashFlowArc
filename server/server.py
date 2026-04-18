@@ -2676,6 +2676,8 @@ def simulator():
     raw_speed = request.args.get("speed")
     raw_points = request.args.get("points")
     raw_wide = request.args.get("wide")
+    if raw_trade_date not in {None, ""}:
+        settings["simulator_trade_date"] = raw_trade_date
     if raw_speed not in {None, ""}:
         try:
             simulator_speed = max(0.5, min(360.0, float(raw_speed)))
@@ -2692,7 +2694,7 @@ def simulator():
             settings["simulator_wide"] = max(0.0, float(raw_wide))
         except Exception:
             pass
-    if any(value not in {None, ""} for value in [raw_speed, raw_points, raw_wide]):
+    if any(value not in {None, ""} for value in [raw_trade_date, raw_speed, raw_points, raw_wide]):
         save_settings(settings)
 
     settings = load_settings()
