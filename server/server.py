@@ -795,11 +795,11 @@ SIMULATOR_HTML = """
         {% if data.error %}
         <div class="error">{{ data.error }}</div>
         {% else %}
-        <form method="get" action="/simulator" class="control-form" style="margin-bottom:16px;">
+        <form id="simulator-form" method="get" action="/simulator" class="control-form" style="margin-bottom:16px;">
             <span class="control-label">Ticker</span>
             <input class="text-input ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
             <span class="control-label">Date</span>
-            <input class="text-input date-input" type="date" name="trade_date" value="{{ data.trade_date }}">
+            <input id="simulator-trade-date" class="text-input date-input" type="date" name="trade_date" value="{{ data.trade_date }}">
             <span class="control-label">Speed</span>
             <input class="text-input" type="number" name="speed" min="0.5" max="360" step="0.5" value="{{ data.speed }}">
             <span class="control-label">Points +/-</span>
@@ -831,9 +831,12 @@ SIMULATOR_HTML = """
     const speed = {{ data.speed_js }};
     const pointsValue = {{ data.points_js }};
     const wideValue = {{ data.wide_js }};
+    const formEl = document.getElementById('simulator-form');
+    const dateInputEl = document.getElementById('simulator-trade-date');
     const chartEl = document.getElementById('simulator-chart');
     const statusEl = document.getElementById('simulator-status');
     const toggleEl = document.getElementById('simulator-toggle');
+    const storageKey = 'cashflowarc_simulator_trade_date';
     const totalSimSeconds = candles.length * 60;
     const guideAnchorLabel = '10:30';
     const guideAnchorIndex = candles.findIndex((candle) => candle.label === guideAnchorLabel);
@@ -952,6 +955,25 @@ SIMULATOR_HTML = """
 
     function formatStatus(label, suffix) {
         return tradeDate + ' ' + label + ' • ' + suffix;
+    }
+
+    if (dateInputEl) {
+        const params = new URLSearchParams(window.location.search);
+        const queryDate = params.get('trade_date');
+        const storedDate = window.localStorage.getItem(storageKey);
+        if (queryDate) {
+            window.localStorage.setItem(storageKey, queryDate);
+        } else if (storedDate) {
+            dateInputEl.value = storedDate;
+        }
+    }
+
+    if (formEl && dateInputEl) {
+        formEl.addEventListener('submit', function() {
+            if (dateInputEl.value) {
+                window.localStorage.setItem(storageKey, dateInputEl.value);
+            }
+        });
     }
 
     function renderChart(openVals, highVals, lowVals, closeVals, labels, showGuides) {
