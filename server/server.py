@@ -2553,6 +2553,10 @@ def update_settings():
     save_settings({
         "refresh_interval": max(15, min(3600, refresh_interval)),
         "chart_interval": chart_interval,
+        "simulator_speed": current.get("simulator_speed", 60.0),
+        "simulator_points": current.get("simulator_points", 70.0),
+        "simulator_wide": current.get("simulator_wide", 20.0),
+        "simulator_trade_date": current.get("simulator_trade_date", ""),
     })
     return ("", 204)
 
