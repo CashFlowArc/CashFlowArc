@@ -840,7 +840,6 @@ SIMULATOR_HTML = """
     const chartEl = document.getElementById('simulator-chart');
     const statusEl = document.getElementById('simulator-status');
     const toggleEl = document.getElementById('simulator-toggle');
-    const storageKey = 'cashflowarc_simulator_form';
     const totalSimSeconds = candles.length * 60;
     const guideAnchorLabel = '10:30';
     const guideAnchorIndex = candles.findIndex((candle) => candle.label === guideAnchorLabel);
@@ -961,70 +960,35 @@ SIMULATOR_HTML = """
         return tradeDate + ' ' + label + ' • ' + suffix;
     }
 
-    let restoredFromStorage = false;
-    const fieldMap = {
-        ticker: tickerInputEl,
-        trade_date: dateInputEl,
-        speed: speedInputEl,
-        points: pointsInputEl,
-        wide: wideInputEl,
-    };
+    let settingsTimer = null;
 
-    if (formEl) {
-        const params = new URLSearchParams(window.location.search);
-        const storedRaw = window.localStorage.getItem(storageKey);
-        const storedValues = storedRaw ? JSON.parse(storedRaw) : {};
-
-        Object.keys(fieldMap).forEach((key) => {
-            const input = fieldMap[key];
-            if (!input) return;
-
-            const queryValue = params.get(key);
-            if (queryValue) {
-                storedValues[key] = queryValue;
-            } else if (storedValues[key]) {
-                input.value = storedValues[key];
-                restoredFromStorage = true;
-            }
-        });
-
-        window.localStorage.setItem(storageKey, JSON.stringify(storedValues));
+    function persistSimulatorSettings() {
+        if (!formEl) return Promise.resolve();
+        const data = new FormData();
+        data.set('simulator_trade_date', dateInputEl ? dateInputEl.value : '');
+        data.set('simulator_speed', speedInputEl ? speedInputEl.value : '');
+        data.set('simulator_points', pointsInputEl ? pointsInputEl.value : '');
+        data.set('simulator_wide', wideInputEl ? wideInputEl.value : '');
+        return fetch('/settings', {method: 'POST', body: data}).catch(() => {});
     }
 
-    function persistFormValues() {
-        if (!formEl) return;
-        const storedValues = {};
-        Object.keys(fieldMap).forEach((key) => {
-            const input = fieldMap[key];
-            if (input && input.value !== '') {
-                storedValues[key] = input.value;
-            }
-        });
-        window.localStorage.setItem(storageKey, JSON.stringify(storedValues));
+    function debouncePersist() {
+        if (settingsTimer) clearTimeout(settingsTimer);
+        settingsTimer = setTimeout(() => {
+            persistSimulatorSettings();
+        }, 250);
     }
+
+    [dateInputEl, speedInputEl, pointsInputEl, wideInputEl].forEach((input) => {
+        if (!input) return;
+        input.addEventListener('input', debouncePersist);
+        input.addEventListener('change', debouncePersist);
+    });
 
     if (formEl) {
         formEl.addEventListener('submit', function() {
-            persistFormValues();
+            persistSimulatorSettings();
         });
-    }
-
-    if (restoredFromStorage && formEl) {
-        const params = new URLSearchParams(window.location.search);
-        const missingQueryValue = Object.keys(fieldMap).some((key) => {
-            const input = fieldMap[key];
-            return input && input.value && !params.get(key);
-        });
-        if (missingQueryValue) {
-            persistFormValues();
-            const formData = new FormData(formEl);
-            const nextParams = new URLSearchParams();
-            for (const [key, value] of formData.entries()) {
-                if (value !== '') nextParams.set(key, value);
-            }
-            window.location.replace(formEl.action + '?' + nextParams.toString());
-            return;
-        }
     }
 
     function renderChart(openVals, highVals, lowVals, closeVals, labels, showGuides) {
@@ -2622,13 +2586,33 @@ def update_settings():
     if chart_interval not in {"5min", "15min", "1h"}:
         chart_interval = current.get("chart_interval", "5min")
 
+    try:
+        simulator_speed = float(request.form.get("simulator_speed", current.get("simulator_speed", 60.0)))
+    except Exception:
+        simulator_speed = current.get("simulator_speed", 60.0)
+    simulator_speed = max(0.5, min(360.0, simulator_speed))
+
+    try:
+        simulator_points = float(request.form.get("simulator_points", current.get("simulator_points", 70.0)))
+    except Exception:
+        simulator_points = current.get("simulator_points", 70.0)
+    simulator_points = max(0.0, simulator_points)
+
+    try:
+        simulator_wide = float(request.form.get("simulator_wide", current.get("simulator_wide", 20.0)))
+    except Exception:
+        simulator_wide = current.get("simulator_wide", 20.0)
+    simulator_wide = max(0.0, simulator_wide)
+
+    simulator_trade_date = str(request.form.get("simulator_trade_date", current.get("simulator_trade_date", "")) or "")
+
     save_settings({
         "refresh_interval": max(15, min(3600, refresh_interval)),
         "chart_interval": chart_interval,
-        "simulator_speed": current.get("simulator_speed", 60.0),
-        "simulator_points": current.get("simulator_points", 70.0),
-        "simulator_wide": current.get("simulator_wide", 20.0),
-        "simulator_trade_date": current.get("simulator_trade_date", ""),
+        "simulator_speed": simulator_speed,
+        "simulator_points": simulator_points,
+        "simulator_wide": simulator_wide,
+        "simulator_trade_date": simulator_trade_date,
     })
     return ("", 204)
 
@@ -2749,28 +2733,6 @@ def simulator():
     raw_speed = request.args.get("speed")
     raw_points = request.args.get("points")
     raw_wide = request.args.get("wide")
-    if raw_trade_date not in {None, ""}:
-        settings["simulator_trade_date"] = raw_trade_date
-    if raw_speed not in {None, ""}:
-        try:
-            simulator_speed = max(0.5, min(360.0, float(raw_speed)))
-            settings["simulator_speed"] = simulator_speed
-        except Exception:
-            pass
-    if raw_points not in {None, ""}:
-        try:
-            settings["simulator_points"] = max(0.0, float(raw_points))
-        except Exception:
-            pass
-    if raw_wide not in {None, ""}:
-        try:
-            settings["simulator_wide"] = max(0.0, float(raw_wide))
-        except Exception:
-            pass
-    if any(value not in {None, ""} for value in [raw_trade_date, raw_speed, raw_points, raw_wide]):
-        save_settings(settings)
-
-    settings = load_settings()
     effective_trade_date = raw_trade_date if raw_trade_date not in {None, ""} else (settings.get("simulator_trade_date") or None)
     try:
         data = run_simulator_service(
@@ -2781,9 +2743,6 @@ def simulator():
             raw_points,
             raw_wide,
         )
-        if data.get("trade_date") and settings.get("simulator_trade_date") != data["trade_date"]:
-            settings["simulator_trade_date"] = data["trade_date"]
-            save_settings(settings)
     except Exception as exc:
         fallback_ticker = normalize_simulator_ticker(request.args.get("ticker"))
         fallback_speed = request.args.get("speed") or format_option_price(settings.get("simulator_speed", 60.0))
