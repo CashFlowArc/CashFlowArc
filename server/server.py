@@ -831,6 +831,7 @@ SIMULATOR_HTML = """
 <script>
 (function() {
     const candles = {{ data.simulator_payload|safe }};
+    const tradeDate = {{ data.trade_date|tojson }};
     const speed = {{ data.speed_js }};
     const pointsValue = {{ data.points_js }};
     const wideValue = {{ data.wide_js }};
@@ -953,6 +954,10 @@ SIMULATOR_HTML = """
         return [minVal - padding, maxVal + padding];
     }
 
+    function formatStatus(label, suffix) {
+        return tradeDate + ' ' + label + ' • ' + suffix;
+    }
+
     function renderChart(openVals, highVals, lowVals, closeVals, labels, showGuides) {
         const traces = [{
             type: 'candlestick',
@@ -961,6 +966,8 @@ SIMULATOR_HTML = """
             high: highVals,
             low: lowVals,
             close: closeVals,
+            name: '',
+            showlegend: false,
             increasing: {line: {color: '#1fce7a'}, fillcolor: '#1fce7a'},
             decreasing: {line: {color: '#ff5d5d'}, fillcolor: '#ff5d5d'},
             hoverinfo: 'x+open+high+low+close',
@@ -1018,9 +1025,9 @@ SIMULATOR_HTML = """
             highVals.push(active.high);
             lowVals.push(active.low);
             closeVals.push(active.close);
-            statusEl.textContent = candle.label + ' • ' + Math.floor(phase) + 's • ' + speed + 'x';
+            statusEl.textContent = formatStatus(candle.label, Math.floor(phase) + 's • ' + speed + 'x');
         } else {
-            statusEl.textContent = 'Complete • 16:00';
+            statusEl.textContent = formatStatus('16:00', 'Complete');
         }
 
         const showGuides = guideAnchorIndex >= 0 && completed > guideAnchorIndex;
@@ -1075,7 +1082,8 @@ SIMULATOR_HTML = """
         setToggleLabel();
         stopTimer();
         if (!completedRun) {
-            statusEl.textContent = 'Stopped • ' + speed + 'x';
+            const latestLabel = candles[Math.min(Math.floor(simulatedSeconds / 60), candles.length - 1)].label;
+            statusEl.textContent = formatStatus(latestLabel, 'Stopped • ' + speed + 'x');
         }
     }
 
