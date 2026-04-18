@@ -811,7 +811,6 @@ SIMULATOR_HTML = """
         </form>
 
         <div class="metrics">
-            <div class="metric"><div class="label">Ticker</div><div class="value">{{ data.ticker }}</div><div class="sub">Stored Oracle symbol</div></div>
             <div class="metric"><div class="label">Status</div><div id="simulator-status" class="value">Ready</div><div class="sub">Simulation clock</div></div>
         </div>
 
@@ -1728,7 +1727,6 @@ def run_simulator_service(
         "subtitle": (
             f"Oracle playback for {ticker} | "
             f"Date: {trade_date.isoformat()} | "
-            f"Latest available date: {latest_trade_date.isoformat()} | "
             "5-minute candles | Stops at 16:00"
         ),
         "ticker": ticker,
