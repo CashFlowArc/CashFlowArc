@@ -797,15 +797,15 @@ SIMULATOR_HTML = """
         {% else %}
         <form id="simulator-form" method="get" action="/simulator" class="control-form" style="margin-bottom:16px;">
             <span class="control-label">Ticker</span>
-            <input class="text-input ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
+            <input id="simulator-ticker" class="text-input ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
             <span class="control-label">Date</span>
             <input id="simulator-trade-date" class="text-input date-input" type="date" name="trade_date" value="{{ data.trade_date }}">
             <span class="control-label">Speed</span>
-            <input class="text-input" type="number" name="speed" min="0.5" max="360" step="0.5" value="{{ data.speed }}">
+            <input id="simulator-speed" class="text-input" type="number" name="speed" min="0.5" max="360" step="0.5" value="{{ data.speed }}">
             <span class="control-label">Points +/-</span>
-            <input class="text-input" type="number" name="points" min="0" step="1" value="{{ data.points }}">
+            <input id="simulator-points" class="text-input" type="number" name="points" min="0" step="1" value="{{ data.points }}">
             <span class="control-label">Wide</span>
-            <input class="text-input" type="number" name="wide" min="0" step="1" value="{{ data.wide }}">
+            <input id="simulator-wide" class="text-input" type="number" name="wide" min="0" step="1" value="{{ data.wide }}">
             <button class="button" type="submit">Load Session</button>
             <button id="simulator-toggle" class="button" type="button">Start Simulation</button>
         </form>
@@ -832,11 +832,15 @@ SIMULATOR_HTML = """
     const pointsValue = {{ data.points_js }};
     const wideValue = {{ data.wide_js }};
     const formEl = document.getElementById('simulator-form');
+    const tickerInputEl = document.getElementById('simulator-ticker');
     const dateInputEl = document.getElementById('simulator-trade-date');
+    const speedInputEl = document.getElementById('simulator-speed');
+    const pointsInputEl = document.getElementById('simulator-points');
+    const wideInputEl = document.getElementById('simulator-wide');
     const chartEl = document.getElementById('simulator-chart');
     const statusEl = document.getElementById('simulator-status');
     const toggleEl = document.getElementById('simulator-toggle');
-    const storageKey = 'cashflowarc_simulator_trade_date';
+    const storageKey = 'cashflowarc_simulator_form';
     const totalSimSeconds = candles.length * 60;
     const guideAnchorLabel = '10:30';
     const guideAnchorIndex = candles.findIndex((candle) => candle.label === guideAnchorLabel);
@@ -957,32 +961,63 @@ SIMULATOR_HTML = """
         return tradeDate + ' ' + label + ' • ' + suffix;
     }
 
-    let restoredDateFromStorage = false;
-    if (dateInputEl) {
+    let restoredFromStorage = false;
+    const fieldMap = {
+        ticker: tickerInputEl,
+        trade_date: dateInputEl,
+        speed: speedInputEl,
+        points: pointsInputEl,
+        wide: wideInputEl,
+    };
+
+    if (formEl) {
         const params = new URLSearchParams(window.location.search);
-        const queryDate = params.get('trade_date');
-        const storedDate = window.localStorage.getItem(storageKey);
-        if (queryDate) {
-            window.localStorage.setItem(storageKey, queryDate);
-        } else if (storedDate) {
-            dateInputEl.value = storedDate;
-            restoredDateFromStorage = true;
-        }
+        const storedRaw = window.localStorage.getItem(storageKey);
+        const storedValues = storedRaw ? JSON.parse(storedRaw) : {};
+
+        Object.keys(fieldMap).forEach((key) => {
+            const input = fieldMap[key];
+            if (!input) return;
+
+            const queryValue = params.get(key);
+            if (queryValue) {
+                storedValues[key] = queryValue;
+            } else if (storedValues[key]) {
+                input.value = storedValues[key];
+                restoredFromStorage = true;
+            }
+        });
+
+        window.localStorage.setItem(storageKey, JSON.stringify(storedValues));
     }
 
-    if (formEl && dateInputEl) {
-        formEl.addEventListener('submit', function() {
-            if (dateInputEl.value) {
-                window.localStorage.setItem(storageKey, dateInputEl.value);
+    function persistFormValues() {
+        if (!formEl) return;
+        const storedValues = {};
+        Object.keys(fieldMap).forEach((key) => {
+            const input = fieldMap[key];
+            if (input && input.value !== '') {
+                storedValues[key] = input.value;
             }
+        });
+        window.localStorage.setItem(storageKey, JSON.stringify(storedValues));
+    }
+
+    if (formEl) {
+        formEl.addEventListener('submit', function() {
+            persistFormValues();
         });
     }
 
-    if (restoredDateFromStorage && formEl) {
+    if (restoredFromStorage && formEl) {
         const params = new URLSearchParams(window.location.search);
-        if (!params.get('trade_date') && dateInputEl.value) {
+        const missingQueryValue = Object.keys(fieldMap).some((key) => {
+            const input = fieldMap[key];
+            return input && input.value && !params.get(key);
+        });
+        if (missingQueryValue) {
+            persistFormValues();
             const formData = new FormData(formEl);
-            formData.set('trade_date', dateInputEl.value);
             const nextParams = new URLSearchParams();
             for (const [key, value] of formData.entries()) {
                 if (value !== '') nextParams.set(key, value);
