@@ -1703,18 +1703,17 @@ def run_simulator_service(
         wide = float(settings.get("simulator_wide", 20.0))
     wide = max(0.0, wide)
 
-    with get_connection() as conn:
-        latest_trade_date = get_latest_trade_date(conn, ticker, INTERVAL_NAME)
-        if latest_trade_date is None:
-            raise ValueError(f"No {ticker} rows were found in {SOURCE_TABLE}.")
+    if not raw_trade_date:
+        raise ValueError("Select a simulator date.")
 
-        if raw_trade_date:
-            try:
-                trade_date = dt.date.fromisoformat(raw_trade_date)
-            except ValueError as exc:
-                raise ValueError("Invalid simulator date. Use YYYY-MM-DD.") from exc
-        else:
-            trade_date = latest_trade_date
+    try:
+        trade_date = dt.date.fromisoformat(raw_trade_date)
+    except ValueError as exc:
+        raise ValueError("Invalid simulator date. Use YYYY-MM-DD.") from exc
+
+    with get_connection() as conn:
+        if get_latest_trade_date(conn, ticker, INTERVAL_NAME) is None:
+            raise ValueError(f"No {ticker} rows were found in {SOURCE_TABLE}.")
 
         day_rows = query_ticker_day(conn, ticker, INTERVAL_NAME, trade_date)
 
