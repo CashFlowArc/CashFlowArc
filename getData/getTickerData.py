@@ -794,6 +794,10 @@ def fetch_market_data_once(yf_tickers: List[str]) -> Dict[str, List[dict]]:
     requested options expirations for the same tickers in the same collection cycle.
     """
     now_et = pd.Timestamp.now(tz=MARKET_TIMEZONE)
+    if not is_regular_market_hours(now_et):
+        logger.info("Skipping all Yahoo pulls: outside regular market hours")
+        return {"price_rows": [], "option_rows": []}
+
     latest_ts_map = get_latest_ts_by_ticker(INPUT_DB_TICKERS)
     logger.info("Latest DB timestamps: %s", latest_ts_map)
     snapshot_ts_utc = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
