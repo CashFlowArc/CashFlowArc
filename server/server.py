@@ -957,6 +957,7 @@ SIMULATOR_HTML = """
         return tradeDate + ' ' + label + ' • ' + suffix;
     }
 
+    let restoredDateFromStorage = false;
     if (dateInputEl) {
         const params = new URLSearchParams(window.location.search);
         const queryDate = params.get('trade_date');
@@ -965,6 +966,7 @@ SIMULATOR_HTML = """
             window.localStorage.setItem(storageKey, queryDate);
         } else if (storedDate) {
             dateInputEl.value = storedDate;
+            restoredDateFromStorage = true;
         }
     }
 
@@ -974,6 +976,20 @@ SIMULATOR_HTML = """
                 window.localStorage.setItem(storageKey, dateInputEl.value);
             }
         });
+    }
+
+    if (restoredDateFromStorage && formEl) {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.get('trade_date') && dateInputEl.value) {
+            const formData = new FormData(formEl);
+            formData.set('trade_date', dateInputEl.value);
+            const nextParams = new URLSearchParams();
+            for (const [key, value] of formData.entries()) {
+                if (value !== '') nextParams.set(key, value);
+            }
+            window.location.replace(formEl.action + '?' + nextParams.toString());
+            return;
+        }
     }
 
     function renderChart(openVals, highVals, lowVals, closeVals, labels, showGuides) {
