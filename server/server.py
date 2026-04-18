@@ -29,6 +29,7 @@ DEFAULT_SETTINGS = {
     "simulator_speed": 60.0,
     "simulator_points": 70.0,
     "simulator_wide": 20.0,
+    "simulator_trade_date": "",
 }
 
 DB_USER = os.environ["DB_USER"]
@@ -812,9 +813,6 @@ SIMULATOR_HTML = """
         <div class="metrics">
             <div class="metric"><div class="label">Ticker</div><div class="value">{{ data.ticker }}</div><div class="sub">Stored Oracle symbol</div></div>
             <div class="metric"><div class="label">Trade Date</div><div class="value">{{ data.trade_date }}</div><div class="sub">Selected trading session</div></div>
-            <div class="metric"><div class="label">Speed</div><div class="value">{{ data.speed_label }}</div><div class="sub">Simulation rate</div></div>
-            <div class="metric"><div class="label">Points +/-</div><div class="value">{{ data.points_label }}</div><div class="sub">Red guide offset</div></div>
-            <div class="metric"><div class="label">Wide</div><div class="value">{{ data.wide_label }}</div><div class="sub">Blue guide offset</div></div>
             <div class="metric"><div class="label">Status</div><div id="simulator-status" class="value">Ready</div><div class="sub">Simulation clock</div></div>
         </div>
 
@@ -1127,6 +1125,7 @@ def load_settings() -> dict:
             out["simulator_speed"] = max(0.5, min(360.0, float(out.get("simulator_speed", 60.0))))
             out["simulator_points"] = max(0.0, float(out.get("simulator_points", 70.0)))
             out["simulator_wide"] = max(0.0, float(out.get("simulator_wide", 20.0)))
+            out["simulator_trade_date"] = str(out.get("simulator_trade_date", "") or "")
             if out["chart_interval"] not in {"5min", "15min", "1h"}:
                 out["chart_interval"] = "5min"
             return out
@@ -2673,9 +2672,12 @@ def option_chain():
 @app.route("/simulator")
 def simulator():
     settings = load_settings()
+    raw_trade_date = request.args.get("trade_date")
     raw_speed = request.args.get("speed")
     raw_points = request.args.get("points")
     raw_wide = request.args.get("wide")
+    if raw_trade_date not in {None, ""}:
+        settings["simulator_trade_date"] = raw_trade_date
     if raw_speed not in {None, ""}:
         try:
             simulator_speed = max(0.5, min(360.0, float(raw_speed)))
@@ -2692,19 +2694,23 @@ def simulator():
             settings["simulator_wide"] = max(0.0, float(raw_wide))
         except Exception:
             pass
-    if any(value not in {None, ""} for value in [raw_speed, raw_points, raw_wide]):
+    if any(value not in {None, ""} for value in [raw_trade_date, raw_speed, raw_points, raw_wide]):
         save_settings(settings)
 
     settings = load_settings()
+    effective_trade_date = raw_trade_date if raw_trade_date not in {None, ""} else (settings.get("simulator_trade_date") or None)
     try:
         data = run_simulator_service(
             settings,
             request.args.get("ticker"),
-            request.args.get("trade_date"),
+            effective_trade_date,
             raw_speed,
             raw_points,
             raw_wide,
         )
+        if not settings.get("simulator_trade_date") and data.get("trade_date"):
+            settings["simulator_trade_date"] = data["trade_date"]
+            save_settings(settings)
     except Exception as exc:
         fallback_ticker = normalize_simulator_ticker(request.args.get("ticker"))
         fallback_speed = request.args.get("speed") or format_option_price(settings.get("simulator_speed", 60.0))
@@ -2713,7 +2719,7 @@ def simulator():
         data = {
             "subtitle": "Oracle playback simulator",
             "ticker": fallback_ticker,
-            "trade_date": request.args.get("trade_date") or "",
+            "trade_date": effective_trade_date or "",
             "speed": fallback_speed,
             "speed_label": f"{fallback_speed}x",
             "speed_js": json.dumps(float(settings.get("simulator_speed", 60.0))),
