@@ -97,9 +97,17 @@ def db_to_yf_ticker(db_ticker: str) -> str:
     return mapping.get(db_ticker.upper(), db_ticker.upper())
 
 
+def db_to_yf_option_ticker(db_ticker: str) -> str:
+    mapping = {
+        "SPX": "^SPX",
+    }
+    return mapping.get(db_ticker.upper(), db_ticker.upper())
+
+
 def yf_to_db_ticker(yf_ticker: str) -> str:
     reverse_mapping = {
         "^GSPC": "SPX",
+        "^SPX": "SPX",
     }
     return reverse_mapping.get(yf_ticker.upper(), yf_ticker.upper())
 
@@ -109,7 +117,8 @@ YF_TICKERS = [db_to_yf_ticker(t) for t in INPUT_DB_TICKERS]
 
 logger.info("Starting collector")
 logger.info("DB tickers: %s", INPUT_DB_TICKERS)
-logger.info("Yahoo tickers: %s", YF_TICKERS)
+logger.info("Yahoo price tickers: %s", YF_TICKERS)
+logger.info("Yahoo option tickers: %s", [db_to_yf_option_ticker(t) for t in INPUT_DB_TICKERS])
 
 
 # =========================
@@ -818,19 +827,15 @@ def fetch_market_data_once(yf_tickers: List[str]) -> Dict[str, List[dict]]:
             ticker_frames[yf_ticker] = ticker_df
             price_rows.extend(build_rows_for_one_ticker(db_ticker, ticker_df, latest_ts))
 
-    tickers_client = yf.Tickers(" ".join(yf_tickers))
-    for yf_ticker in yf_tickers:
-        db_ticker = yf_to_db_ticker(yf_ticker)
-        ticker_client = tickers_client.tickers.get(yf_ticker)
-        if ticker_client is None:
-            logger.warning("No Yahoo ticker client available for %s", yf_ticker)
-            continue
-
-        latest_close, previous_close = get_latest_close_values(ticker_frames.get(yf_ticker, pd.DataFrame()))
+    for db_ticker in INPUT_DB_TICKERS:
+        price_yf_ticker = db_to_yf_ticker(db_ticker)
+        option_yf_ticker = db_to_yf_option_ticker(db_ticker)
+        ticker_client = yf.Ticker(option_yf_ticker)
+        latest_close, previous_close = get_latest_close_values(ticker_frames.get(price_yf_ticker, pd.DataFrame()))
         option_rows.extend(
             build_option_rows_for_ticker(
                 db_ticker=db_ticker,
-                yf_ticker=yf_ticker,
+                yf_ticker=option_yf_ticker,
                 ticker_client=ticker_client,
                 snapshot_ts_utc=snapshot_ts_utc,
                 latest_close=latest_close,
