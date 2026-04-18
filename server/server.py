@@ -812,7 +812,6 @@ SIMULATOR_HTML = """
 
         <div class="metrics">
             <div class="metric"><div class="label">Ticker</div><div class="value">{{ data.ticker }}</div><div class="sub">Stored Oracle symbol</div></div>
-            <div class="metric"><div class="label">Trade Date</div><div class="value">{{ data.trade_date }}</div><div class="sub">Selected trading session</div></div>
             <div class="metric"><div class="label">Status</div><div id="simulator-status" class="value">Ready</div><div class="sub">Simulation clock</div></div>
         </div>
 
@@ -2676,8 +2675,6 @@ def simulator():
     raw_speed = request.args.get("speed")
     raw_points = request.args.get("points")
     raw_wide = request.args.get("wide")
-    if raw_trade_date not in {None, ""}:
-        settings["simulator_trade_date"] = raw_trade_date
     if raw_speed not in {None, ""}:
         try:
             simulator_speed = max(0.5, min(360.0, float(raw_speed)))
@@ -2694,7 +2691,7 @@ def simulator():
             settings["simulator_wide"] = max(0.0, float(raw_wide))
         except Exception:
             pass
-    if any(value not in {None, ""} for value in [raw_trade_date, raw_speed, raw_points, raw_wide]):
+    if any(value not in {None, ""} for value in [raw_speed, raw_points, raw_wide]):
         save_settings(settings)
 
     settings = load_settings()
@@ -2708,7 +2705,7 @@ def simulator():
             raw_points,
             raw_wide,
         )
-        if not settings.get("simulator_trade_date") and data.get("trade_date"):
+        if data.get("trade_date") and settings.get("simulator_trade_date") != data["trade_date"]:
             settings["simulator_trade_date"] = data["trade_date"]
             save_settings(settings)
     except Exception as exc:
