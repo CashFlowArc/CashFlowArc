@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deploy"
+  short_description: "Commit, push, and verify cashflowarc.com deployments."
+  default_prompt: "Use this when the user says deploy. Commit the current changes, push to git, then verify the live deployment on cashflowarc.com and relevant routes."
