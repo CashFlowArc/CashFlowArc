@@ -97,6 +97,12 @@ HTML = """
             margin-left:auto;
             display:flex; align-items:center; gap:12px; flex-wrap:wrap;
         }
+        .nav-links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+        .nav-link{
+            color:var(--muted); text-decoration:none; font-size:13px; font-weight:700;
+            padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
+        }
+        .nav-link.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
         .control-form{
             display:flex; align-items:center; gap:10px; flex-wrap:wrap;
             background:var(--panel-2); border:1px solid var(--border);
@@ -173,8 +179,10 @@ HTML = """
             <p>SPX dashboard • Auto-refresh {{ data.refresh_interval }}s • Last update: {{ data.time }}</p>
         </div>
         <div class="top-right">
-            <div class="control-form" style="padding:6px 8px;">
-                <a href="/gex" style="color:var(--text); text-decoration:none; font-size:13px; font-weight:700;">SPX GEX</a>
+            <div class="nav-links">
+                <a class="nav-link active" href="/">Trading Terminal</a>
+                <a class="nav-link" href="/gex">SPX GEX</a>
+                <a class="nav-link" href="/option-chain">SPX Option Chain</a>
             </div>
             <form id="settings-form" method="post" action="/settings" class="control-form">
                 <span class="control-label">Refresh Interval</span>
@@ -349,6 +357,7 @@ GEX_HTML = """
             color:var(--muted); text-decoration:none; font-weight:700; font-size:13px;
             padding:8px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel-2);
         }
+        .links a.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
         .card{
             background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
         }
@@ -392,7 +401,8 @@ GEX_HTML = """
         </div>
         <div class="links">
             <a href="/">Trading Terminal</a>
-            <a href="/gex">GEX View</a>
+            <a class="active" href="/gex">GEX View</a>
+            <a href="/option-chain">Option Chain</a>
         </div>
     </div>
 
@@ -434,6 +444,204 @@ GEX_HTML = """
 (function() {
     const refresh = document.getElementById('refresh_interval');
     const form = document.getElementById('gex-settings-form');
+    let timer = null;
+
+    function submit() {
+        const data = new FormData(form);
+        fetch('/settings', { method: 'POST', body: data })
+            .then(() => window.location.reload())
+            .catch(() => {});
+    }
+
+    if (refresh) {
+        refresh.addEventListener('input', function() {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(submit, 250);
+        });
+    }
+})();
+</script>
+</body>
+</html>
+"""
+
+OPTION_CHAIN_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>CashFlowArc</title>
+    <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
+    <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root{
+            --panel:#121821;
+            --panel-2:#17202b;
+            --border:#273244;
+            --text:#e8eef7;
+            --muted:#8fa2b7;
+            --green:#1fce7a;
+            --red:#ff5d5d;
+        }
+        *{box-sizing:border-box}
+        body{
+            margin:0;
+            font-family:Segoe UI, Arial, sans-serif;
+            background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
+            color:var(--text);
+        }
+        .wrap{max-width:1800px; margin:0 auto; padding:20px;}
+        .topbar{
+            display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+            margin-bottom:16px; padding:14px 18px; background:var(--panel);
+            border:1px solid var(--border); border-radius:14px;
+        }
+        .title h1{margin:0; font-size:24px}
+        .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
+        .links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+        .links a{
+            color:var(--muted); text-decoration:none; font-weight:700; font-size:13px;
+            padding:8px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel-2);
+        }
+        .links a.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
+        .card{
+            background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
+        }
+        .controls{
+            display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;
+        }
+        .control-form{
+            display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:8px 10px;
+        }
+        .control-label{font-size:13px; color:var(--text); font-weight:700}
+        .text-input{
+            width:90px; background:#0f141b; color:var(--text);
+            border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
+        }
+        .metrics{
+            display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;
+        }
+        @media (max-width: 1100px){ .metrics{grid-template-columns:repeat(2,1fr);} }
+        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} }
+        .metric{
+            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:14px;
+        }
+        .metric .label{font-size:12px; color:var(--muted); text-transform:uppercase}
+        .metric .value{margin-top:8px; font-size:24px; font-weight:700}
+        .metric .sub{margin-top:4px; font-size:12px; color:var(--muted)}
+        .table-wrap{
+            overflow:auto; border:1px solid var(--border); border-radius:12px; background:var(--panel-2);
+            max-height:72vh;
+        }
+        table{width:100%; border-collapse:collapse}
+        th, td{
+            padding:10px 8px; border-bottom:1px solid var(--border); font-size:12px; white-space:nowrap; text-align:right;
+        }
+        th{
+            position:sticky; top:0; z-index:1; background:#111923; color:var(--muted); font-weight:700;
+        }
+        td.strike, th.strike{text-align:center; font-weight:700}
+        td.call-last, td.call-bid, td.call-ask, td.call-oi, td.call-vol, td.call-iv{color:var(--green)}
+        td.put-last, td.put-bid, td.put-ask, td.put-oi, td.put-vol, td.put-iv{color:var(--red)}
+        .error{font-size:18px; color:#b42318; font-weight:700}
+        .notes{margin-top:14px; font-size:12px; color:var(--muted); line-height:1.5}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="topbar">
+        <div class="title">
+            <h1>SPX Option Chain</h1>
+            <p>{{ data.subtitle }}</p>
+        </div>
+        <div class="links">
+            <a href="/">Trading Terminal</a>
+            <a href="/gex">GEX View</a>
+            <a class="active" href="/option-chain">Option Chain</a>
+        </div>
+    </div>
+
+    <div class="card">
+        {% if data.error %}
+        <div class="error">{{ data.error }}</div>
+        {% else %}
+        <div class="controls">
+            <form id="option-settings-form" method="post" action="/settings" class="control-form">
+                <span class="control-label">Refresh Interval</span>
+                <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
+                <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+            </form>
+            <div class="control-form">
+                <span class="control-label">Expiration</span>
+                <span>{{ data.expiration_date }}</span>
+            </div>
+            <div class="control-form">
+                <span class="control-label">Snapshot</span>
+                <span>{{ data.snapshot_time }}</span>
+            </div>
+        </div>
+
+        <div class="metrics">
+            <div class="metric"><div class="label">Spot</div><div class="value">{{ data.spot_price }}</div><div class="sub">Latest stored SPX underlying price</div></div>
+            <div class="metric"><div class="label">Contracts</div><div class="value">{{ data.contract_count }}</div><div class="sub">Stored rows in selected chain</div></div>
+            <div class="metric"><div class="label">Call OI</div><div class="value">{{ data.call_open_interest }}</div><div class="sub">Total open interest</div></div>
+            <div class="metric"><div class="label">Put OI</div><div class="value">{{ data.put_open_interest }}</div><div class="sub">Total open interest</div></div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Call Last</th>
+                        <th>Call Bid</th>
+                        <th>Call Ask</th>
+                        <th>Call Vol</th>
+                        <th>Call OI</th>
+                        <th>Call IV</th>
+                        <th class="strike">Strike</th>
+                        <th>Put IV</th>
+                        <th>Put OI</th>
+                        <th>Put Vol</th>
+                        <th>Put Bid</th>
+                        <th>Put Ask</th>
+                        <th>Put Last</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data.rows %}
+                    <tr>
+                        <td class="call-last">{{ row.call_last }}</td>
+                        <td class="call-bid">{{ row.call_bid }}</td>
+                        <td class="call-ask">{{ row.call_ask }}</td>
+                        <td class="call-vol">{{ row.call_volume }}</td>
+                        <td class="call-oi">{{ row.call_open_interest }}</td>
+                        <td class="call-iv">{{ row.call_iv }}</td>
+                        <td class="strike">{{ row.strike }}</td>
+                        <td class="put-iv">{{ row.put_iv }}</td>
+                        <td class="put-oi">{{ row.put_open_interest }}</td>
+                        <td class="put-vol">{{ row.put_volume }}</td>
+                        <td class="put-bid">{{ row.put_bid }}</td>
+                        <td class="put-ask">{{ row.put_ask }}</td>
+                        <td class="put-last">{{ row.put_last }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="notes">
+            Source: Oracle table {{ data.source_table }}. This view uses the latest stored SPX option snapshot and selects the session-relevant expiration directly from Oracle, with no external fetch in `server.py`.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+(function() {
+    const refresh = document.getElementById('refresh_interval');
+    const form = document.getElementById('option-settings-form');
     let timer = null;
 
     function submit() {
@@ -590,6 +798,37 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
     )
 
 
+def fetch_spx_option_chain_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, dict, dt.date, dt.datetime]:
+    spx_db_ticker = db_storage_ticker(SPX_TICKER)
+    with get_connection() as conn:
+        snapshot_ts = get_latest_option_snapshot_ts(conn, spx_db_ticker)
+        if snapshot_ts is None:
+            raise ValueError(f"No stored options snapshots found in {OPTION_SOURCE_TABLE} for {spx_db_ticker}.")
+        options = query_option_snapshot(conn, spx_db_ticker, snapshot_ts)
+
+    if options.empty:
+        raise ValueError(f"No stored option rows found in {OPTION_SOURCE_TABLE} for {spx_db_ticker}.")
+
+    available_dates = sorted(pd.to_datetime(options["expiration_date"]).dt.date.unique())
+    selected_expiration_date = resolve_gex_expiration_date(now_et, available_dates)
+    selected_options = options[
+        pd.to_datetime(options["expiration_date"]).dt.date == selected_expiration_date
+    ].copy()
+
+    if selected_options.empty:
+        fallback_expiration_date = available_dates[0]
+        selected_options = options[
+            pd.to_datetime(options["expiration_date"]).dt.date == fallback_expiration_date
+        ].copy()
+        selected_expiration_date = fallback_expiration_date
+
+    if selected_options.empty:
+        raise ValueError("Latest stored SPX snapshot did not contain a usable expiration chain.")
+
+    underlying = build_underlying_snapshot(selected_options)
+    return selected_options, underlying, selected_expiration_date, snapshot_ts
+
+
 def get_latest_option_snapshot_ts(conn, ticker: str) -> Optional[dt.datetime]:
     sql = f"""
         SELECT MAX(snapshot_ts_utc)
@@ -664,6 +903,79 @@ def build_underlying_snapshot(options: pd.DataFrame) -> dict:
         "regularMarketPrice": float(underlying_price_series.iloc[-1]) if not underlying_price_series.empty else 0.0,
         "previousClose": float(previous_close_series.iloc[-1]) if not previous_close_series.empty else 0.0,
     }
+
+
+def format_option_price(value) -> str:
+    if value is None or pd.isna(value):
+        return "-"
+    return f"{float(value):,.2f}"
+
+
+def format_option_integer(value) -> str:
+    if value is None or pd.isna(value):
+        return "-"
+    return f"{int(round(float(value))):,}"
+
+
+def format_option_iv(value) -> str:
+    if value is None or pd.isna(value):
+        return "-"
+    return f"{float(value) * 100:.1f}%"
+
+
+def build_option_chain_rows(options: pd.DataFrame) -> list[dict]:
+    if options is None or options.empty:
+        return []
+
+    working = options.copy()
+    for column in ["strike", "last_price", "bid_price", "ask_price", "volume", "open_interest", "implied_volatility"]:
+        working[column] = pd.to_numeric(working.get(column), errors="coerce")
+
+    base_columns = ["strike", "last_price", "bid_price", "ask_price", "volume", "open_interest", "implied_volatility"]
+    calls = (
+        working[working["option_type"] == "call"][base_columns]
+        .drop_duplicates(subset=["strike"], keep="last")
+        .rename(columns={
+            "last_price": "call_last",
+            "bid_price": "call_bid",
+            "ask_price": "call_ask",
+            "volume": "call_volume",
+            "open_interest": "call_open_interest",
+            "implied_volatility": "call_iv",
+        })
+    )
+    puts = (
+        working[working["option_type"] == "put"][base_columns]
+        .drop_duplicates(subset=["strike"], keep="last")
+        .rename(columns={
+            "last_price": "put_last",
+            "bid_price": "put_bid",
+            "ask_price": "put_ask",
+            "volume": "put_volume",
+            "open_interest": "put_open_interest",
+            "implied_volatility": "put_iv",
+        })
+    )
+
+    merged = pd.merge(calls, puts, on="strike", how="outer").sort_values("strike").reset_index(drop=True)
+    rows: list[dict] = []
+    for row in merged.itertuples(index=False):
+        rows.append({
+            "call_last": format_option_price(getattr(row, "call_last", None)),
+            "call_bid": format_option_price(getattr(row, "call_bid", None)),
+            "call_ask": format_option_price(getattr(row, "call_ask", None)),
+            "call_volume": format_option_integer(getattr(row, "call_volume", None)),
+            "call_open_interest": format_option_integer(getattr(row, "call_open_interest", None)),
+            "call_iv": format_option_iv(getattr(row, "call_iv", None)),
+            "strike": format_option_price(getattr(row, "strike", None)),
+            "put_iv": format_option_iv(getattr(row, "put_iv", None)),
+            "put_open_interest": format_option_integer(getattr(row, "put_open_interest", None)),
+            "put_volume": format_option_integer(getattr(row, "put_volume", None)),
+            "put_bid": format_option_price(getattr(row, "put_bid", None)),
+            "put_ask": format_option_price(getattr(row, "put_ask", None)),
+            "put_last": format_option_price(getattr(row, "put_last", None)),
+        })
+    return rows
 
 
 def candidate_has_usable_gex_data(options: pd.DataFrame, underlying: dict) -> bool:
@@ -868,6 +1180,46 @@ def run_gex_service(settings: dict) -> dict:
         "refresh_interval": settings["refresh_interval"],
         "chart_interval": settings["chart_interval"],
         "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
+        "error": None,
+    }
+
+
+def run_option_chain_service(settings: dict) -> dict:
+    now_et = pd.Timestamp.now(tz=TIMEZONE)
+    options, underlying, expiration_date, snapshot_ts = fetch_spx_option_chain_for_session(now_et)
+    rows = build_option_chain_rows(options)
+    if not rows:
+        raise ValueError("No option-chain rows were available in the latest stored SPX snapshot.")
+
+    spot_price = float(
+        underlying.get("regularMarketPrice")
+        or underlying.get("postMarketPrice")
+        or underlying.get("preMarketPrice")
+        or underlying.get("previousClose")
+        or 0.0
+    )
+    call_open_interest = pd.to_numeric(
+        options.loc[options["option_type"] == "call", "open_interest"],
+        errors="coerce",
+    ).fillna(0.0).sum()
+    put_open_interest = pd.to_numeric(
+        options.loc[options["option_type"] == "put", "open_interest"],
+        errors="coerce",
+    ).fillna(0.0).sum()
+    snapshot_ts_et = pd.Timestamp(snapshot_ts, tz="UTC").tz_convert(TIMEZONE)
+
+    return {
+        "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        "expiration_date": expiration_date.isoformat(),
+        "snapshot_time": snapshot_ts_et.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "spot_price": "N/A" if spot_price <= 0 else f"{spot_price:,.2f}",
+        "contract_count": f"{len(options):,}",
+        "call_open_interest": f"{int(round(call_open_interest)):,}",
+        "put_open_interest": f"{int(round(put_open_interest)):,}",
+        "rows": rows,
+        "refresh_interval": settings["refresh_interval"],
+        "chart_interval": settings["chart_interval"],
+        "source_table": OPTION_SOURCE_TABLE,
         "error": None,
     }
 
@@ -1634,6 +1986,30 @@ def gex():
             "error": str(exc),
         }
     return render_template_string(GEX_HTML, data=data, favicon_version=FAVICON_VERSION)
+
+
+@app.route("/option-chain")
+def option_chain():
+    settings = load_settings()
+    try:
+        data = run_option_chain_service(settings)
+    except Exception as exc:
+        now_et = pd.Timestamp.now(tz=TIMEZONE)
+        data = {
+            "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            "expiration_date": now_et.date().isoformat(),
+            "snapshot_time": "N/A",
+            "spot_price": "N/A",
+            "contract_count": "0",
+            "call_open_interest": "0",
+            "put_open_interest": "0",
+            "rows": [],
+            "refresh_interval": settings["refresh_interval"],
+            "chart_interval": settings["chart_interval"],
+            "source_table": OPTION_SOURCE_TABLE,
+            "error": str(exc),
+        }
+    return render_template_string(OPTION_CHAIN_HTML, data=data, favicon_version=FAVICON_VERSION)
 
 
 if __name__ == "__main__":
