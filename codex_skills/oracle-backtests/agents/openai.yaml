@@ -1,0 +1,4 @@
+interface:
+  display_name: "Oracle Backtests"
+  short_description: "Query Oracle TICKER_HISTORY for historical strategy tests."
+  default_prompt: "Use $oracle-backtests to inspect Oracle-backed price history in this CashFlowArc repo and backtest a strategy against TICKER_HISTORY."
