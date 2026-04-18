@@ -27,6 +27,8 @@ DEFAULT_SETTINGS = {
     "refresh_interval": 31,
     "chart_interval": "5min",
     "simulator_speed": 60.0,
+    "simulator_points": 70.0,
+    "simulator_wide": 20.0,
 }
 
 DB_USER = os.environ["DB_USER"]
@@ -799,6 +801,10 @@ SIMULATOR_HTML = """
             <input class="text-input date-input" type="date" name="trade_date" value="{{ data.trade_date }}">
             <span class="control-label">Speed</span>
             <input class="text-input" type="number" name="speed" min="0.5" max="360" step="0.5" value="{{ data.speed }}">
+            <span class="control-label">Points +/-</span>
+            <input class="text-input" type="number" name="points" min="0" step="1" value="{{ data.points }}">
+            <span class="control-label">Wide</span>
+            <input class="text-input" type="number" name="wide" min="0" step="1" value="{{ data.wide }}">
             <button class="button" type="submit">Load Session</button>
             <button id="simulator-toggle" class="button" type="button">Start Simulation</button>
         </form>
@@ -807,6 +813,8 @@ SIMULATOR_HTML = """
             <div class="metric"><div class="label">Ticker</div><div class="value">{{ data.ticker }}</div><div class="sub">Stored Oracle symbol</div></div>
             <div class="metric"><div class="label">Trade Date</div><div class="value">{{ data.trade_date }}</div><div class="sub">Selected trading session</div></div>
             <div class="metric"><div class="label">Speed</div><div class="value">{{ data.speed_label }}</div><div class="sub">Simulation rate</div></div>
+            <div class="metric"><div class="label">Points +/-</div><div class="value">{{ data.points_label }}</div><div class="sub">Red guide offset</div></div>
+            <div class="metric"><div class="label">Wide</div><div class="value">{{ data.wide_label }}</div><div class="sub">Blue guide offset</div></div>
             <div class="metric"><div class="label">Status</div><div id="simulator-status" class="value">Ready</div><div class="sub">Simulation clock</div></div>
         </div>
 
@@ -824,10 +832,15 @@ SIMULATOR_HTML = """
 (function() {
     const candles = {{ data.simulator_payload|safe }};
     const speed = {{ data.speed_js }};
+    const pointsValue = {{ data.points_js }};
+    const wideValue = {{ data.wide_js }};
     const chartEl = document.getElementById('simulator-chart');
     const statusEl = document.getElementById('simulator-status');
     const toggleEl = document.getElementById('simulator-toggle');
     const totalSimSeconds = candles.length * 60;
+    const guideAnchorLabel = '10:30';
+    const guideAnchorIndex = candles.findIndex((candle) => candle.label === guideAnchorLabel);
+    const guideAnchorClose = guideAnchorIndex >= 0 ? candles[guideAnchorIndex].close : null;
     const config = { displayModeBar: false, responsive: true };
     const layout = {
         margin: {l: 28, r: 28, t: 20, b: 50},
@@ -890,8 +903,58 @@ SIMULATOR_HTML = """
         };
     }
 
-    function renderChart(openVals, highVals, lowVals, closeVals, labels) {
-        Plotly.react(chartEl, [{
+    function buildGuideTraces(labels, showGuides) {
+        if (!showGuides || guideAnchorClose === null) return [];
+
+        const startIndex = labels.indexOf(guideAnchorLabel);
+        if (startIndex === -1) return [];
+
+        const guideLabels = labels.slice(startIndex);
+        if (!guideLabels.length) return [];
+
+        const redUpper = guideAnchorClose + pointsValue;
+        const redLower = guideAnchorClose - pointsValue;
+        const blueUpper = guideAnchorClose + pointsValue + wideValue;
+        const blueLower = guideAnchorClose - pointsValue - wideValue;
+
+        return [
+            {y: redUpper, color: '#ff5d5d'},
+            {y: redLower, color: '#ff5d5d'},
+            {y: blueUpper, color: '#4da3ff'},
+            {y: blueLower, color: '#4da3ff'},
+        ].map((guide) => ({
+            type: 'scatter',
+            mode: 'lines',
+            x: guideLabels,
+            y: guideLabels.map(() => guide.y),
+            line: {color: guide.color, width: 2},
+            hoverinfo: 'skip',
+            showlegend: false,
+        }));
+    }
+
+    function computeYRange(highVals, lowVals, labels, showGuides) {
+        const values = [];
+        values.push.apply(values, highVals);
+        values.push.apply(values, lowVals);
+
+        if (showGuides && guideAnchorClose !== null && labels.indexOf(guideAnchorLabel) !== -1) {
+            values.push(guideAnchorClose + pointsValue);
+            values.push(guideAnchorClose - pointsValue);
+            values.push(guideAnchorClose + pointsValue + wideValue);
+            values.push(guideAnchorClose - pointsValue - wideValue);
+        }
+
+        if (!values.length) return null;
+
+        const minVal = Math.min.apply(null, values);
+        const maxVal = Math.max.apply(null, values);
+        const padding = Math.max((maxVal - minVal) * 0.1, 10);
+        return [minVal - padding, maxVal + padding];
+    }
+
+    function renderChart(openVals, highVals, lowVals, closeVals, labels, showGuides) {
+        const traces = [{
             type: 'candlestick',
             x: labels,
             open: openVals,
@@ -901,13 +964,21 @@ SIMULATOR_HTML = """
             increasing: {line: {color: '#1fce7a'}, fillcolor: '#1fce7a'},
             decreasing: {line: {color: '#ff5d5d'}, fillcolor: '#ff5d5d'},
             hoverinfo: 'x+open+high+low+close',
-        }], layout, config);
+        }];
+        traces.push.apply(traces, buildGuideTraces(labels, showGuides));
+
+        const yRange = computeYRange(highVals, lowVals, labels, showGuides);
+        const nextLayout = Object.assign({}, layout, {
+            yaxis: Object.assign({}, layout.yaxis, yRange ? {range: yRange} : {}),
+        });
+
+        Plotly.react(chartEl, traces, nextLayout, config);
     }
 
     if (!candles.length) {
         statusEl.textContent = 'No Data';
         toggleEl.disabled = true;
-        renderChart([], [], [], [], []);
+        renderChart([], [], [], [], [], false);
         return;
     }
 
@@ -952,7 +1023,8 @@ SIMULATOR_HTML = """
             statusEl.textContent = 'Complete • 16:00';
         }
 
-        renderChart(openVals, highVals, lowVals, closeVals, labels);
+        const showGuides = guideAnchorIndex >= 0 && completed > guideAnchorIndex;
+        renderChart(openVals, highVals, lowVals, closeVals, labels, showGuides);
     }
 
     function stopTimer() {
@@ -1015,7 +1087,7 @@ SIMULATOR_HTML = """
         }
     });
 
-    renderChart([], [], [], [], []);
+    renderChart([], [], [], [], [], false);
     setToggleLabel();
 })();
 </script>
@@ -1045,6 +1117,8 @@ def load_settings() -> dict:
             out["refresh_interval"] = max(15, min(3600, int(out.get("refresh_interval", 30))))
             out["chart_interval"] = str(out.get("chart_interval", "5min"))
             out["simulator_speed"] = max(0.5, min(360.0, float(out.get("simulator_speed", 60.0))))
+            out["simulator_points"] = max(0.0, float(out.get("simulator_points", 70.0)))
+            out["simulator_wide"] = max(0.0, float(out.get("simulator_wide", 20.0)))
             if out["chart_interval"] not in {"5min", "15min", "1h"}:
                 out["chart_interval"] = "5min"
             return out
@@ -1599,13 +1673,30 @@ def run_option_chain_service(settings: dict) -> dict:
     }
 
 
-def run_simulator_service(settings: dict, raw_ticker: Optional[str], raw_trade_date: Optional[str], raw_speed: Optional[str]) -> dict:
+def run_simulator_service(
+    settings: dict,
+    raw_ticker: Optional[str],
+    raw_trade_date: Optional[str],
+    raw_speed: Optional[str],
+    raw_points: Optional[str],
+    raw_wide: Optional[str],
+) -> dict:
     ticker = normalize_simulator_ticker(raw_ticker)
     try:
         speed = float(raw_speed) if raw_speed not in {None, ""} else float(settings.get("simulator_speed", 60.0))
     except Exception:
         speed = float(settings.get("simulator_speed", 60.0))
     speed = max(0.5, min(360.0, speed))
+    try:
+        points = float(raw_points) if raw_points not in {None, ""} else float(settings.get("simulator_points", 70.0))
+    except Exception:
+        points = float(settings.get("simulator_points", 70.0))
+    points = max(0.0, points)
+    try:
+        wide = float(raw_wide) if raw_wide not in {None, ""} else float(settings.get("simulator_wide", 20.0))
+    except Exception:
+        wide = float(settings.get("simulator_wide", 20.0))
+    wide = max(0.0, wide)
 
     with get_connection() as conn:
         latest_trade_date = get_latest_trade_date(conn, ticker, INTERVAL_NAME)
@@ -1639,6 +1730,12 @@ def run_simulator_service(settings: dict, raw_ticker: Optional[str], raw_trade_d
         "speed": format_option_price(speed),
         "speed_label": f"{speed:g}x",
         "speed_js": json.dumps(speed),
+        "points": format_option_price(points),
+        "points_label": f"{points:,.0f}",
+        "points_js": json.dumps(points),
+        "wide": format_option_price(wide),
+        "wide_label": f"{wide:,.0f}",
+        "wide_js": json.dumps(wide),
         "simulator_payload": json.dumps(payload),
         "trade": terminal_snapshot.get("trade", "NO TRADE"),
         "error": None,
@@ -2569,13 +2666,26 @@ def option_chain():
 def simulator():
     settings = load_settings()
     raw_speed = request.args.get("speed")
+    raw_points = request.args.get("points")
+    raw_wide = request.args.get("wide")
     if raw_speed not in {None, ""}:
         try:
             simulator_speed = max(0.5, min(360.0, float(raw_speed)))
             settings["simulator_speed"] = simulator_speed
-            save_settings(settings)
         except Exception:
             pass
+    if raw_points not in {None, ""}:
+        try:
+            settings["simulator_points"] = max(0.0, float(raw_points))
+        except Exception:
+            pass
+    if raw_wide not in {None, ""}:
+        try:
+            settings["simulator_wide"] = max(0.0, float(raw_wide))
+        except Exception:
+            pass
+    if any(value not in {None, ""} for value in [raw_speed, raw_points, raw_wide]):
+        save_settings(settings)
 
     settings = load_settings()
     try:
@@ -2584,10 +2694,14 @@ def simulator():
             request.args.get("ticker"),
             request.args.get("trade_date"),
             raw_speed,
+            raw_points,
+            raw_wide,
         )
     except Exception as exc:
         fallback_ticker = normalize_simulator_ticker(request.args.get("ticker"))
         fallback_speed = request.args.get("speed") or format_option_price(settings.get("simulator_speed", 60.0))
+        fallback_points = request.args.get("points") or format_option_price(settings.get("simulator_points", 70.0))
+        fallback_wide = request.args.get("wide") or format_option_price(settings.get("simulator_wide", 20.0))
         data = {
             "subtitle": "Oracle playback simulator",
             "ticker": fallback_ticker,
@@ -2595,6 +2709,12 @@ def simulator():
             "speed": fallback_speed,
             "speed_label": f"{fallback_speed}x",
             "speed_js": json.dumps(float(settings.get("simulator_speed", 60.0))),
+            "points": fallback_points,
+            "points_label": f"{float(fallback_points):,.0f}" if fallback_points not in {"", None} else "70",
+            "points_js": json.dumps(float(settings.get("simulator_points", 70.0))),
+            "wide": fallback_wide,
+            "wide_label": f"{float(fallback_wide):,.0f}" if fallback_wide not in {"", None} else "20",
+            "wide_js": json.dumps(float(settings.get("simulator_wide", 20.0))),
             "simulator_payload": "[]",
             "trade": run_web_service(settings).get("trade", "NO TRADE"),
             "error": str(exc),
