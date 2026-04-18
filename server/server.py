@@ -1123,9 +1123,7 @@ SIMULATOR_HTML = """
             statusEl.textContent = formatStatus('16:00', 'Complete');
         }
 
-        const guideWindowReached = guideAnchorIndex >= 0 && completed > guideAnchorIndex;
-        const guideWindowOpen = guideEndIndex < 0 || completed <= guideEndIndex;
-        const showGuides = guideWindowReached && guideWindowOpen;
+        const showGuides = guideAnchorIndex >= 0 && completed > guideAnchorIndex;
         renderChart(openVals, highVals, lowVals, closeVals, labels, showGuides);
     }
 
