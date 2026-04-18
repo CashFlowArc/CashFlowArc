@@ -842,7 +842,6 @@ SIMULATOR_HTML = """
 (function() {
     const candles = {{ data.simulator_payload|safe }};
     const tradeDate = {{ data.trade_date|tojson }};
-    const renderedTicker = {{ data.ticker|tojson }};
     const speed = {{ data.speed_js }};
     const pointsValue = {{ data.points_js }};
     const wideValue = {{ data.wide_js }};
@@ -866,7 +865,7 @@ SIMULATOR_HTML = """
     const guideAnchorClose = guideAnchorIndex >= 0 ? candles[guideAnchorIndex].close : null;
     const config = { displayModeBar: false, responsive: true };
     const layout = {
-        margin: {l: 28, r: 28, t: 20, b: 50},
+        margin: {l: 28, r: 28, t: 20, b: 64},
         paper_bgcolor: '#17202b',
         plot_bgcolor: '#17202b',
         font: {color: '#e8eef7'},
@@ -1000,16 +999,23 @@ SIMULATOR_HTML = """
         return (value || '').trim().slice(0, 5);
     }
 
+    function currentSessionState() {
+        return {
+            ticker: normalizeTicker(tickerInputEl ? tickerInputEl.value : ''),
+            tradeDate: dateInputEl ? dateInputEl.value : '',
+            speed: normalizeNumberString(speedInputEl ? speedInputEl.value : ''),
+            points: normalizeNumberString(pointsInputEl ? pointsInputEl.value : ''),
+            wide: normalizeNumberString(wideInputEl ? wideInputEl.value : ''),
+            executeTime: normalizeTimeString(executeTimeInputEl ? executeTimeInputEl.value : ''),
+            executionEndTime: normalizeTimeString(executionEndTimeInputEl ? executionEndTimeInputEl.value : ''),
+        };
+    }
+
+    const initialSessionState = currentSessionState();
+
     function sessionConfigChanged() {
-        return (
-            normalizeTicker(tickerInputEl ? tickerInputEl.value : '') !== normalizeTicker(renderedTicker) ||
-            (dateInputEl ? dateInputEl.value : '') !== (tradeDate || '') ||
-            normalizeNumberString(speedInputEl ? speedInputEl.value : '') !== String(speed) ||
-            normalizeNumberString(pointsInputEl ? pointsInputEl.value : '') !== String(pointsValue) ||
-            normalizeNumberString(wideInputEl ? wideInputEl.value : '') !== String(wideValue) ||
-            normalizeTimeString(executeTimeInputEl ? executeTimeInputEl.value : '') !== normalizeTimeString(executeTime) ||
-            normalizeTimeString(executionEndTimeInputEl ? executionEndTimeInputEl.value : '') !== normalizeTimeString(executionEndTime)
-        );
+        const current = currentSessionState();
+        return Object.keys(initialSessionState).some((key) => current[key] !== initialSessionState[key]);
     }
 
     let settingsTimer = null;
