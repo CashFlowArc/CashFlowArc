@@ -344,20 +344,24 @@ GEX_HTML = """
             background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
             color:var(--text);
         }
-        .wrap{max-width:1280px; margin:0 auto; padding:20px;}
+        .wrap{max-width:1800px; margin:0 auto; padding:18px;}
         .topbar{
-            display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
-            margin-bottom:16px; padding:14px 18px; background:var(--panel);
-            border:1px solid var(--border); border-radius:14px;
+            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
+            gap:16px; margin-bottom:16px; padding:14px 18px;
+            background:var(--panel); border:1px solid var(--border); border-radius:14px;
         }
-        .title h1{margin:0; font-size:24px}
+        .title h1{margin:0; font-size:28px}
         .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
-        .links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-        .links a{
-            color:var(--muted); text-decoration:none; font-weight:700; font-size:13px;
-            padding:8px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel-2);
+        .top-right{
+            margin-left:auto;
+            display:flex; align-items:center; gap:12px; flex-wrap:wrap;
         }
-        .links a.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
+        .nav-links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+        .nav-link{
+            color:var(--muted); text-decoration:none; font-size:13px; font-weight:700;
+            padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
+        }
+        .nav-link.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
         .card{
             background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
         }
@@ -372,6 +376,10 @@ GEX_HTML = """
         .text-input{
             width:90px; background:#0f141b; color:var(--text);
             border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
+        }
+        .status-pill{
+            padding:10px 14px; border-radius:999px; font-weight:700;
+            border:1px solid var(--border); background:var(--panel-2);
         }
         .metrics{
             display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px;
@@ -399,10 +407,20 @@ GEX_HTML = """
             <h1>SPX 0DTE Gamma Exposure</h1>
             <p>{{ data.subtitle }}</p>
         </div>
-        <div class="links">
-            <a href="/">Trading Terminal</a>
-            <a class="active" href="/gex">GEX View</a>
-            <a href="/option-chain">Option Chain</a>
+        <div class="top-right">
+            <div class="nav-links">
+                <a class="nav-link" href="/">Trading Terminal</a>
+                <a class="nav-link active" href="/gex">SPX GEX</a>
+                <a class="nav-link" href="/option-chain">SPX Option Chain</a>
+            </div>
+            <form id="gex-settings-form" method="post" action="/settings" class="control-form">
+                <span class="control-label">Refresh Interval</span>
+                <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
+                <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+            </form>
+            <div class="status-pill">
+                Expiration {{ data.expiration_date }}
+            </div>
         </div>
     </div>
 
@@ -410,18 +428,6 @@ GEX_HTML = """
         {% if data.error %}
         <div class="error">{{ data.error }}</div>
         {% else %}
-        <div class="controls">
-            <form id="gex-settings-form" method="post" action="/settings" class="control-form">
-                <span class="control-label">Refresh Interval</span>
-                <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
-                <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
-            </form>
-            <div class="control-form">
-                <span class="control-label">Expiration</span>
-                <span>{{ data.expiration_date }}</span>
-            </div>
-        </div>
-
         <div class="chart-wrap">
             {{ data.chart_html|safe }}
         </div>
@@ -491,20 +497,24 @@ OPTION_CHAIN_HTML = """
             background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
             color:var(--text);
         }
-        .wrap{max-width:1800px; margin:0 auto; padding:20px;}
+        .wrap{max-width:1800px; margin:0 auto; padding:18px;}
         .topbar{
-            display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
-            margin-bottom:16px; padding:14px 18px; background:var(--panel);
-            border:1px solid var(--border); border-radius:14px;
+            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
+            gap:16px; margin-bottom:16px; padding:14px 18px;
+            background:var(--panel); border:1px solid var(--border); border-radius:14px;
         }
-        .title h1{margin:0; font-size:24px}
+        .title h1{margin:0; font-size:28px}
         .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
-        .links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-        .links a{
-            color:var(--muted); text-decoration:none; font-weight:700; font-size:13px;
-            padding:8px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel-2);
+        .top-right{
+            margin-left:auto;
+            display:flex; align-items:center; gap:12px; flex-wrap:wrap;
         }
-        .links a.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
+        .nav-links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+        .nav-link{
+            color:var(--muted); text-decoration:none; font-size:13px; font-weight:700;
+            padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
+        }
+        .nav-link.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
         .card{
             background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
         }
@@ -519,6 +529,10 @@ OPTION_CHAIN_HTML = """
         .text-input{
             width:90px; background:#0f141b; color:var(--text);
             border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
+        }
+        .status-pill{
+            padding:10px 14px; border-radius:999px; font-weight:700;
+            border:1px solid var(--border); background:var(--panel-2);
         }
         .metrics{
             display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;
@@ -556,10 +570,23 @@ OPTION_CHAIN_HTML = """
             <h1>SPX Option Chain</h1>
             <p>{{ data.subtitle }}</p>
         </div>
-        <div class="links">
-            <a href="/">Trading Terminal</a>
-            <a href="/gex">GEX View</a>
-            <a class="active" href="/option-chain">Option Chain</a>
+        <div class="top-right">
+            <div class="nav-links">
+                <a class="nav-link" href="/">Trading Terminal</a>
+                <a class="nav-link" href="/gex">SPX GEX</a>
+                <a class="nav-link active" href="/option-chain">SPX Option Chain</a>
+            </div>
+            <form id="option-settings-form" method="post" action="/settings" class="control-form">
+                <span class="control-label">Refresh Interval</span>
+                <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
+                <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+            </form>
+            <div class="status-pill">
+                Expiration {{ data.expiration_date }}
+            </div>
+            <div class="status-pill">
+                Snapshot {{ data.snapshot_time }}
+            </div>
         </div>
     </div>
 
@@ -567,22 +594,6 @@ OPTION_CHAIN_HTML = """
         {% if data.error %}
         <div class="error">{{ data.error }}</div>
         {% else %}
-        <div class="controls">
-            <form id="option-settings-form" method="post" action="/settings" class="control-form">
-                <span class="control-label">Refresh Interval</span>
-                <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
-                <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
-            </form>
-            <div class="control-form">
-                <span class="control-label">Expiration</span>
-                <span>{{ data.expiration_date }}</span>
-            </div>
-            <div class="control-form">
-                <span class="control-label">Snapshot</span>
-                <span>{{ data.snapshot_time }}</span>
-            </div>
-        </div>
-
         <div class="metrics">
             <div class="metric"><div class="label">Spot</div><div class="value">{{ data.spot_price }}</div><div class="sub">Latest stored SPX underlying price</div></div>
             <div class="metric"><div class="label">Contracts</div><div class="value">{{ data.contract_count }}</div><div class="sub">Stored rows in selected chain</div></div>
