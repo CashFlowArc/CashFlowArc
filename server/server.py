@@ -381,6 +381,8 @@ GEX_HTML = """
             padding:10px 14px; border-radius:999px; font-weight:700;
             border:1px solid var(--border); background:var(--panel-2);
         }
+        .enter{color:#062b18; background:var(--green); border-color:var(--green)}
+        .no{color:#3b0d0d; background:#ff5d5d; border-color:#ff5d5d}
         .metrics{
             display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px;
         }
@@ -418,8 +420,8 @@ GEX_HTML = """
                 <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
                 <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
             </form>
-            <div class="status-pill">
-                Expiration {{ data.expiration_date }}
+            <div class="status-pill {{ 'enter' if data.trade != 'NO TRADE' else 'no' }}">
+                {{ 'ENTER TRADE' if data.trade != 'NO TRADE' else 'NO TRADE' }}
             </div>
         </div>
     </div>
@@ -534,6 +536,8 @@ OPTION_CHAIN_HTML = """
             padding:10px 14px; border-radius:999px; font-weight:700;
             border:1px solid var(--border); background:var(--panel-2);
         }
+        .enter{color:#062b18; background:var(--green); border-color:var(--green)}
+        .no{color:#3b0d0d; background:#ff5d5d; border-color:#ff5d5d}
         .metrics{
             display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;
         }
@@ -581,11 +585,8 @@ OPTION_CHAIN_HTML = """
                 <input id="refresh_interval" class="text-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
                 <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
             </form>
-            <div class="status-pill">
-                Expiration {{ data.expiration_date }}
-            </div>
-            <div class="status-pill">
-                Snapshot {{ data.snapshot_time }}
+            <div class="status-pill {{ 'enter' if data.trade != 'NO TRADE' else 'no' }}">
+                {{ 'ENTER TRADE' if data.trade != 'NO TRADE' else 'NO TRADE' }}
             </div>
         </div>
     </div>
@@ -1168,6 +1169,7 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
 def run_gex_service(settings: dict) -> dict:
     now_et = pd.Timestamp.now(tz=TIMEZONE)
     gex_snapshot = get_net_gex_snapshot()
+    terminal_snapshot = run_web_service(settings)
     spot_price = gex_snapshot["spot_price"]
     gex_by_strike = gex_snapshot["gex_by_strike"]
     expiration_date = gex_snapshot["expiration_date"]
@@ -1180,7 +1182,11 @@ def run_gex_service(settings: dict) -> dict:
     net_gex = gex_snapshot["net_gex"]
 
     return {
-        "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        "subtitle": (
+            f"Current date: {now_et.date().isoformat()} | "
+            f"Expiration: {expiration_date.isoformat()} | "
+            f"Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        ),
         "requested_date": now_et.date().isoformat(),
         "expiration_date": expiration_date.isoformat(),
         "spot_price": f"{spot_price:,.2f}",
@@ -1191,6 +1197,7 @@ def run_gex_service(settings: dict) -> dict:
         "refresh_interval": settings["refresh_interval"],
         "chart_interval": settings["chart_interval"],
         "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
+        "trade": terminal_snapshot.get("trade", "NO TRADE"),
         "error": None,
     }
 
@@ -1198,6 +1205,7 @@ def run_gex_service(settings: dict) -> dict:
 def run_option_chain_service(settings: dict) -> dict:
     now_et = pd.Timestamp.now(tz=TIMEZONE)
     options, underlying, expiration_date, snapshot_ts = fetch_spx_option_chain_for_session(now_et)
+    terminal_snapshot = run_web_service(settings)
     rows = build_option_chain_rows(options)
     if not rows:
         raise ValueError("No option-chain rows were available in the latest stored SPX snapshot.")
@@ -1220,7 +1228,12 @@ def run_option_chain_service(settings: dict) -> dict:
     snapshot_ts_et = pd.Timestamp(snapshot_ts, tz="UTC").tz_convert(TIMEZONE)
 
     return {
-        "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        "subtitle": (
+            f"Current date: {now_et.date().isoformat()} | "
+            f"Expiration: {expiration_date.isoformat()} | "
+            f"Snapshot: {snapshot_ts_et.strftime('%Y-%m-%d %H:%M:%S %Z')} | "
+            f"Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        ),
         "expiration_date": expiration_date.isoformat(),
         "snapshot_time": snapshot_ts_et.strftime("%Y-%m-%d %H:%M:%S %Z"),
         "spot_price": "N/A" if spot_price <= 0 else f"{spot_price:,.2f}",
@@ -1231,6 +1244,7 @@ def run_option_chain_service(settings: dict) -> dict:
         "refresh_interval": settings["refresh_interval"],
         "chart_interval": settings["chart_interval"],
         "source_table": OPTION_SOURCE_TABLE,
+        "trade": terminal_snapshot.get("trade", "NO TRADE"),
         "error": None,
     }
 
@@ -1957,6 +1971,7 @@ def gex():
         data = run_gex_service(settings)
     except NoOpenInterestInFeedError as exc:
         now_et = pd.Timestamp.now(tz=TIMEZONE)
+        terminal_snapshot = run_web_service(settings)
         underlying = exc.underlying or {}
         spot_price = float(
             underlying.get("regularMarketPrice")
@@ -1967,7 +1982,11 @@ def gex():
         )
         expiration_date = exc.expiration_date or now_et.date()
         data = {
-            "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            "subtitle": (
+                f"Current date: {now_et.date().isoformat()} | "
+                f"Expiration: {expiration_date.isoformat()} | "
+                f"Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+            ),
             "requested_date": now_et.date().isoformat(),
             "expiration_date": expiration_date.isoformat(),
             "spot_price": "N/A" if spot_price <= 0 else f"{spot_price:,.2f}",
@@ -1978,12 +1997,18 @@ def gex():
             "refresh_interval": settings["refresh_interval"],
             "chart_interval": settings["chart_interval"],
             "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
+            "trade": terminal_snapshot.get("trade", "NO TRADE"),
             "error": None,
         }
     except Exception as exc:
         now_et = pd.Timestamp.now(tz=TIMEZONE)
+        terminal_snapshot = run_web_service(settings)
         data = {
-            "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            "subtitle": (
+                f"Current date: {now_et.date().isoformat()} | "
+                f"Expiration: {now_et.date().isoformat()} | "
+                f"Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+            ),
             "requested_date": now_et.date().isoformat(),
             "expiration_date": now_et.date().isoformat(),
             "spot_price": "N/A",
@@ -1994,6 +2019,7 @@ def gex():
             "refresh_interval": settings["refresh_interval"],
             "chart_interval": settings["chart_interval"],
             "min_time_minutes": max(GEX_MIN_TIME_SECONDS // 60, 1),
+            "trade": terminal_snapshot.get("trade", "NO TRADE"),
             "error": str(exc),
         }
     return render_template_string(GEX_HTML, data=data, favicon_version=FAVICON_VERSION)
@@ -2006,8 +2032,14 @@ def option_chain():
         data = run_option_chain_service(settings)
     except Exception as exc:
         now_et = pd.Timestamp.now(tz=TIMEZONE)
+        terminal_snapshot = run_web_service(settings)
         data = {
-            "subtitle": f"Current date: {now_et.date().isoformat()} | Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            "subtitle": (
+                f"Current date: {now_et.date().isoformat()} | "
+                f"Expiration: {now_et.date().isoformat()} | "
+                "Snapshot: N/A | "
+                f"Last update: {now_et.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+            ),
             "expiration_date": now_et.date().isoformat(),
             "snapshot_time": "N/A",
             "spot_price": "N/A",
@@ -2018,6 +2050,7 @@ def option_chain():
             "refresh_interval": settings["refresh_interval"],
             "chart_interval": settings["chart_interval"],
             "source_table": OPTION_SOURCE_TABLE,
+            "trade": terminal_snapshot.get("trade", "NO TRADE"),
             "error": str(exc),
         }
     return render_template_string(OPTION_CHAIN_HTML, data=data, favicon_version=FAVICON_VERSION)
