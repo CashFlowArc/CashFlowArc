@@ -26,6 +26,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_SETTINGS = {
     "refresh_interval": 31,
     "chart_interval": "5min",
+    "simulator_speed": 60.0,
 }
 
 DB_USER = os.environ["DB_USER"]
@@ -734,6 +735,7 @@ SIMULATOR_HTML = """
             border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
         }
         .text-input.ticker-input{width:120px}
+        .text-input.date-input{width:150px}
         .status-pill{
             padding:10px 14px; border-radius:999px; font-weight:700;
             border:1px solid var(--border); background:var(--panel-2);
@@ -794,23 +796,24 @@ SIMULATOR_HTML = """
             <span class="control-label">Ticker</span>
             <input class="text-input ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
             <span class="control-label">Date</span>
-            <input class="text-input" type="date" name="trade_date" value="{{ data.trade_date }}">
+            <input class="text-input date-input" type="date" name="trade_date" value="{{ data.trade_date }}">
             <span class="control-label">Speed</span>
-            <input class="text-input" type="number" name="speed" min="0.5" max="60" step="0.5" value="{{ data.speed }}">
-            <button class="button" type="submit">Start Simulation</button>
+            <input class="text-input" type="number" name="speed" min="0.5" max="360" step="0.5" value="{{ data.speed }}">
+            <button class="button" type="submit">Load Session</button>
+            <button id="simulator-toggle" class="button" type="button">Start Simulation</button>
         </form>
 
         <div class="metrics">
             <div class="metric"><div class="label">Ticker</div><div class="value">{{ data.ticker }}</div><div class="sub">Stored Oracle symbol</div></div>
             <div class="metric"><div class="label">Trade Date</div><div class="value">{{ data.trade_date }}</div><div class="sub">Selected trading session</div></div>
             <div class="metric"><div class="label">Speed</div><div class="value">{{ data.speed_label }}</div><div class="sub">Simulation rate</div></div>
-            <div class="metric"><div class="label">Status</div><div id="simulator-status" class="value">Starting</div><div class="sub">Simulation clock</div></div>
+            <div class="metric"><div class="label">Status</div><div id="simulator-status" class="value">Ready</div><div class="sub">Simulation clock</div></div>
         </div>
 
         <div id="simulator-chart" class="chart-wrap"></div>
 
         <div class="notes">
-            Simulation uses Oracle 1-minute candles for the selected day. Each candle plays over 60 simulated seconds: 10 seconds at the open, 20 seconds to a random high/low, 20 seconds to the other extreme, and 10 seconds to the close. Rendering stops after the final intraday candle for the session.
+            Simulation uses Oracle data aggregated into 5-minute candles for the selected day. Each candle plays over 60 simulated seconds: 10 seconds at the open, 20 seconds to a random high/low, 20 seconds to the other extreme, and 10 seconds to the close. Rendering stops after the final intraday candle for the session.
         </div>
         {% endif %}
     </div>
@@ -823,6 +826,7 @@ SIMULATOR_HTML = """
     const speed = {{ data.speed_js }};
     const chartEl = document.getElementById('simulator-chart');
     const statusEl = document.getElementById('simulator-status');
+    const toggleEl = document.getElementById('simulator-toggle');
     const totalSimSeconds = candles.length * 60;
     const config = { displayModeBar: false, responsive: true };
     const layout = {
@@ -902,16 +906,22 @@ SIMULATOR_HTML = """
 
     if (!candles.length) {
         statusEl.textContent = 'No Data';
+        toggleEl.disabled = true;
         renderChart([], [], [], [], []);
         return;
     }
 
-    const startedAt = Date.now();
     let timerId = null;
+    let running = false;
+    let completedRun = false;
+    let simulatedSeconds = 0;
+    let lastTickAt = null;
 
-    function tick() {
-        const elapsedSeconds = ((Date.now() - startedAt) / 1000) * speed;
-        const cappedSeconds = Math.min(elapsedSeconds, totalSimSeconds);
+    function setToggleLabel() {
+        toggleEl.textContent = running ? 'Stop Simulation' : 'Start Simulation';
+    }
+
+    function drawState(cappedSeconds) {
         const completed = Math.floor(cappedSeconds / 60);
         const phase = cappedSeconds - (completed * 60);
         const openVals = [];
@@ -940,15 +950,73 @@ SIMULATOR_HTML = """
             statusEl.textContent = candle.label + ' • ' + Math.floor(phase) + 's • ' + speed + 'x';
         } else {
             statusEl.textContent = 'Complete • 16:00';
-            clearInterval(timerId);
         }
 
         renderChart(openVals, highVals, lowVals, closeVals, labels);
     }
 
+    function stopTimer() {
+        if (timerId) {
+            clearInterval(timerId);
+            timerId = null;
+        }
+    }
+
+    function tick() {
+        if (!running) return;
+
+        const now = Date.now();
+        if (lastTickAt !== null) {
+            simulatedSeconds += ((now - lastTickAt) / 1000) * speed;
+        }
+        lastTickAt = now;
+
+        const cappedSeconds = Math.min(simulatedSeconds, totalSimSeconds);
+        drawState(cappedSeconds);
+
+        if (cappedSeconds >= totalSimSeconds) {
+            simulatedSeconds = totalSimSeconds;
+            running = false;
+            completedRun = true;
+            stopTimer();
+            setToggleLabel();
+        }
+    }
+
+    function startSimulation() {
+        if (completedRun) {
+            simulatedSeconds = 0;
+            completedRun = false;
+            drawState(0);
+        }
+        running = true;
+        lastTickAt = Date.now();
+        setToggleLabel();
+        if (!timerId) {
+            timerId = setInterval(tick, 200);
+        }
+    }
+
+    function stopSimulation() {
+        running = false;
+        lastTickAt = null;
+        setToggleLabel();
+        stopTimer();
+        if (!completedRun) {
+            statusEl.textContent = 'Stopped • ' + speed + 'x';
+        }
+    }
+
+    toggleEl.addEventListener('click', function() {
+        if (running) {
+            stopSimulation();
+        } else {
+            startSimulation();
+        }
+    });
+
     renderChart([], [], [], [], []);
-    tick();
-    timerId = setInterval(tick, 200);
+    setToggleLabel();
 })();
 </script>
 {% endif %}
@@ -976,6 +1044,7 @@ def load_settings() -> dict:
             out.update(data)
             out["refresh_interval"] = max(15, min(3600, int(out.get("refresh_interval", 30))))
             out["chart_interval"] = str(out.get("chart_interval", "5min"))
+            out["simulator_speed"] = max(0.5, min(360.0, float(out.get("simulator_speed", 60.0))))
             if out["chart_interval"] not in {"5min", "15min", "1h"}:
                 out["chart_interval"] = "5min"
             return out
@@ -1533,10 +1602,10 @@ def run_option_chain_service(settings: dict) -> dict:
 def run_simulator_service(settings: dict, raw_ticker: Optional[str], raw_trade_date: Optional[str], raw_speed: Optional[str]) -> dict:
     ticker = normalize_simulator_ticker(raw_ticker)
     try:
-        speed = float(raw_speed) if raw_speed not in {None, ""} else 5.0
+        speed = float(raw_speed) if raw_speed not in {None, ""} else float(settings.get("simulator_speed", 60.0))
     except Exception:
-        speed = 5.0
-    speed = max(0.5, min(60.0, speed))
+        speed = float(settings.get("simulator_speed", 60.0))
+    speed = max(0.5, min(360.0, speed))
 
     with get_connection() as conn:
         latest_trade_date = get_latest_trade_date(conn, ticker, INTERVAL_NAME)
@@ -1563,7 +1632,7 @@ def run_simulator_service(settings: dict, raw_ticker: Optional[str], raw_trade_d
             f"Oracle playback for {ticker} | "
             f"Date: {trade_date.isoformat()} | "
             f"Latest available date: {latest_trade_date.isoformat()} | "
-            f"Stops after the 16:00 candle"
+            "5-minute candles | Stops at 16:00"
         ),
         "ticker": ticker,
         "trade_date": trade_date.isoformat(),
@@ -1736,6 +1805,23 @@ def build_simulator_payload(df: pd.DataFrame) -> list[dict]:
     working = working[intraday_session_mask(working["ts"])].copy()
     working = working[working["ts"].dt.time <= dt.time(16, 0)].copy()
     working = working.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
+    if working.empty:
+        return []
+
+    working = (
+        working[["ts", "open_price", "high_price", "low_price", "close_price", "volume"]]
+        .resample("5min", on="ts", label="left", closed="left")
+        .agg({
+            "open_price": "first",
+            "high_price": "max",
+            "low_price": "min",
+            "close_price": "last",
+            "volume": "sum",
+        })
+        .dropna(subset=["open_price", "high_price", "low_price", "close_price"])
+        .reset_index()
+    )
+    working = working[working["ts"].dt.time <= dt.time(15, 55)].copy()
     if working.empty:
         return []
 
@@ -2482,23 +2568,33 @@ def option_chain():
 @app.route("/simulator")
 def simulator():
     settings = load_settings()
+    raw_speed = request.args.get("speed")
+    if raw_speed not in {None, ""}:
+        try:
+            simulator_speed = max(0.5, min(360.0, float(raw_speed)))
+            settings["simulator_speed"] = simulator_speed
+            save_settings(settings)
+        except Exception:
+            pass
+
+    settings = load_settings()
     try:
         data = run_simulator_service(
             settings,
             request.args.get("ticker"),
             request.args.get("trade_date"),
-            request.args.get("speed"),
+            raw_speed,
         )
     except Exception as exc:
         fallback_ticker = normalize_simulator_ticker(request.args.get("ticker"))
-        fallback_speed = request.args.get("speed") or "5.00"
+        fallback_speed = request.args.get("speed") or format_option_price(settings.get("simulator_speed", 60.0))
         data = {
             "subtitle": "Oracle playback simulator",
             "ticker": fallback_ticker,
             "trade_date": request.args.get("trade_date") or "",
             "speed": fallback_speed,
             "speed_label": f"{fallback_speed}x",
-            "speed_js": json.dumps(5.0),
+            "speed_js": json.dumps(float(settings.get("simulator_speed", 60.0))),
             "simulator_payload": "[]",
             "trade": run_web_service(settings).get("trade", "NO TRADE"),
             "error": str(exc),
