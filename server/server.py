@@ -806,7 +806,6 @@ SIMULATOR_HTML = """
             <input id="simulator-points" class="text-input" type="number" name="points" min="0" step="1" value="{{ data.points }}">
             <span class="control-label">Wide</span>
             <input id="simulator-wide" class="text-input" type="number" name="wide" min="0" step="1" value="{{ data.wide }}">
-            <button class="button" type="submit">Load Session</button>
             <button id="simulator-toggle" class="button" type="button">Start Simulation</button>
         </form>
 
@@ -828,6 +827,7 @@ SIMULATOR_HTML = """
 (function() {
     const candles = {{ data.simulator_payload|safe }};
     const tradeDate = {{ data.trade_date|tojson }};
+    const renderedTicker = {{ data.ticker|tojson }};
     const speed = {{ data.speed_js }};
     const pointsValue = {{ data.points_js }};
     const wideValue = {{ data.wide_js }};
@@ -958,6 +958,25 @@ SIMULATOR_HTML = """
 
     function formatStatus(label, suffix) {
         return tradeDate + ' ' + label + ' • ' + suffix;
+    }
+
+    function normalizeTicker(value) {
+        return (value || '').trim().toUpperCase();
+    }
+
+    function normalizeNumberString(value) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? String(parsed) : '';
+    }
+
+    function sessionConfigChanged() {
+        return (
+            normalizeTicker(tickerInputEl ? tickerInputEl.value : '') !== normalizeTicker(renderedTicker) ||
+            (dateInputEl ? dateInputEl.value : '') !== (tradeDate || '') ||
+            normalizeNumberString(speedInputEl ? speedInputEl.value : '') !== String(speed) ||
+            normalizeNumberString(pointsInputEl ? pointsInputEl.value : '') !== String(pointsValue) ||
+            normalizeNumberString(wideInputEl ? wideInputEl.value : '') !== String(wideValue)
+        );
     }
 
     let settingsTimer = null;
@@ -1121,6 +1140,12 @@ SIMULATOR_HTML = """
     }
 
     toggleEl.addEventListener('click', function() {
+        if (sessionConfigChanged()) {
+            persistSimulatorSettings();
+            formEl.requestSubmit();
+            return;
+        }
+
         if (running) {
             stopSimulation();
         } else {
