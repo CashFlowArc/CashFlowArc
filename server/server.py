@@ -4,7 +4,6 @@ import json
 import math
 import os
 import re
-import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -12,7 +11,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.offline import plot
 import oracledb
-import yfinance as yf
 
 
 app = Flask(__name__)
@@ -35,6 +33,7 @@ WALLET_DIR = os.environ["WALLET_DIR"]
 DB_DSN = os.environ["DB_DSN"]
 
 SOURCE_TABLE = os.environ.get("SOURCE_TABLE", "TICKER_HISTORY")
+OPTION_SOURCE_TABLE = os.environ.get("OPTION_SOURCE_TABLE", "TICKER_OPTIONS_HISTORY")
 SPX_TICKER = os.environ.get("SPX_TICKER", "^GSPC")
 SPY_TICKER = os.environ.get("SPY_TICKER", "SPY")
 INTERVAL_NAME = os.environ.get("INTERVAL_NAME", "1m")
@@ -50,6 +49,13 @@ class NoOpenInterestInFeedError(Exception):
         super().__init__("No Open Interest In Feed")
         self.expiration_date = expiration_date
         self.underlying = underlying or {}
+
+
+def db_storage_ticker(ticker: str) -> str:
+    mapping = {
+        "^GSPC": "SPX",
+    }
+    return mapping.get(ticker.upper(), ticker.upper())
 
 HTML = """
 <!DOCTYPE html>
@@ -505,7 +511,7 @@ def black_scholes_gamma(spot: float, strike: float, volatility: float, time_to_e
 
 def resolve_gex_expiration_date(now_et: pd.Timestamp, available_dates: list[dt.date]) -> dt.date:
     if not available_dates:
-        raise ValueError("Yahoo did not return any SPX expirations.")
+        raise ValueError("No stored SPX expirations were found.")
 
     current_date = now_et.date()
     market_close = dt.time(16, 0)
@@ -523,20 +529,18 @@ def resolve_gex_expiration_date(now_et: pd.Timestamp, available_dates: list[dt.d
 
 
 def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, dict, dt.date]:
-    cache_dir = os.path.join(tempfile.gettempdir(), "cashflowarc-yfinance-cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    yf.set_tz_cache_location(cache_dir)
+    spx_db_ticker = db_storage_ticker(SPX_TICKER)
+    with get_connection() as conn:
+        snapshot_ts = get_latest_option_snapshot_ts(conn, spx_db_ticker)
+        if snapshot_ts is None:
+            raise ValueError(f"No stored options snapshots found in {OPTION_SOURCE_TABLE} for {spx_db_ticker}.")
+        options = query_option_snapshot(conn, spx_db_ticker, snapshot_ts)
 
-    ticker = yf.Ticker("^SPX")
-    available_expirations = tuple(ticker.options)
-    if not available_expirations:
-        raise ValueError("Yahoo did not return any SPX expirations.")
+    if options.empty:
+        raise ValueError(f"No stored option rows found in {OPTION_SOURCE_TABLE} for {spx_db_ticker}.")
 
-    expiration_map = {
-        pd.Timestamp(exp).date(): exp
-        for exp in available_expirations
-    }
-    available_dates = sorted(expiration_map)
+    available_dates = sorted(pd.to_datetime(options["expiration_date"]).dt.date.unique())
+    expiration_map = {value: value.isoformat() for value in available_dates}
     preferred_expiration_date = resolve_gex_expiration_date(now_et, available_dates)
 
     candidate_dates: list[dt.date] = [preferred_expiration_date]
@@ -548,46 +552,118 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
     last_underlying: dict = {}
     last_selected_expiration_date: Optional[dt.date] = None
     for selected_expiration_date in candidate_dates:
-        expiration_label = expiration_map.get(selected_expiration_date)
-        if expiration_label is None:
+        if selected_expiration_date not in expiration_map:
             continue
 
-        chain = ticker.option_chain(expiration_label)
-        calls = chain.calls.copy() if chain.calls is not None else pd.DataFrame()
-        puts = chain.puts.copy() if chain.puts is not None else pd.DataFrame()
-        calls["option_type"] = "call"
-        puts["option_type"] = "put"
-        options = pd.concat([calls, puts], ignore_index=True, sort=False)
-        if options.empty:
-            last_empty_error = f"Yahoo returned an empty SPX chain for {selected_expiration_date.isoformat()}."
+        selected_options = options[
+            pd.to_datetime(options["expiration_date"]).dt.date == selected_expiration_date
+        ].copy()
+        if selected_options.empty:
+            last_empty_error = f"Stored snapshot returned an empty SPX chain for {selected_expiration_date.isoformat()}."
             continue
 
-        underlying = chain.underlying or {}
+        underlying = build_underlying_snapshot(selected_options)
         last_underlying = underlying
         last_selected_expiration_date = selected_expiration_date
 
-        total_open_interest = pd.to_numeric(options.get("openInterest"), errors="coerce").fillna(0.0).sum()
+        total_open_interest = pd.to_numeric(selected_options.get("open_interest"), errors="coerce").fillna(0.0).sum()
         if total_open_interest <= 0:
             last_empty_error = (
-                f"Yahoo returned no usable SPX open interest for {selected_expiration_date.isoformat()}."
+                f"Stored snapshot returned no usable SPX open interest for {selected_expiration_date.isoformat()}."
             )
             continue
 
-        if not candidate_has_usable_gex_data(options, underlying):
+        if not candidate_has_usable_gex_data(selected_options, underlying):
             last_empty_error = (
-                f"Yahoo returned no usable near-spot SPX open interest for {selected_expiration_date.isoformat()}."
+                f"Stored snapshot returned no usable near-spot SPX open interest for {selected_expiration_date.isoformat()}."
             )
             continue
 
-        return options, underlying, selected_expiration_date
+        return selected_options, underlying, selected_expiration_date
 
     if "open interest" in last_empty_error.lower():
         raise NoOpenInterestInFeedError(last_selected_expiration_date or preferred_expiration_date, last_underlying)
 
     available = ", ".join(sorted(expiration_map.values()))
     raise ValueError(
-        last_empty_error or f"No SPX expiration matched usable data. Available expirations: {available}"
+        last_empty_error or f"No SPX expiration matched usable stored data. Available expirations: {available}"
     )
+
+
+def get_latest_option_snapshot_ts(conn, ticker: str) -> Optional[dt.datetime]:
+    sql = f"""
+        SELECT MAX(snapshot_ts_utc)
+        FROM {OPTION_SOURCE_TABLE}
+        WHERE ticker = :ticker
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute(sql, {"ticker": ticker})
+        row = cur.fetchone()
+        return None if row is None else row[0]
+    finally:
+        cur.close()
+
+
+def query_option_snapshot(conn, ticker: str, snapshot_ts_utc: dt.datetime) -> pd.DataFrame:
+    sql = f"""
+        SELECT
+            ticker,
+            snapshot_ts_utc,
+            expiration_date,
+            dte_target,
+            actual_dte,
+            option_type,
+            contract_symbol,
+            strike,
+            last_price,
+            bid_price,
+            ask_price,
+            change_amount,
+            percent_change,
+            volume,
+            open_interest,
+            implied_volatility,
+            in_the_money,
+            last_trade_ts_utc,
+            contract_size,
+            currency,
+            underlying_price,
+            underlying_previous_close
+        FROM {OPTION_SOURCE_TABLE}
+        WHERE ticker = :ticker
+          AND snapshot_ts_utc = :snapshot_ts_utc
+        ORDER BY expiration_date, strike, option_type, contract_symbol
+    """
+    df = pd.read_sql(
+        sql,
+        conn,
+        params={
+            "ticker": ticker,
+            "snapshot_ts_utc": snapshot_ts_utc,
+        },
+    )
+    if df.empty:
+        return df
+
+    df.columns = [c.lower() for c in df.columns]
+    df["snapshot_ts_utc"] = pd.to_datetime(df["snapshot_ts_utc"], utc=True)
+    df["expiration_date"] = pd.to_datetime(df["expiration_date"]).dt.date
+    df["last_trade_ts_utc"] = pd.to_datetime(df["last_trade_ts_utc"], utc=True, errors="coerce")
+    return df
+
+
+def build_underlying_snapshot(options: pd.DataFrame) -> dict:
+    if options is None or options.empty:
+        return {}
+
+    underlying_price_series = pd.to_numeric(options.get("underlying_price"), errors="coerce").dropna()
+    previous_close_series = pd.to_numeric(options.get("underlying_previous_close"), errors="coerce").dropna()
+
+    return {
+        "regularMarketPrice": float(underlying_price_series.iloc[-1]) if not underlying_price_series.empty else 0.0,
+        "previousClose": float(previous_close_series.iloc[-1]) if not previous_close_series.empty else 0.0,
+    }
 
 
 def candidate_has_usable_gex_data(options: pd.DataFrame, underlying: dict) -> bool:
@@ -603,13 +679,13 @@ def candidate_has_usable_gex_data(options: pd.DataFrame, underlying: dict) -> bo
 
     working = options.copy()
     working["strike"] = pd.to_numeric(working.get("strike"), errors="coerce")
-    working["openInterest"] = pd.to_numeric(working.get("openInterest"), errors="coerce").fillna(0.0)
-    working["impliedVolatility"] = pd.to_numeric(working.get("impliedVolatility"), errors="coerce")
-    working = working.dropna(subset=["strike", "impliedVolatility"])
+    working["open_interest"] = pd.to_numeric(working.get("open_interest"), errors="coerce").fillna(0.0)
+    working["implied_volatility"] = pd.to_numeric(working.get("implied_volatility"), errors="coerce")
+    working = working.dropna(subset=["strike", "implied_volatility"])
     working = working[
         (working["strike"] > 0) &
-        (working["impliedVolatility"] > 0) &
-        (working["openInterest"] > 0) &
+        (working["implied_volatility"] > 0) &
+        (working["open_interest"] > 0) &
         (working["strike"] >= spot_price - GEX_STRIKE_WINDOW) &
         (working["strike"] <= spot_price + GEX_STRIKE_WINDOW)
     ].copy()
@@ -625,12 +701,12 @@ def build_gex_frame(options: pd.DataFrame, spot_price: float, now_et: pd.Timesta
 
     working = options.copy()
     working["strike"] = pd.to_numeric(working.get("strike"), errors="coerce")
-    working["openInterest"] = pd.to_numeric(working.get("openInterest"), errors="coerce").fillna(0.0)
-    working["impliedVolatility"] = pd.to_numeric(working.get("impliedVolatility"), errors="coerce")
+    working["open_interest"] = pd.to_numeric(working.get("open_interest"), errors="coerce").fillna(0.0)
+    working["implied_volatility"] = pd.to_numeric(working.get("implied_volatility"), errors="coerce")
     working["volume"] = pd.to_numeric(working.get("volume"), errors="coerce").fillna(0.0)
-    working["lastPrice"] = pd.to_numeric(working.get("lastPrice"), errors="coerce")
-    working = working.dropna(subset=["strike", "impliedVolatility"])
-    working = working[(working["strike"] > 0) & (working["impliedVolatility"] > 0)].copy()
+    working["last_price"] = pd.to_numeric(working.get("last_price"), errors="coerce")
+    working = working.dropna(subset=["strike", "implied_volatility"])
+    working = working[(working["strike"] > 0) & (working["implied_volatility"] > 0)].copy()
     if working.empty:
         raise ValueError("No SPX options had both strike and implied volatility for GEX calculation.")
 
@@ -638,7 +714,7 @@ def build_gex_frame(options: pd.DataFrame, spot_price: float, now_et: pd.Timesta
         lambda row: black_scholes_gamma(
             spot=spot_price,
             strike=float(row["strike"]),
-            volatility=float(row["impliedVolatility"]),
+            volatility=float(row["implied_volatility"]),
             time_to_expiry=time_to_expiry_years,
         ),
         axis=1,
@@ -646,7 +722,7 @@ def build_gex_frame(options: pd.DataFrame, spot_price: float, now_et: pd.Timesta
     working["direction"] = working["option_type"].map({"call": 1.0, "put": -1.0}).fillna(0.0)
     working["gex"] = (
         working["gamma"]
-        * working["openInterest"]
+        * working["open_interest"]
         * GEX_CONTRACT_SIZE
         * (spot_price ** 2)
         * 0.01
@@ -659,7 +735,7 @@ def build_gex_frame(options: pd.DataFrame, spot_price: float, now_et: pd.Timesta
             net_gex=("gex", "sum"),
             call_gex=("gex", lambda values: float(sum(x for x in values if x > 0))),
             put_gex=("gex", lambda values: float(sum(x for x in values if x < 0))),
-            total_oi=("openInterest", "sum"),
+            total_oi=("open_interest", "sum"),
         )
         .sort_values("strike")
         .reset_index(drop=True)
@@ -1310,7 +1386,7 @@ def run_web_service(settings: dict) -> dict:
     net_gex_billions = "N/A"
     net_gex_date = ""
     net_gex_class = ""
-    net_gex_subtext = "Live options feed unavailable"
+    net_gex_subtext = "Stored options snapshot unavailable"
 
     with get_connection() as conn:
         spx = query_ticker_history(conn, SPX_TICKER, INTERVAL_NAME, start_utc)
