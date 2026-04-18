@@ -30,6 +30,7 @@ DEFAULT_SETTINGS = {
     "simulator_points": 70.0,
     "simulator_wide": 20.0,
     "simulator_trade_date": "",
+    "simulator_execute_time": "10:30",
 }
 
 DB_USER = os.environ["DB_USER"]
@@ -739,6 +740,7 @@ SIMULATOR_HTML = """
         }
         .text-input.ticker-input{width:120px}
         .text-input.date-input{width:150px}
+        .text-input.time-input{width:120px}
         .status-pill{
             padding:10px 14px; border-radius:999px; font-weight:700;
             border:1px solid var(--border); background:var(--panel-2);
@@ -755,6 +757,14 @@ SIMULATOR_HTML = """
         @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} }
         .metric{
             background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:14px;
+        }
+        .metrics.simulator-metrics{grid-template-columns:1fr;}
+        .metrics.simulator-metrics .metric{min-height:0;}
+        .metrics.simulator-metrics .metric .value{
+            font-size:20px;
+            line-height:1.35;
+            white-space:normal;
+            word-break:break-word;
         }
         .metric .label{font-size:12px; color:var(--muted); text-transform:uppercase}
         .metric .value{margin-top:8px; font-size:24px; font-weight:700}
@@ -806,10 +816,12 @@ SIMULATOR_HTML = """
             <input id="simulator-points" class="text-input" type="number" name="points" min="0" step="1" value="{{ data.points }}">
             <span class="control-label">Wide</span>
             <input id="simulator-wide" class="text-input" type="number" name="wide" min="0" step="1" value="{{ data.wide }}">
+            <span class="control-label">Execute Time</span>
+            <input id="simulator-execute-time" class="text-input time-input" type="time" name="execute_time" step="300" value="{{ data.execute_time }}">
             <button id="simulator-toggle" class="button" type="button">Start Simulation</button>
         </form>
 
-        <div class="metrics">
+        <div class="metrics simulator-metrics">
             <div class="metric"><div class="label">Status</div><div id="simulator-status" class="value">Ready</div><div class="sub">Simulation clock</div></div>
         </div>
 
@@ -831,17 +843,19 @@ SIMULATOR_HTML = """
     const speed = {{ data.speed_js }};
     const pointsValue = {{ data.points_js }};
     const wideValue = {{ data.wide_js }};
+    const executeTime = {{ data.execute_time|tojson }};
     const formEl = document.getElementById('simulator-form');
     const tickerInputEl = document.getElementById('simulator-ticker');
     const dateInputEl = document.getElementById('simulator-trade-date');
     const speedInputEl = document.getElementById('simulator-speed');
     const pointsInputEl = document.getElementById('simulator-points');
     const wideInputEl = document.getElementById('simulator-wide');
+    const executeTimeInputEl = document.getElementById('simulator-execute-time');
     const chartEl = document.getElementById('simulator-chart');
     const statusEl = document.getElementById('simulator-status');
     const toggleEl = document.getElementById('simulator-toggle');
     const totalSimSeconds = candles.length * 60;
-    const guideAnchorLabel = '10:30';
+    const guideAnchorLabel = executeTime;
     const guideAnchorIndex = candles.findIndex((candle) => candle.label === guideAnchorLabel);
     const guideAnchorClose = guideAnchorIndex >= 0 ? candles[guideAnchorIndex].close : null;
     const config = { displayModeBar: false, responsive: true };
@@ -969,13 +983,18 @@ SIMULATOR_HTML = """
         return Number.isFinite(parsed) ? String(parsed) : '';
     }
 
+    function normalizeTimeString(value) {
+        return (value || '').trim().slice(0, 5);
+    }
+
     function sessionConfigChanged() {
         return (
             normalizeTicker(tickerInputEl ? tickerInputEl.value : '') !== normalizeTicker(renderedTicker) ||
             (dateInputEl ? dateInputEl.value : '') !== (tradeDate || '') ||
             normalizeNumberString(speedInputEl ? speedInputEl.value : '') !== String(speed) ||
             normalizeNumberString(pointsInputEl ? pointsInputEl.value : '') !== String(pointsValue) ||
-            normalizeNumberString(wideInputEl ? wideInputEl.value : '') !== String(wideValue)
+            normalizeNumberString(wideInputEl ? wideInputEl.value : '') !== String(wideValue) ||
+            normalizeTimeString(executeTimeInputEl ? executeTimeInputEl.value : '') !== normalizeTimeString(executeTime)
         );
     }
 
@@ -988,6 +1007,7 @@ SIMULATOR_HTML = """
         data.set('simulator_speed', speedInputEl ? speedInputEl.value : '');
         data.set('simulator_points', pointsInputEl ? pointsInputEl.value : '');
         data.set('simulator_wide', wideInputEl ? wideInputEl.value : '');
+        data.set('simulator_execute_time', executeTimeInputEl ? executeTimeInputEl.value : '');
         return fetch('/settings', {method: 'POST', body: data}).catch(() => {});
     }
 
@@ -998,7 +1018,7 @@ SIMULATOR_HTML = """
         }, 250);
     }
 
-    [dateInputEl, speedInputEl, pointsInputEl, wideInputEl].forEach((input) => {
+    [dateInputEl, speedInputEl, pointsInputEl, wideInputEl, executeTimeInputEl].forEach((input) => {
         if (!input) return;
         input.addEventListener('input', debouncePersist);
         input.addEventListener('change', debouncePersist);
@@ -1048,7 +1068,13 @@ SIMULATOR_HTML = """
     let lastTickAt = null;
 
     function setToggleLabel() {
-        toggleEl.textContent = running ? 'Stop Simulation' : 'Start Simulation';
+        if (running) {
+            toggleEl.textContent = 'Pause Simulation';
+        } else if (simulatedSeconds > 0 && !completedRun) {
+            toggleEl.textContent = 'Resume Simulation';
+        } else {
+            toggleEl.textContent = 'Start Simulation';
+        }
     }
 
     function drawState(cappedSeconds) {
@@ -1135,7 +1161,7 @@ SIMULATOR_HTML = """
         stopTimer();
         if (!completedRun) {
             const latestLabel = candles[Math.min(Math.floor(simulatedSeconds / 60), candles.length - 1)].label;
-            statusEl.textContent = formatStatus(latestLabel, 'Stopped • ' + speed + 'x');
+            statusEl.textContent = formatStatus(latestLabel, 'Paused • ' + speed + 'x');
         }
     }
 
@@ -1186,6 +1212,7 @@ def load_settings() -> dict:
             out["simulator_points"] = max(0.0, float(out.get("simulator_points", 70.0)))
             out["simulator_wide"] = max(0.0, float(out.get("simulator_wide", 20.0)))
             out["simulator_trade_date"] = str(out.get("simulator_trade_date", "") or "")
+            out["simulator_execute_time"] = normalize_execute_time(out.get("simulator_execute_time", "10:30"))
             if out["chart_interval"] not in {"5min", "15min", "1h"}:
                 out["chart_interval"] = "5min"
             return out
@@ -1196,6 +1223,18 @@ def load_settings() -> dict:
 
 def save_settings(settings: dict) -> None:
     SETTINGS_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+
+def normalize_execute_time(value: Optional[str]) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "10:30"
+    candidate = raw[:5]
+    try:
+        parsed = dt.time.fromisoformat(candidate)
+        return parsed.strftime("%H:%M")
+    except ValueError:
+        return "10:30"
 
 
 def format_billions(value: float) -> str:
@@ -1747,6 +1786,7 @@ def run_simulator_service(
     raw_speed: Optional[str],
     raw_points: Optional[str],
     raw_wide: Optional[str],
+    raw_execute_time: Optional[str],
 ) -> dict:
     ticker = normalize_simulator_ticker(raw_ticker)
     try:
@@ -1764,6 +1804,7 @@ def run_simulator_service(
     except Exception:
         wide = float(settings.get("simulator_wide", 20.0))
     wide = max(0.0, wide)
+    execute_time = normalize_execute_time(raw_execute_time if raw_execute_time not in {None, ""} else settings.get("simulator_execute_time", "10:30"))
 
     if not raw_trade_date:
         raise ValueError("Select a simulator date.")
@@ -1801,6 +1842,7 @@ def run_simulator_service(
         "wide": format_option_price(wide),
         "wide_label": f"{wide:,.0f}",
         "wide_js": json.dumps(wide),
+        "execute_time": execute_time,
         "simulator_payload": json.dumps(payload),
         "trade": terminal_snapshot.get("trade", "NO TRADE"),
         "error": None,
@@ -2630,6 +2672,7 @@ def update_settings():
     simulator_wide = max(0.0, simulator_wide)
 
     simulator_trade_date = str(request.form.get("simulator_trade_date", current.get("simulator_trade_date", "")) or "")
+    simulator_execute_time = normalize_execute_time(request.form.get("simulator_execute_time", current.get("simulator_execute_time", "10:30")))
 
     save_settings({
         "refresh_interval": max(15, min(3600, refresh_interval)),
@@ -2638,6 +2681,7 @@ def update_settings():
         "simulator_points": simulator_points,
         "simulator_wide": simulator_wide,
         "simulator_trade_date": simulator_trade_date,
+        "simulator_execute_time": simulator_execute_time,
     })
     return ("", 204)
 
@@ -2758,6 +2802,7 @@ def simulator():
     raw_speed = request.args.get("speed")
     raw_points = request.args.get("points")
     raw_wide = request.args.get("wide")
+    raw_execute_time = request.args.get("execute_time")
     effective_trade_date = raw_trade_date if raw_trade_date not in {None, ""} else (settings.get("simulator_trade_date") or None)
     try:
         data = run_simulator_service(
@@ -2767,12 +2812,14 @@ def simulator():
             raw_speed,
             raw_points,
             raw_wide,
+            raw_execute_time,
         )
     except Exception as exc:
         fallback_ticker = normalize_simulator_ticker(request.args.get("ticker"))
         fallback_speed = request.args.get("speed") or format_option_price(settings.get("simulator_speed", 60.0))
         fallback_points = request.args.get("points") or format_option_price(settings.get("simulator_points", 70.0))
         fallback_wide = request.args.get("wide") or format_option_price(settings.get("simulator_wide", 20.0))
+        fallback_execute_time = normalize_execute_time(request.args.get("execute_time") or settings.get("simulator_execute_time", "10:30"))
         data = {
             "subtitle": "Oracle playback simulator",
             "ticker": fallback_ticker,
@@ -2786,6 +2833,7 @@ def simulator():
             "wide": fallback_wide,
             "wide_label": f"{float(fallback_wide):,.0f}" if fallback_wide not in {"", None} else "20",
             "wide_js": json.dumps(float(settings.get("simulator_wide", 20.0))),
+            "execute_time": fallback_execute_time,
             "simulator_payload": "[]",
             "trade": run_web_service(settings).get("trade", "NO TRADE"),
             "error": str(exc),
