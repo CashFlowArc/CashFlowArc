@@ -31,6 +31,9 @@ POLL_SECONDS = int(os.getenv("POLL_SECONDS", "60"))
 
 YF_PERIOD = os.getenv("YF_PERIOD", "8d")
 YF_INTERVAL = os.getenv("YF_INTERVAL", "1m")
+MARKET_TIMEZONE = os.getenv("MARKET_TIMEZONE", "America/New_York")
+OPTION_PULL_INTERVAL_MINUTES = int(os.getenv("OPTION_PULL_INTERVAL_MINUTES", "5"))
+OPTION_STRIKE_WINDOW_PCT = float(os.getenv("OPTION_STRIKE_WINDOW_PCT", "0.10"))
 OPTION_TARGET_DTES = [
     int(value.strip())
     for value in os.getenv("OPTION_TARGET_DTES", "0,1,5,7").split(",")
@@ -171,6 +174,21 @@ def sleep_backoff_429() -> None:
     delay = random.randint(60, 300)
     logger.warning("Rate limit hit. Sleeping %s seconds before retry.", delay)
     time.sleep(delay)
+
+
+def is_regular_market_hours(now_et: pd.Timestamp) -> bool:
+    if now_et.weekday() >= 5:
+        return False
+    current_time = now_et.time()
+    return dt.time(9, 30) <= current_time <= dt.time(16, 0)
+
+
+def should_pull_options_now(now_et: pd.Timestamp) -> tuple[bool, str]:
+    if not is_regular_market_hours(now_et):
+        return False, "outside regular market hours"
+    if OPTION_PULL_INTERVAL_MINUTES > 1 and (now_et.minute % OPTION_PULL_INTERVAL_MINUTES != 0):
+        return False, f"waiting for {OPTION_PULL_INTERVAL_MINUTES}-minute boundary"
+    return True, ""
 
 
 def safe_float(value) -> Optional[float]:
@@ -644,12 +662,24 @@ def build_option_rows_for_chain(
     if frame is None or frame.empty:
         return []
 
+    strike_floor = None
+    strike_ceiling = None
+    if underlying_price is not None and underlying_price > 0:
+        strike_floor = underlying_price * (1.0 - OPTION_STRIKE_WINDOW_PCT)
+        strike_ceiling = underlying_price * (1.0 + OPTION_STRIKE_WINDOW_PCT)
+
     rows: List[dict] = []
     working = frame.copy()
     for _, row in working.iterrows():
         contract_symbol = row.get("contractSymbol")
         if pd.isna(contract_symbol) or not contract_symbol:
             continue
+        strike = safe_float(row.get("strike"))
+        if strike is None:
+            continue
+        if strike_floor is not None and strike_ceiling is not None:
+            if strike < strike_floor or strike > strike_ceiling:
+                continue
 
         rows.append(
             {
@@ -660,7 +690,7 @@ def build_option_rows_for_chain(
                 "actual_dte": actual_dte,
                 "option_type": option_type,
                 "contract_symbol": str(contract_symbol),
-                "strike": safe_float(row.get("strike")),
+                "strike": strike,
                 "last_price": safe_float(row.get("lastPrice")),
                 "bid_price": safe_float(row.get("bid")),
                 "ask_price": safe_float(row.get("ask")),
@@ -685,12 +715,11 @@ def build_option_rows_for_ticker(
     db_ticker: str,
     yf_ticker: str,
     ticker_client,
+    now_et: pd.Timestamp,
     snapshot_ts_utc: dt.datetime,
     latest_close: Optional[float],
     previous_close: Optional[float],
 ) -> List[dict]:
-    now_et = pd.Timestamp.now(tz="America/New_York")
-
     try:
         expiration_labels = list(ticker_client.options or ())
     except Exception as exc:
@@ -764,6 +793,7 @@ def fetch_market_data_once(yf_tickers: List[str]) -> Dict[str, List[dict]]:
     Fetch price history for all tickers in one download call, then fetch the
     requested options expirations for the same tickers in the same collection cycle.
     """
+    now_et = pd.Timestamp.now(tz=MARKET_TIMEZONE)
     latest_ts_map = get_latest_ts_by_ticker(INPUT_DB_TICKERS)
     logger.info("Latest DB timestamps: %s", latest_ts_map)
     snapshot_ts_utc = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
@@ -827,21 +857,26 @@ def fetch_market_data_once(yf_tickers: List[str]) -> Dict[str, List[dict]]:
             ticker_frames[yf_ticker] = ticker_df
             price_rows.extend(build_rows_for_one_ticker(db_ticker, ticker_df, latest_ts))
 
-    for db_ticker in INPUT_DB_TICKERS:
-        price_yf_ticker = db_to_yf_ticker(db_ticker)
-        option_yf_ticker = db_to_yf_option_ticker(db_ticker)
-        ticker_client = yf.Ticker(option_yf_ticker)
-        latest_close, previous_close = get_latest_close_values(ticker_frames.get(price_yf_ticker, pd.DataFrame()))
-        option_rows.extend(
-            build_option_rows_for_ticker(
+    pull_options, options_skip_reason = should_pull_options_now(now_et)
+    if pull_options:
+        for db_ticker in INPUT_DB_TICKERS:
+            price_yf_ticker = db_to_yf_ticker(db_ticker)
+            option_yf_ticker = db_to_yf_option_ticker(db_ticker)
+            ticker_client = yf.Ticker(option_yf_ticker)
+            latest_close, previous_close = get_latest_close_values(ticker_frames.get(price_yf_ticker, pd.DataFrame()))
+            option_rows.extend(
+                build_option_rows_for_ticker(
                 db_ticker=db_ticker,
                 yf_ticker=option_yf_ticker,
                 ticker_client=ticker_client,
+                now_et=now_et,
                 snapshot_ts_utc=snapshot_ts_utc,
                 latest_close=latest_close,
                 previous_close=previous_close,
+                )
             )
-        )
+    else:
+        logger.info("Skipping options pull: %s", options_skip_reason)
 
     return {"price_rows": price_rows, "option_rows": option_rows}
 
