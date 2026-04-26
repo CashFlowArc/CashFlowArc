@@ -589,7 +589,7 @@ TERMINAL_HTML = """
     <section class="layout">
         <div class="stack left-stack">
             <section class="panel">
-                <div class="panel-title"><span>SPX {{ data.chart_interval }}</span><span>Updated {{ data.last_update_date }}</span></div>
+                <div class="panel-title"><span>SPX {{ data.chart_interval }}</span><span>Updated {{ data.last_update_timestamp }}</span></div>
                 <div class="chart-wrap">{{ data.chart_html|safe }}</div>
             </section>
         </div>
@@ -3424,6 +3424,7 @@ def run_web_service(settings: dict) -> dict:
         "current_day_high": int(round(current_day_high, 0)),
         "current_day_low": int(round(current_day_low, 0)),
         "last_update_date": current_et_date.isoformat(),
+        "last_update_timestamp": now_et.strftime("%Y-%m-%d %H:%M:%S"),
         "spy_price": "N/A" if spy_latest is None else f"{spy_latest:,.2f}",
         "daily_change": f"{daily_change:+,.2f}",
         "daily_change_pct": "N/A" if pd.isna(daily_change_pct) else f"{daily_change_pct:+.2f}",
@@ -3487,6 +3488,7 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "current_day_high": "N/A",
         "current_day_low": "N/A",
         "last_update_date": dt.date.today().isoformat(),
+        "last_update_timestamp": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "daily_change": "N/A",
         "daily_change_pct": "N/A",
         "daily_change_class": "yellow",
