@@ -433,7 +433,7 @@ TERMINAL_HTML = """
         .layout{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px; align-items:stretch;}
         .stack{display:grid; gap:18px; align-content:start;}
         .left-stack{grid-template-rows:auto auto;}
-        .center-stack{grid-template-rows:300px 190px 154px;}
+        .center-stack{grid-template-rows:300px 206px 154px;}
         .right-stack{grid-template-rows:auto auto; min-width:0; overflow:hidden;}
         .panel{padding:16px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:#c8f8ff; text-transform:uppercase; font-size:14px; font-weight:900; letter-spacing:.02em;}
@@ -445,20 +445,20 @@ TERMINAL_HTML = """
         .symbol{font-size:74px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
         .price{font-size:76px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36), 0 0 44px rgba(66,240,186,.18);}
         .change{font-size:22px; font-weight:900;}
-        .signal{position:relative; text-align:center; padding:22px 20px; display:grid; grid-template-columns:104px minmax(190px,1fr) 104px; column-gap:14px; align-items:center;}
+        .signal{position:relative; text-align:center; padding:22px 20px; display:grid; grid-template-columns:minmax(64px,82px) minmax(0,1fr) minmax(64px,82px); grid-template-rows:1fr auto; column-gap:14px; row-gap:14px; align-items:center;}
         .signal-content{position:relative; z-index:1; grid-column:2; min-width:0;}
         .signal-icons{display:contents; pointer-events:none;}
-        .signal-icon{width:104px; height:94px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease; align-self:center; justify-self:center;}
+        .signal-icon{width:82px; height:76px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease; align-self:center; justify-self:center;}
         .signal-icon img{width:100%; height:100%; object-fit:contain;}
         .signal-icon.bull{grid-column:1;}
         .signal-icon.bear{grid-column:3;}
         .signal-icon.active{opacity:1; filter:drop-shadow(0 0 16px rgba(28,255,115,.44));}
         .signal-icon.bear.active{filter:drop-shadow(0 0 16px rgba(255,49,72,.42));}
         .signal span{color:#c8f8ff; text-transform:uppercase; font-weight:900; font-size:15px;}
-        .signal strong{display:block; color:var(--green); font-size:clamp(36px, 3vw, 46px); line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.32); white-space:nowrap;}
+        .signal strong{display:block; color:var(--green); font-size:clamp(34px, 2.65vw, 44px); line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.32); white-space:nowrap;}
         .signal strong.red{color:var(--red); text-shadow:0 0 18px rgba(255,49,72,.30);}
         .signal strong.yellow{color:var(--yellow); text-shadow:0 0 18px rgba(255,196,0,.24);}
-        .bars{display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-top:18px;}
+        .bars{grid-column:1 / -1; grid-row:2; display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-top:0;}
         .bars i{height:8px; background:rgba(142,170,179,.24); border-radius:1px;}
         .bars i.on{background:var(--green); box-shadow:0 0 12px rgba(28,255,115,.45);}
         .confidence{display:grid; grid-template-columns:132px 1fr; gap:22px; align-items:center;}
@@ -565,11 +565,11 @@ TERMINAL_HTML = """
                 <div class="signal-content">
                     <span>TRADE SIGNAL</span>
                     <strong class="{{ 'green' if data.bullish else ('red' if data.bearish else 'yellow') }}">{{ data.bias_label }}</strong>
-                    <div class="bars">
-                        {% for bar_on in data.signal_bars %}
-                        <i class="{{ 'on' if bar_on else '' }}"></i>
-                        {% endfor %}
-                    </div>
+                </div>
+                <div class="bars">
+                    {% for bar_on in data.signal_bars %}
+                    <i class="{{ 'on' if bar_on else '' }}"></i>
+                    {% endfor %}
                 </div>
             </section>
             <section class="panel confidence">
