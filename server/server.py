@@ -3094,6 +3094,10 @@ def run_web_service(settings: dict) -> dict:
         spx = spx[spx["ts"] <= as_of_naive].copy()
         spy = spy[spy["ts"] <= as_of_naive].copy()
 
+    spy["trade_date"] = spy["ts"].dt.date
+    spx["trade_date"] = spx["ts"].dt.date
+    spx["ema9_spx"] = spx["close_price"].ewm(span=9, adjust=False).mean()
+    spx["ema21_spx"] = spx["close_price"].ewm(span=21, adjust=False).mean()
     spx_regular = spx[intraday_session_mask(spx["ts"])].copy()
     spy_regular = spy[intraday_session_mask(spy["ts"])].copy()
     if spx_regular.empty or spy_regular.empty:
@@ -3112,11 +3116,6 @@ def run_web_service(settings: dict) -> dict:
 
     if spx_current.empty or spy_current.empty or spx_prev.empty or spy_prev.empty:
         return {"time": now, "error": f"Could not separate current/prior session data from {SOURCE_TABLE}.", **settings}
-
-    spx["ema9_spx"] = spx["close_price"].ewm(span=9, adjust=False).mean()
-    spx["ema21_spx"] = spx["close_price"].ewm(span=21, adjust=False).mean()
-    spy["trade_date"] = spy["ts"].dt.date
-    spx["trade_date"] = spx["ts"].dt.date
 
     spy_session = spy_regular.copy()
     spx_session = spx_regular.copy()
