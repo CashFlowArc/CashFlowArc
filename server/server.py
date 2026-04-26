@@ -11,6 +11,7 @@ from typing import Optional
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.offline import plot
+from plotly.subplots import make_subplots
 import oracledb
 
 
@@ -392,8 +393,22 @@ TERMINAL_HTML = """
             opacity:.38;
             mix-blend-mode:screen;
         }
+        body:after{
+            content:"";
+            position:fixed;
+            inset:0;
+            pointer-events:none;
+            background:
+                linear-gradient(90deg, transparent 0 8%, rgba(0,229,240,.14) 12%, transparent 16% 54%, rgba(82,165,255,.10) 58%, transparent 62%),
+                linear-gradient(0deg, transparent 0 18%, rgba(0,229,240,.10) 19%, transparent 20% 72%, rgba(0,229,240,.08) 73%, transparent 74%);
+            background-size:620px 100%,100% 360px;
+            animation:pulse-lines 7s linear infinite;
+            opacity:.24;
+            mix-blend-mode:screen;
+        }
+        @keyframes pulse-lines{0%{background-position:-620px 0,0 -360px; opacity:.13}45%{opacity:.27}100%{background-position:620px 0,0 360px; opacity:.13}}
         .shell{min-height:100vh; padding:18px; display:grid; grid-template-rows:auto 1fr auto; gap:18px;}
-        .topbar,.tickerbar,.panel{
+        .topbar,.controlbar,.tickerbar,.panel{
             position:relative;
             border:1px solid var(--cyan-soft);
             background:
@@ -403,25 +418,28 @@ TERMINAL_HTML = """
             backdrop-filter:blur(10px);
             clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px);
         }
-        .topbar:before,.tickerbar:before,.panel:before{
+        .topbar:before,.controlbar:before,.tickerbar:before,.panel:before{
             content:""; position:absolute; inset:6px; pointer-events:none;
             border-top:1px solid rgba(0,229,240,.34);
             border-bottom:1px solid rgba(0,229,240,.14);
             clip-path:polygon(14px 0,42% 0,42% 1px,14px 1px,14px 14px,13px 14px,13px 0,0 0,0 13px,1px 13px,1px 1px,14px 1px);
         }
-        .topbar{display:grid; grid-template-columns:minmax(320px,1fr) auto minmax(520px,1fr); align-items:center; gap:24px; padding:14px 20px; min-height:96px;}
+        .topbar{display:grid; grid-template-columns:minmax(360px,1fr) auto minmax(360px,1fr); align-items:center; gap:24px; padding:10px 22px; min-height:74px;}
         .brand{text-align:center}
-        .brand h1{margin:0; font-size:42px; letter-spacing:0; line-height:.95; text-shadow:0 0 16px rgba(255,255,255,.22), 0 0 24px rgba(0,229,240,.22);}
+        .brand h1{margin:0; font-size:30px; letter-spacing:0; line-height:.95; text-shadow:0 0 16px rgba(255,255,255,.22), 0 0 24px rgba(0,229,240,.22);}
         .brand p{margin:10px 0 0; color:#b5e9f0; font-size:14px; text-transform:uppercase;}
-        .timeblock{justify-self:start; display:grid; grid-template-columns:auto auto; gap:10px 22px; align-items:center; color:var(--text); font-size:16px; font-weight:800; padding:14px 20px; min-width:320px; border:1px solid rgba(0,229,240,.25); background:linear-gradient(135deg, rgba(0,229,240,.10), rgba(0,9,13,.55)); clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);}
-        .timeblock .label{grid-column:1 / -1; color:var(--muted); font-size:10px; letter-spacing:.08em; text-transform:uppercase;}
+        .timeblock{justify-self:start; display:flex; gap:18px; align-items:center; color:var(--text); font-size:14px; font-weight:800; padding:9px 14px; min-width:320px; border:1px solid rgba(0,229,240,.25); background:linear-gradient(135deg, rgba(0,229,240,.10), rgba(0,9,13,.55)); clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);}
+        .timeblock .label{display:none;}
+        .timeblock .clockmark{color:#dffcff; opacity:.88;}
         .nav-panel{justify-self:end; display:grid; gap:6px; justify-items:end;}
         .market-readout{text-align:right; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.02em;}
         .market-readout b{display:inline-block; margin-right:10px; font-size:18px;}
-        .nav-links{display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; opacity:.68;}
+        .market-readout b:before{content:""; display:inline-block; width:8px; height:8px; margin-right:7px; border-radius:50%; background:currentColor; box-shadow:0 0 12px currentColor;}
+        .controlbar{display:flex; justify-content:space-between; align-items:center; gap:18px; padding:9px 16px; min-height:48px;}
+        .nav-links{display:flex; justify-content:flex-start; gap:8px; flex-wrap:wrap; opacity:.68;}
         .nav-link{color:var(--muted); text-decoration:none; font-size:11px; font-weight:900; padding:8px 11px; border:1px solid rgba(0,229,240,.18); background:rgba(0,10,14,.38); text-transform:uppercase;}
         .nav-link.active{color:#dffcff; border-color:rgba(0,229,240,.48); box-shadow:inset 0 0 0 1px rgba(0,229,240,.18);}
-        .debug-form{grid-column:1 / -1; justify-self:end; display:flex; align-items:center; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:11px; text-transform:uppercase;}
+        .debug-form{display:flex; align-items:center; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:11px; text-transform:uppercase;}
         .debug-form input,.debug-form select{height:28px; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 8px; font:inherit;}
         .debug-switch{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
         .debug-switch input{position:absolute; opacity:0; pointer-events:none;}
@@ -433,7 +451,7 @@ TERMINAL_HTML = """
         .layout{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px; align-items:stretch;}
         .stack{display:grid; gap:18px; align-content:start;}
         .left-stack{grid-template-rows:auto auto;}
-        .center-stack{grid-template-rows:300px 206px 154px;}
+        .center-stack{grid-template-rows:300px 206px 174px;}
         .right-stack{grid-template-rows:auto auto; min-width:0; overflow:hidden;}
         .panel{padding:16px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:#c8f8ff; text-transform:uppercase; font-size:14px; font-weight:900; letter-spacing:.02em;}
@@ -445,33 +463,41 @@ TERMINAL_HTML = """
         .symbol{font-size:74px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
         .price{font-size:76px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36), 0 0 44px rgba(66,240,186,.18);}
         .change{font-size:22px; font-weight:900;}
-        .signal{position:relative; text-align:center; padding:20px; display:grid; grid-template-columns:minmax(64px,82px) minmax(0,1fr) minmax(64px,82px); grid-template-rows:minmax(86px,1fr) auto; column-gap:14px; row-gap:14px; align-items:center;}
+        .signal{position:relative; text-align:center; padding:20px; display:grid; grid-template-columns:minmax(54px,70px) minmax(0,1fr) minmax(54px,70px); grid-template-rows:minmax(86px,1fr) auto; column-gap:10px; row-gap:14px; align-items:center;}
         .signal-content{position:relative; z-index:1; grid-column:2; grid-row:1; min-width:0; align-self:center;}
         .signal-icons{display:contents; pointer-events:none;}
-        .signal-icon{width:82px; height:76px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease; align-self:center; justify-self:center;}
+        .signal-icon{width:70px; height:66px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease; align-self:center; justify-self:center;}
         .signal-icon img{width:100%; height:100%; object-fit:contain;}
         .signal-icon.bull{grid-column:1; grid-row:1;}
         .signal-icon.bear{grid-column:3; grid-row:1;}
         .signal-icon.active{opacity:1; filter:drop-shadow(0 0 16px rgba(28,255,115,.44));}
         .signal-icon.bear.active{filter:drop-shadow(0 0 16px rgba(255,49,72,.42));}
         .signal span{color:#c8f8ff; text-transform:uppercase; font-weight:900; font-size:15px;}
-        .signal strong{display:block; color:var(--green); font-size:clamp(34px, 2.65vw, 44px); line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.32); white-space:nowrap;}
+        .signal strong{display:block; color:var(--green); font-size:clamp(28px, 2.35vw, 38px); line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.32); white-space:nowrap;}
         .signal strong.red{color:var(--red); text-shadow:0 0 18px rgba(255,49,72,.30);}
         .signal strong.yellow{color:var(--yellow); text-shadow:0 0 18px rgba(255,196,0,.24);}
         .bars{grid-column:1 / -1; grid-row:2; display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-top:0;}
         .bars i{height:8px; background:rgba(142,170,179,.24); border-radius:1px;}
         .bars i.on{background:var(--green); box-shadow:0 0 12px rgba(28,255,115,.45);}
         .confidence{display:grid; grid-template-columns:132px 1fr; gap:22px; align-items:center;}
+        .confidence-meter{display:grid; justify-items:center; gap:7px;}
+        .confidence-label{color:#c8f8ff; text-transform:uppercase; font-size:11px; font-weight:900; letter-spacing:.06em;}
         .ring{height:118px; width:118px; border-radius:50%; display:grid; place-items:center; color:var(--text); font-size:30px; font-weight:900; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); box-shadow:0 0 20px rgba(28,255,115,.18);}
         .ring span{height:82px; width:82px; border-radius:50%; display:grid; place-items:center; background:#061016;}
         .notes{margin:0; padding-left:18px; color:var(--text); line-height:1.65; font-size:14px;}
         .market-grid{display:grid; grid-template-columns:minmax(560px,.8fr) minmax(680px,1fr); gap:18px;}
         .market-grid .panel{min-height:170px;}
         table{width:100%; border-collapse:collapse;}
-        td,th{padding:9px 7px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px; white-space:nowrap;}
+        td,th{padding:9px 7px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px;}
         th{color:var(--muted); text-align:left; font-size:12px; text-transform:uppercase;}
         td:last-child,th:last-child{text-align:right;}
-        .option-grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(170px,.72fr); gap:14px; min-width:0; overflow:hidden;}
+        .option-grid{display:grid; grid-template-columns:minmax(250px,1.08fr) minmax(170px,.72fr); gap:16px; min-width:0; overflow:hidden;}
+        .setup-table{table-layout:fixed;}
+        .setup-table td:first-child{width:34%; color:#dffcff;}
+        .setup-table td:last-child{width:66%; white-space:normal; overflow-wrap:anywhere;}
+        .trade-state{font-weight:900; text-transform:uppercase;}
+        .trade-state.trade{color:var(--green);}
+        .trade-state.no-trade{color:var(--red);}
         .option-grid table{min-width:0;}
         .ladder td{font-size:13px; padding:7px 6px;}
         .selected-short{outline:1px solid var(--red); color:var(--red); background:rgba(255,49,72,.08);}
@@ -484,11 +510,15 @@ TERMINAL_HTML = """
         .radar{height:112px; width:112px; border-radius:50%; margin:auto; position:relative; background:radial-gradient(circle, rgba(28,255,115,.95) 0 5px, transparent 6px), repeating-radial-gradient(circle, rgba(0,229,240,.28) 0 1px, transparent 1px 15px), conic-gradient(from 180deg, rgba(28,255,115,.38), transparent 35%, rgba(0,229,240,.15) 70%, transparent);}
         .radar:before,.radar:after{content:""; position:absolute; left:50%; top:0; bottom:0; border-left:1px solid rgba(0,229,240,.35);}
         .radar:after{transform:rotate(90deg);}
+        .snapshot-table{table-layout:fixed;}
+        .snapshot-table td{white-space:nowrap;}
+        .snapshot-table td:nth-child(2),.snapshot-table td:nth-child(4){text-align:right;}
+        .snapshot-table td:nth-child(3){color:var(--muted); border-left:1px solid rgba(142,170,179,.18); padding-left:18px;}
         .green{color:var(--green); font-weight:900}.red{color:var(--red); font-weight:900}.yellow{color:var(--yellow); font-weight:900}.muted{color:var(--muted)}
         .tickerbar{display:flex; align-items:center; gap:34px; overflow:auto; white-space:nowrap; padding:12px 20px;}
         .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 160px 136px}}
+        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.controlbar{display:grid; justify-items:center}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 180px 156px}}
         @media (max-width: 760px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}.chart-wrap{height:430px}}
     </style>
 </head>
@@ -496,42 +526,45 @@ TERMINAL_HTML = """
 <main class="shell">
     <header class="topbar">
         <div class="timeblock">
-            <span class="label">Session Timestamp</span>
-            <span>{{ data.time }}</span>
-            <span>SPX</span>
+            <span class="clockmark">TIME</span>
+            <span>{{ data.header_time }}</span>
+            <span>{{ data.header_date }}</span>
+            <span>{{ data.header_weekday }}</span>
         </div>
         <div class="brand">
             <h1>CashFlowArc Terminal</h1>
         </div>
         <div class="nav-panel">
             <div class="market-readout"><b class="{{ data.market_status_class }}">{{ data.market_status }}</b>{{ data.market_hours }}</div>
-            <nav class="nav-links">
-                <a class="nav-link active" href="/terminal">Modern Terminal</a>
-                <a class="nav-link" href="/hud">AR HUD</a>
-                <a class="nav-link" href="/">Classic Terminal</a>
-                <a class="nav-link" href="/gex">SPX GEX</a>
-                <a class="nav-link" href="/option-chain">Option Chain</a>
-                <a class="nav-link" href="/simulator">Simulator</a>
-            </nav>
-            <form class="debug-form" method="post" action="/settings">
-                <input type="hidden" name="refresh_interval" value="{{ data.refresh_interval }}">
-                <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
-                <input type="hidden" name="debug_mode" value="0">
-                <label class="debug-switch">
-                    <span>Debug</span>
-                    <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
-                    <span class="debug-slider"></span>
-                </label>
-                <input type="date" name="debug_trade_date" value="{{ data.debug_trade_date }}">
-                <select name="debug_time">
-                    <option value="">Time</option>
-                    {% for option in data.debug_time_options %}
-                    <option value="{{ option }}" {% if data.debug_time == option %}selected{% endif %}>{{ option }}</option>
-                    {% endfor %}
-                </select>
-            </form>
         </div>
     </header>
+    <section class="controlbar">
+        <nav class="nav-links">
+            <a class="nav-link active" href="/terminal">Modern Terminal</a>
+            <a class="nav-link" href="/hud">AR HUD</a>
+            <a class="nav-link" href="/">Classic Terminal</a>
+            <a class="nav-link" href="/gex">SPX GEX</a>
+            <a class="nav-link" href="/option-chain">Option Chain</a>
+            <a class="nav-link" href="/simulator">Simulator</a>
+        </nav>
+        <form class="debug-form" method="post" action="/settings">
+            <input type="hidden" name="refresh_interval" value="{{ data.refresh_interval }}">
+            <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+            <input type="hidden" name="debug_mode" value="0">
+            <label class="debug-switch">
+                <span>Debug</span>
+                <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
+                <span class="debug-slider"></span>
+            </label>
+            <input type="date" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+            <select name="debug_time">
+                <option value="">Time</option>
+                {% for option in data.debug_time_options %}
+                <option value="{{ option }}" {% if data.debug_time == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </section>
 
     {% if data.error %}
     <section class="panel"><div class="err">{{ data.error }}</div></section>
@@ -573,7 +606,10 @@ TERMINAL_HTML = """
                 </div>
             </section>
             <section class="panel confidence">
-                <div class="ring" style="--score:{{ data.confidence }}"><span>{{ data.confidence }}%</span></div>
+                <div class="confidence-meter">
+                    <div class="ring" style="--score:{{ data.confidence }}"><span>{{ data.confidence }}%</span></div>
+                    <div class="confidence-label">Confidence</div>
+                </div>
                 <ul class="notes">
                     {% for note in data.setup_notes %}
                     <li>{{ note }}</li>
@@ -584,9 +620,9 @@ TERMINAL_HTML = """
 
         <div class="stack right-stack">
             <section class="panel">
-                <div class="panel-title"><span>Trade Setup</span><span>{{ data.trade }}</span></div>
+                <div class="panel-title"><span>Trade Setup</span><span class="trade-state {{ 'no-trade' if data.trade == 'NO TRADE' else 'trade' }}">{{ data.trade }}</span></div>
                 <div class="option-grid">
-                    <table>
+                    <table class="setup-table">
                         <tr><td>Type</td><td class="{{ 'green' if data.trade != 'NO TRADE' else 'yellow' }}">{{ data.trade_type }}</td></tr>
                         <tr><td>Short Strike</td><td>{{ data.short_strike }}</td></tr>
                         <tr><td>Long Strike</td><td>{{ data.long_strike }}</td></tr>
@@ -623,11 +659,12 @@ TERMINAL_HTML = """
     <section class="market-grid">
         <section class="panel">
             <div class="panel-title"><span>Market Snapshot</span><span>Oracle {{ data.source_table }}</span></div>
-            <table>
-                <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td><td>SPY {{ data.spy_price }}</td></tr>
-                <tr><td>Price vs VWAP</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td><td>Open {{ data.open_price }}</td></tr>
-                <tr><td>Prev Day High</td><td>{{ data.prev_day_high }}</td><td>Prev Day Low {{ data.prev_day_low }}</td></tr>
-                <tr><td>Day High</td><td>{{ data.current_day_high }}</td><td>Day Low {{ data.current_day_low }}</td></tr>
+            <table class="snapshot-table">
+                <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td><td>Prev Day High</td><td>{{ data.prev_day_high }}</td></tr>
+                <tr><td>Price vs VWAP</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td><td>Prev Day Low</td><td>{{ data.prev_day_low }}</td></tr>
+                <tr><td>Open</td><td>{{ data.open_price }}</td><td>Prev Day Open</td><td>{{ data.prev_day_open }}</td></tr>
+                <tr><td>Day High</td><td>{{ data.current_day_high }}</td><td>Prev Day Close</td><td>{{ data.prev_day_close }}</td></tr>
+                <tr><td>Day Low</td><td>{{ data.current_day_low }}</td><td>SPY</td><td>{{ data.spy_price }}</td></tr>
             </table>
         </section>
         <section class="panel">
@@ -2640,7 +2677,7 @@ def rolling_regular_session_candle_count(chart_interval: str) -> int:
     regular_session_minutes = 390
     interval_minutes = chart_interval_minutes(chart_interval)
     full_session_candles = math.floor(regular_session_minutes / interval_minutes) + 1
-    return max(1, full_session_candles + math.ceil(full_session_candles / 4))
+    return max(1, math.ceil(full_session_candles * 1.1))
 
 
 def market_status_info(now_et: pd.Timestamp) -> dict:
@@ -2669,12 +2706,22 @@ def debug_as_of_timestamp(settings: dict) -> Optional[pd.Timestamp]:
     return parsed
 
 
-def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
+def make_chart(
+    spx_1m: pd.DataFrame,
+    range_high: float,
+    range_low: float,
+    prev_day_high: float,
+    prev_day_low: float,
+    prev_day_open: float,
+    prev_day_close: float,
+    current_price: float,
+    chart_interval: str,
+    start_of_day: pd.Timestamp,
+) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
     tick_minute_step = {"5min": 60, "15min": 60, "1h": 60}
     resample_rule = interval_map.get(chart_interval, "5min")
-    chart_label = label_map.get(chart_interval, "5 Minute")
     label_every = tick_minute_step.get(chart_interval, 60)
 
     working = spx_1m.copy()
@@ -2685,13 +2732,14 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         return "<div style='padding:20px;color:#ff5d5d;'>No chart data available.</div>"
 
     spx_resampled = (
-        working[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spx_proxy"]]
+        working[["ts", "open_price", "high_price", "low_price", "close_price", "volume", "ema9_spx", "ema21_spx", "vwap_spx_proxy"]]
         .resample(resample_rule, on="ts", label="right", closed="right")
         .agg({
             "open_price": "first",
             "high_price": "max",
             "low_price": "min",
             "close_price": "last",
+            "volume": "sum",
             "ema9_spx": "last",
             "ema21_spx": "last",
             "vwap_spx_proxy": "last",
@@ -2742,7 +2790,13 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     else:
         start_of_day_x = int(current_session.iloc[0]["xpos"])
 
-    fig = go.Figure()
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=[0.82, 0.18],
+        vertical_spacing=0.02,
+    )
     candle_hover = [
         f"Time: {t}<br>Open: {o:.0f}<br>High: {h:.0f}<br>Low: {l:.0f}<br>Close: {c:.0f}"
         for t, o, h, l, c in zip(
@@ -2764,7 +2818,19 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         text=candle_hover,
         hoverinfo="text",
         hovertemplate=None,
-    ))
+    ), row=1, col=1)
+    volume_colors = [
+        "#1cff73" if close >= open_ else "#ff3148"
+        for open_, close in zip(spx_resampled["open_price"], spx_resampled["close_price"])
+    ]
+    fig.add_trace(go.Bar(
+        x=spx_resampled["xpos"],
+        y=spx_resampled["volume"],
+        name="Volume",
+        marker=dict(color=volume_colors, opacity=0.38),
+        hoverinfo="skip",
+        showlegend=False,
+    ), row=2, col=1)
     fig.add_trace(go.Scatter(
         x=spx_resampled["xpos"],
         y=spx_resampled["vwap_spx_proxy"],
@@ -2773,7 +2839,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         hoverinfo="skip",
         hovertemplate=None,
         line=dict(color="#9b87f5", width=2),
-    ))
+    ), row=1, col=1)
     fig.add_trace(go.Scatter(
         x=spx_resampled["xpos"],
         y=spx_resampled["ema9_spx"],
@@ -2782,7 +2848,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         hoverinfo="skip",
         hovertemplate=None,
         line=dict(color="#00cc96", width=1.8),
-    ))
+    ), row=1, col=1)
     fig.add_trace(go.Scatter(
         x=spx_resampled["xpos"],
         y=spx_resampled["ema21_spx"],
@@ -2791,7 +2857,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         hoverinfo="skip",
         hovertemplate=None,
         line=dict(color="#ffd166", width=1.8),
-    ))
+    ), row=1, col=1)
 
     fig.add_shape(
         type="line",
@@ -2819,12 +2885,17 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     )
 
     reference_lines = [
+        (current_price, "Current", "#42f0ba", "solid"),
         (range_high, "Opening Range High", "#00cc96", "dash"),
         (range_low, "Opening Range Low", "#ef553b", "dash"),
+        (prev_day_open, "Prev Day Open", "#8ab1ba", "dot"),
+        (prev_day_close, "Prev Day Close", "#b5e9f0", "dot"),
         (prev_day_high, "Prev Day High", "#ffd166", "dot"),
         (prev_day_low, "Prev Day Low", "#4da3ff", "dot"),
     ]
     for y, name, color, dash in reference_lines:
+        if y is None or pd.isna(y):
+            continue
         fig.add_shape(
             type="line",
             x0=0,
@@ -2836,30 +2907,29 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             line=dict(color=color, width=1.5, dash=dash),
         )
         fig.add_annotation(
-            x=0.02,
+            x=0.99,
             y=y,
             xref="paper",
             yref="y",
-            text=name,
+            text=f"{name} {y:,.0f}",
             showarrow=False,
-            xanchor="left",
+            xanchor="right",
             yanchor="bottom",
-            font=dict(color=color, size=12),
-            bgcolor="#17202b",
+            font=dict(color=color, size=11),
+            bgcolor="rgba(5,13,17,0.72)",
             borderpad=2,
         )
 
     fig.update_layout(
-        margin=dict(l=28, r=28, t=20, b=50),
+        margin=dict(l=18, r=58, t=18, b=28),
         paper_bgcolor="#17202b",
         plot_bgcolor="#17202b",
         font=dict(color="#e8eef7"),
         xaxis=dict(
             type="linear",
-            showgrid=True,
-            gridcolor="#273244",
+            showgrid=False,
             rangeslider=dict(visible=False),
-            title=f"Time ({chart_label})",
+            title="",
             title_standoff=4,
             range=[-0.75, len(spx_resampled) - 0.25],
             tickmode="array",
@@ -2871,19 +2941,52 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
             zeroline=False,
         ),
         yaxis=dict(
-            showgrid=True,
-            gridcolor="#273244",
-            title="SPX",
+            showgrid=False,
+            title="",
             title_standoff=4,
+            automargin=True,
+            fixedrange=False,
+            side="right",
+            showline=False,
+            zeroline=False,
+        ),
+        xaxis2=dict(
+            type="linear",
+            showgrid=False,
+            title="",
+            range=[-0.75, len(spx_resampled) - 0.25],
+            tickmode="array",
+            tickvals=tickvals,
+            ticktext=ticktext,
             automargin=True,
             fixedrange=False,
             showline=False,
             zeroline=False,
         ),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        yaxis2=dict(
+            showgrid=False,
+            title="",
+            side="right",
+            showticklabels=False,
+            fixedrange=True,
+            showline=False,
+            zeroline=False,
+        ),
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=0.98,
+            xanchor="left",
+            x=0.02,
+            bgcolor="rgba(5,13,17,0.62)",
+            bordercolor="rgba(0,229,240,0.16)",
+            borderwidth=1,
+            font=dict(size=11),
+        ),
         hovermode="closest",
         hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
         hoverdistance=20,
+        bargap=0.08,
     )
     fig.update_xaxes(showspikes=False)
     fig.update_yaxes(showspikes=False)
@@ -3144,8 +3247,9 @@ def run_web_service(settings: dict) -> dict:
     open_price = first_valid_number(spx_current["open_price"])
     latest_vwap = last_valid_number(spx_current["vwap_spx_proxy"])
     prev_close = last_valid_number(chart_spx[chart_spx["ts"].dt.date == prev_date]["close_price"])
+    prev_open = first_valid_number(chart_spx[chart_spx["ts"].dt.date == prev_date]["open_price"])
 
-    if None in {latest_price, latest_ema9, latest_ema21, open_price, latest_vwap, prev_close}:
+    if None in {latest_price, latest_ema9, latest_ema21, open_price, latest_vwap, prev_close, prev_open}:
         return {"time": now, "error": f"Missing current-session values in {SOURCE_TABLE}.", **settings}
 
     opening_df = spx_current[
@@ -3261,12 +3365,18 @@ def run_web_service(settings: dict) -> dict:
         range_low,
         prev_day_high,
         prev_day_low,
+        prev_open,
+        prev_close,
+        latest_price,
         settings["chart_interval"],
         pd.Timestamp(spx_current["ts"].min()),
     )
 
     return {
         "time": now,
+        "header_time": now_et.strftime("%I:%M:%S %p").lstrip("0"),
+        "header_date": now_et.strftime("%b %d, %Y").upper(),
+        "header_weekday": now_et.strftime("%a").upper(),
         "price": int(round(latest_price, 0)),
         "vwap": int(round(latest_vwap, 0)),
         "ema9": int(round(latest_ema9, 0)),
@@ -3274,6 +3384,8 @@ def run_web_service(settings: dict) -> dict:
         "open_price": int(round(open_price, 0)),
         "range_high": int(round(range_high, 0)),
         "range_low": int(round(range_low, 0)),
+        "prev_day_open": int(round(prev_open, 0)),
+        "prev_day_close": int(round(prev_close, 0)),
         "prev_day_high": int(round(prev_day_high, 0)),
         "prev_day_low": int(round(prev_day_low, 0)),
         "current_day_high": int(round(current_day_high, 0)),
@@ -3323,6 +3435,9 @@ def run_web_service(settings: dict) -> dict:
 
 def ensure_terminal_display_data(data: dict) -> dict:
     defaults = {
+        "header_time": "",
+        "header_date": "",
+        "header_weekday": "",
         "price": "N/A",
         "spy_price": "N/A",
         "vwap": "N/A",
@@ -3331,6 +3446,8 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "ema21": "N/A",
         "range_high": "N/A",
         "range_low": "N/A",
+        "prev_day_open": "N/A",
+        "prev_day_close": "N/A",
         "prev_day_high": "N/A",
         "prev_day_low": "N/A",
         "current_day_high": "N/A",
