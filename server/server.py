@@ -2788,7 +2788,7 @@ def make_chart(
         else:
             open_row = session_df.iloc[0]
         tickvals.append(int(open_row["xpos"]))
-        ticktext.append(f"{open_row['ts'].strftime('%b %d')}<br>09:30")
+        ticktext.append("09:30")
 
         hourly_rows = session_df[
             (session_df["ts"].dt.minute == 0) &
@@ -2916,29 +2916,15 @@ def make_chart(
     for y, name, color, dash in reference_lines:
         if y is None or pd.isna(y):
             continue
-        fig.add_shape(
-            type="line",
-            x0=0,
-            x1=1,
-            xref="paper",
-            y0=y,
-            y1=y,
-            yref="y",
+        fig.add_trace(go.Scatter(
+            x=[0, len(spx_resampled) - 1],
+            y=[y, y],
+            mode="lines",
+            name=f"{name} {y:,.0f}",
+            hoverinfo="skip",
+            hovertemplate=None,
             line=dict(color=color, width=1.5, dash=dash),
-        )
-        fig.add_annotation(
-            x=0.99,
-            y=y,
-            xref="paper",
-            yref="y",
-            text=f"{name} {y:,.0f}",
-            showarrow=False,
-            xanchor="right",
-            yanchor="bottom",
-            font=dict(color=color, size=11),
-            bgcolor="rgba(5,13,17,0.72)",
-            borderpad=2,
-        )
+        ), row=1, col=1)
 
     fig.update_layout(
         margin=dict(l=18, r=58, t=18, b=28),
@@ -3005,7 +2991,9 @@ def make_chart(
             bgcolor="rgba(5,13,17,0.62)",
             bordercolor="rgba(0,229,240,0.16)",
             borderwidth=1,
-            font=dict(size=11),
+            font=dict(size=10),
+            itemclick="toggle",
+            itemdoubleclick="toggleothers",
         ),
         hovermode="closest",
         hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
@@ -3037,6 +3025,32 @@ def make_chart(
     var tooltip = null;
     var crosshairV = null;
     var crosshairH = null;
+    var labelsVisible = true;
+
+    if (!gd.style.position) gd.style.position = 'relative';
+
+    var legendButton = document.createElement('button');
+    legendButton.type = 'button';
+    legendButton.textContent = 'Labels -';
+    legendButton.setAttribute('aria-label', 'Toggle chart labels');
+    legendButton.style.position = 'absolute';
+    legendButton.style.right = '8px';
+    legendButton.style.top = '8px';
+    legendButton.style.zIndex = '30';
+    legendButton.style.border = '1px solid rgba(0,229,240,.3)';
+    legendButton.style.background = 'rgba(5,13,17,.76)';
+    legendButton.style.color = '#00e5f0';
+    legendButton.style.font = '700 10px Segoe UI, Arial, sans-serif';
+    legendButton.style.textTransform = 'uppercase';
+    legendButton.style.padding = '4px 7px';
+    legendButton.style.cursor = 'pointer';
+    legendButton.addEventListener('click', function(event) {{
+        event.preventDefault();
+        labelsVisible = !labelsVisible;
+        legendButton.textContent = labelsVisible ? 'Labels -' : 'Labels +';
+        if (window.Plotly) Plotly.relayout(gd, {{showlegend: labelsVisible}});
+    }});
+    gd.appendChild(legendButton);
 
     function ensureTooltip() {{
         if (tooltip) return tooltip;
