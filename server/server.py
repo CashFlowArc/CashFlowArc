@@ -493,8 +493,10 @@ TERMINAL_HTML = """
         .notes li::marker{font-size:1.42em;}
         .notes li.green{color:var(--green); font-weight:800;}
         .notes li.red{color:var(--red); font-weight:800;}
-        .market-grid{display:grid; grid-template-columns:minmax(560px,.8fr) minmax(680px,1fr); gap:18px;}
+        .market-grid{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px;}
         .market-grid .panel{min-height:170px;}
+        .market-grid .panel:first-child{grid-column:1 / 3;}
+        .market-grid .panel:nth-child(2){grid-column:3;}
         table{width:100%; border-collapse:collapse;}
         td,th{padding:9px 7px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px;}
         th{color:var(--muted); text-align:left; font-size:12px; text-transform:uppercase;}
@@ -533,7 +535,7 @@ TERMINAL_HTML = """
         .tickerbar{display:flex; align-items:center; gap:34px; overflow:auto; white-space:nowrap; padding:12px 20px;}
         .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.controlbar{display:grid; justify-items:center}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 180px 156px}}
+        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.market-grid .panel:first-child,.market-grid .panel:nth-child(2){grid-column:auto}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.controlbar{display:grid; justify-items:center}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 180px 156px}}
         @media (max-width: 760px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}.chart-wrap{height:430px}}
     </style>
 </head>
