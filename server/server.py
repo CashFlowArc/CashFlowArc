@@ -433,7 +433,7 @@ TERMINAL_HTML = """
         .layout{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px; align-items:stretch;}
         .stack{display:grid; gap:18px; align-content:start;}
         .left-stack{grid-template-rows:auto auto;}
-        .center-stack{grid-template-rows:300px 176px 154px;}
+        .center-stack{grid-template-rows:300px 190px 154px;}
         .right-stack{grid-template-rows:auto auto; min-width:0; overflow:hidden;}
         .panel{padding:16px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:#c8f8ff; text-transform:uppercase; font-size:14px; font-weight:900; letter-spacing:.02em;}
@@ -445,17 +445,17 @@ TERMINAL_HTML = """
         .symbol{font-size:74px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
         .price{font-size:76px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36), 0 0 44px rgba(66,240,186,.18);}
         .change{font-size:22px; font-weight:900;}
-        .signal{position:relative; text-align:center; padding:22px 20px;}
-        .signal-content{position:relative; z-index:1;}
-        .signal-icons{position:absolute; inset:22px 24px auto 24px; display:flex; justify-content:space-between; pointer-events:none;}
-        .signal-icon{width:96px; height:72px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease;}
-        .signal-icon img,.signal-icon svg{width:100%; height:100%; object-fit:contain;}
+        .signal{position:relative; text-align:center; padding:22px 20px; display:grid; grid-template-columns:104px minmax(190px,1fr) 104px; column-gap:14px; align-items:center;}
+        .signal-content{position:relative; z-index:1; grid-column:2; min-width:0;}
+        .signal-icons{display:contents; pointer-events:none;}
+        .signal-icon{width:104px; height:94px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease; align-self:center; justify-self:center;}
+        .signal-icon img{width:100%; height:100%; object-fit:contain;}
+        .signal-icon.bull{grid-column:1;}
+        .signal-icon.bear{grid-column:3;}
         .signal-icon.active{opacity:1; filter:drop-shadow(0 0 16px rgba(28,255,115,.44));}
         .signal-icon.bear.active{filter:drop-shadow(0 0 16px rgba(255,49,72,.42));}
-        .signal-icon.bull{color:var(--green);}
-        .signal-icon.bear{color:var(--red);}
         .signal span{color:#c8f8ff; text-transform:uppercase; font-weight:900; font-size:15px;}
-        .signal strong{display:block; color:var(--green); font-size:46px; line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.32);}
+        .signal strong{display:block; color:var(--green); font-size:clamp(36px, 3vw, 46px); line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.32); white-space:nowrap;}
         .signal strong.red{color:var(--red); text-shadow:0 0 18px rgba(255,49,72,.30);}
         .signal strong.yellow{color:var(--yellow); text-shadow:0 0 18px rgba(255,196,0,.24);}
         .bars{display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-top:18px;}
@@ -559,12 +559,7 @@ TERMINAL_HTML = """
                         <img src="{{ url_for('static', filename='bull-signal.png') }}" alt="">
                     </div>
                     <div class="signal-icon bear {{ 'active' if data.bearish else '' }}" aria-hidden="true">
-                        <svg viewBox="0 0 96 72" fill="none">
-                            <path d="M25 24C21 12 27 7 36 15M71 24C75 12 69 7 60 15" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-                            <path d="M22 38C22 24 34 13 48 13C62 13 74 24 74 38C74 53 63 63 48 63C33 63 22 53 22 38Z" stroke="currentColor" stroke-width="5"/>
-                            <path d="M38 36H38.5M57.5 36H58" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
-                            <path d="M39 52C45 47 51 47 57 52" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                        </svg>
+                        <img src="{{ url_for('static', filename='bear-signal.png') }}" alt="">
                     </div>
                 </div>
                 <div class="signal-content">
@@ -3387,8 +3382,9 @@ def update_settings():
     if chart_interval not in {"5min", "15min", "1h"}:
         chart_interval = current.get("chart_interval", "5min")
 
-    if "debug_mode" in request.form:
-        debug_mode = str(request.form.get("debug_mode", "0")) == "1"
+    debug_mode_values = request.form.getlist("debug_mode")
+    if debug_mode_values:
+        debug_mode = str(debug_mode_values[-1]) == "1"
     else:
         debug_mode = bool(current.get("debug_mode", False))
     debug_trade_date = str(request.form.get("debug_trade_date", current.get("debug_trade_date", "")) or "")
