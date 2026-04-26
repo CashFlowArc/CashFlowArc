@@ -340,57 +340,99 @@ TERMINAL_HTML = """
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <style>
         :root{
-            --bg:#050709;
-            --panel:#091016;
-            --panel-2:#0e1820;
-            --line:#0ad7e7;
-            --line-soft:rgba(10,215,231,.28);
-            --text:#eef7fb;
-            --muted:#91a8b5;
-            --green:#28f077;
-            --red:#ff3d4f;
-            --yellow:#ffc629;
+            --bg:#020506;
+            --panel:rgba(3,13,17,.86);
+            --panel-2:rgba(6,21,27,.92);
+            --cyan:#00e5f0;
+            --cyan-soft:rgba(0,229,240,.34);
+            --cyan-faint:rgba(0,229,240,.12);
+            --text:#f3fbff;
+            --muted:#8eaab3;
+            --green:#1cff73;
+            --red:#ff3148;
+            --yellow:#ffc400;
+            --blue:#52a5ff;
         }
         *{box-sizing:border-box}
-        body{margin:0; font-family:Segoe UI, Arial, sans-serif; background:radial-gradient(circle at 50% 20%, #12212a 0%, #050709 42%, #020304 100%); color:var(--text);}
-        .shell{min-height:100vh; padding:22px; display:grid; grid-template-rows:auto 1fr auto; gap:16px;}
-        .topbar,.tickerbar{border:1px solid var(--line-soft); background:rgba(5,12,16,.86); box-shadow:0 0 22px rgba(10,215,231,.11); clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px); padding:14px 18px;}
-        .topbar{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
-        .brand h1{margin:0; font-size:34px; letter-spacing:0; line-height:1;}
-        .brand p{margin:6px 0 0; color:var(--muted); font-size:13px;}
-        .nav-links{display:flex; gap:8px; flex-wrap:wrap;}
-        .nav-link{color:var(--muted); text-decoration:none; font-size:13px; font-weight:800; padding:9px 12px; border:1px solid rgba(10,215,231,.25); background:#071018;}
-        .nav-link.active{color:var(--text); border-color:var(--line); box-shadow:inset 0 0 0 1px rgba(10,215,231,.45);}
-        .market{font-weight:900; color:var(--green);}
-        .layout{display:grid; grid-template-columns:minmax(420px,1.15fr) minmax(300px,.75fr) minmax(420px,1fr); gap:16px; align-items:stretch;}
-        .stack{display:grid; gap:16px;}
-        .panel{border:1px solid var(--line-soft); background:linear-gradient(180deg,rgba(9,16,22,.93),rgba(4,8,11,.93)); padding:14px; min-width:0; box-shadow:0 0 18px rgba(0,0,0,.34);}
-        .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; color:var(--muted); text-transform:uppercase; font-size:13px; font-weight:900;}
-        .chart-wrap{height:510px; overflow:hidden; background:#05090d; border:1px solid rgba(10,215,231,.12);}
+        body{
+            margin:0;
+            font-family:Segoe UI, Arial, sans-serif;
+            color:var(--text);
+            background:
+                linear-gradient(90deg, rgba(0,229,240,.035) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(0,229,240,.025) 1px, transparent 1px),
+                radial-gradient(circle at 50% 18%, rgba(14,83,95,.62) 0%, rgba(2,5,6,.9) 38%, #010303 72%);
+            background-size:44px 44px,44px 44px,auto;
+        }
+        .shell{min-height:100vh; padding:18px; display:grid; grid-template-rows:auto 1fr auto; gap:14px;}
+        .topbar,.tickerbar,.panel{
+            position:relative;
+            border:1px solid var(--cyan-soft);
+            background:linear-gradient(180deg, rgba(6,19,24,.88), rgba(1,6,8,.92));
+            box-shadow:0 0 26px rgba(0,229,240,.12), inset 0 0 28px rgba(0,229,240,.035);
+            clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px);
+        }
+        .topbar:before,.tickerbar:before,.panel:before{
+            content:""; position:absolute; inset:6px; pointer-events:none;
+            border-top:1px solid rgba(0,229,240,.34);
+            border-bottom:1px solid rgba(0,229,240,.14);
+            clip-path:polygon(14px 0,42% 0,42% 1px,14px 1px,14px 14px,13px 14px,13px 0,0 0,0 13px,1px 13px,1px 1px,14px 1px);
+        }
+        .topbar{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:18px; padding:12px 18px;}
+        .brand{text-align:center}
+        .brand h1{margin:0; font-size:38px; letter-spacing:0; line-height:.95; text-shadow:0 0 16px rgba(255,255,255,.22);}
+        .brand p{margin:8px 0 0; color:#b5e9f0; font-size:13px; text-transform:uppercase;}
+        .timeblock{display:flex; gap:18px; align-items:center; color:var(--text); font-size:16px; font-weight:800;}
+        .nav-links{display:flex; justify-content:flex-end; gap:7px; flex-wrap:wrap;}
+        .nav-link{color:var(--muted); text-decoration:none; font-size:12px; font-weight:900; padding:8px 10px; border:1px solid rgba(0,229,240,.25); background:rgba(0,10,14,.7); text-transform:uppercase;}
+        .nav-link.active{color:var(--text); border-color:var(--cyan); box-shadow:0 0 12px rgba(0,229,240,.2), inset 0 0 0 1px rgba(0,229,240,.35);}
+        .market{color:var(--green); font-weight:900; text-align:right; text-transform:uppercase;}
+        .layout{display:grid; grid-template-columns:minmax(440px,1.08fr) minmax(310px,.72fr) minmax(470px,1fr); gap:14px; align-items:stretch;}
+        .stack{display:grid; gap:14px; align-content:start;}
+        .panel{padding:14px; min-width:0;}
+        .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; color:#c8f8ff; text-transform:uppercase; font-size:13px; font-weight:900; letter-spacing:.02em;}
+        .panel-title span:last-child{color:var(--cyan)}
+        .chart-wrap{height:520px; overflow:hidden; background:rgba(0,8,11,.76); border:1px solid rgba(0,229,240,.18);}
         .chart-wrap .plotly-graph-div{width:100% !important; height:100% !important;}
-        .hero{display:grid; align-content:center; justify-items:center; gap:14px; min-height:360px; text-align:center;}
-        .symbol{font-size:64px; font-weight:900; line-height:.95;}
-        .price{font-size:66px; color:#43e8b1; font-weight:900; text-shadow:0 0 24px rgba(67,232,177,.32);}
-        .signal{border:1px solid var(--line-soft); padding:20px; width:100%; text-align:center;}
-        .signal strong{display:block; color:var(--green); font-size:44px; line-height:1; margin-top:8px;}
-        .confidence{display:grid; grid-template-columns:120px 1fr; gap:14px; align-items:center;}
-        .ring{height:112px; width:112px; border-radius:50%; border:10px solid rgba(40,240,119,.25); display:grid; place-items:center; color:var(--text); font-size:28px; font-weight:900; box-shadow:inset 0 0 0 8px #071018;}
+        .hero{min-height:295px; display:grid; place-items:center; text-align:center;}
+        .hero-inner{width:100%; display:grid; justify-items:center; gap:8px;}
+        .symbol{font-size:74px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
+        .price{font-size:74px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36);}
+        .change{font-size:22px; color:var(--green); font-weight:900;}
+        .signal{text-align:center; padding:22px 18px;}
+        .signal span{color:#c8f8ff; text-transform:uppercase; font-weight:900; font-size:14px;}
+        .signal strong{display:block; color:var(--green); font-size:48px; line-height:1; margin-top:10px; text-shadow:0 0 18px rgba(28,255,115,.32);}
+        .bars{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:14px;}
+        .bars i{height:6px; background:rgba(142,170,179,.24); border-radius:1px;}
+        .bars i.on{background:var(--green); box-shadow:0 0 10px rgba(28,255,115,.45);}
+        .confidence{display:grid; grid-template-columns:112px 1fr; gap:14px; align-items:center;}
+        .ring{height:104px; width:104px; border-radius:50%; display:grid; place-items:center; color:var(--text); font-size:26px; font-weight:900; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); box-shadow:0 0 20px rgba(28,255,115,.18);}
+        .ring span{height:74px; width:74px; border-radius:50%; display:grid; place-items:center; background:#061016;}
         .notes{margin:0; padding-left:18px; color:var(--text); line-height:1.65; font-size:14px;}
+        .metric-grid{display:grid; grid-template-columns:1fr 1fr; gap:0 14px;}
         table{width:100%; border-collapse:collapse;}
-        td,th{padding:9px 6px; border-bottom:1px solid rgba(145,168,181,.18); font-size:14px; white-space:nowrap;}
-        th{color:var(--muted); text-align:left; font-size:12px;}
+        td,th{padding:9px 6px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px; white-space:nowrap;}
+        th{color:var(--muted); text-align:left; font-size:12px; text-transform:uppercase;}
         td:last-child,th:last-child{text-align:right;}
+        .option-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+        .ladder td{font-size:13px; padding:7px 6px;}
+        .selected-short{outline:1px solid var(--red); color:var(--red);}
+        .selected-long{outline:1px solid var(--green); color:var(--green);}
         .green{color:var(--green); font-weight:900}.red{color:var(--red); font-weight:900}.yellow{color:var(--yellow); font-weight:900}.muted{color:var(--muted)}
-        .tickerbar{display:flex; align-items:center; gap:26px; overflow:auto; white-space:nowrap;}
-        .tickerbar b{color:var(--line); margin-right:6px;}
+        .tickerbar{display:flex; align-items:center; gap:30px; overflow:auto; white-space:nowrap; padding:12px 18px;}
+        .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 1380px){.layout{grid-template-columns:1fr 1fr}.layout>.stack:first-child{grid-column:1 / -1}.chart-wrap{height:420px}}
-        @media (max-width: 820px){.shell{padding:12px}.layout{grid-template-columns:1fr}.price{font-size:48px}.symbol{font-size:46px}.confidence{grid-template-columns:1fr}.ring{margin:auto}}
+        @media (max-width: 1460px){.layout{grid-template-columns:1fr 1fr}.layout>.stack:first-child{grid-column:1 / -1}.chart-wrap{height:430px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-links{justify-content:center}.timeblock{justify-content:center}}
+        @media (max-width: 860px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.metric-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}}
     </style>
 </head>
 <body>
 <main class="shell">
     <header class="topbar">
+        <div class="timeblock">
+            <span>{{ data.time }}</span>
+            <span>SPX</span>
+        </div>
         <div class="brand">
             <h1>CashFlowArc Terminal</h1>
             <p>S&P 500 Index - SPX - Last update {{ data.time }}</p>
@@ -403,7 +445,6 @@ TERMINAL_HTML = """
             <a class="nav-link" href="/option-chain">Option Chain</a>
             <a class="nav-link" href="/simulator">Simulator</a>
         </nav>
-        <div class="market">MARKET DATA LIVE</div>
     </header>
 
     {% if data.error %}
@@ -428,16 +469,20 @@ TERMINAL_HTML = """
 
         <div class="stack">
             <section class="panel hero">
-                <div class="symbol">SPX</div>
-                <div class="price">{{ data.price }}</div>
-                <div class="{{ 'green' if data.bullish else ('red' if data.bearish else 'yellow') }}">{{ data.bias_label }}</div>
+                <div class="hero-inner">
+                    <div class="muted">S&P 500 INDEX</div>
+                    <div class="symbol">SPX</div>
+                    <div class="price">{{ data.price }}</div>
+                    <div class="change">VWAP {{ data.vwap_distance_pct }}% - {{ data.bias_label }}</div>
+                </div>
             </section>
             <section class="panel signal">
                 <span>TRADE SIGNAL</span>
                 <strong>{{ data.bias_label }}</strong>
+                <div class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="{{ 'on' if data.confidence >= 80 else '' }}"></i><i class="{{ 'on' if data.confidence >= 95 else '' }}"></i></div>
             </section>
             <section class="panel confidence">
-                <div class="ring">{{ data.confidence }}%</div>
+                <div class="ring" style="--score:{{ data.confidence }}"><span>{{ data.confidence }}%</span></div>
                 <ul class="notes">
                     {% for note in data.setup_notes %}
                     <li>{{ note }}</li>
@@ -449,15 +494,26 @@ TERMINAL_HTML = """
         <div class="stack">
             <section class="panel">
                 <div class="panel-title"><span>Trade Setup</span><span>{{ data.trade }}</span></div>
-                <table>
-                    <tr><td>Type</td><td class="{{ 'green' if data.trade != 'NO TRADE' else 'yellow' }}">{{ data.trade_type }}</td></tr>
-                    <tr><td>Short Strike</td><td>{{ data.short_strike }}</td></tr>
-                    <tr><td>Long Strike</td><td>{{ data.long_strike }}</td></tr>
-                    <tr><td>Credit</td><td>{{ data.credit }}</td></tr>
-                    <tr><td>Max Profit</td><td class="green">{{ data.max_profit }}</td></tr>
-                    <tr><td>Max Risk</td><td class="red">{{ data.max_risk }}</td></tr>
-                    <tr><td>Net GEX</td><td>{{ data.net_gex_billions }}</td></tr>
-                </table>
+                <div class="option-grid">
+                    <table>
+                        <tr><td>Type</td><td class="{{ 'green' if data.trade != 'NO TRADE' else 'yellow' }}">{{ data.trade_type }}</td></tr>
+                        <tr><td>Short Strike</td><td class="red">{{ data.short_strike }}</td></tr>
+                        <tr><td>Long Strike</td><td class="green">{{ data.long_strike }}</td></tr>
+                        <tr><td>Credit</td><td>{{ data.credit }}</td></tr>
+                        <tr><td>Max Profit</td><td class="green">{{ data.max_profit }}</td></tr>
+                        <tr><td>Max Risk</td><td class="red">{{ data.max_risk }}</td></tr>
+                        <tr><td>Net GEX</td><td>{{ data.net_gex_billions }}</td></tr>
+                    </table>
+                    <table class="ladder">
+                        <tr><th>Strike</th><th>Put</th><th>Call</th></tr>
+                        <tr><td>{{ data.price + 30 }}</td><td>8.10</td><td>1.20</td></tr>
+                        <tr><td>{{ data.price + 20 }}</td><td>5.80</td><td>1.65</td></tr>
+                        <tr><td>{{ data.price + 10 }}</td><td>3.25</td><td>2.35</td></tr>
+                        <tr class="selected-short"><td>{{ data.short_strike }}</td><td>1.65</td><td>3.10</td></tr>
+                        <tr class="selected-long"><td>{{ data.long_strike }}</td><td>0.55</td><td>4.40</td></tr>
+                        <tr><td>{{ data.price - 30 }}</td><td>0.28</td><td>6.20</td></tr>
+                    </table>
+                </div>
             </section>
             <section class="panel">
                 <div class="panel-title"><span>Alerts & Checklist</span><span>Rules</span></div>
@@ -495,34 +551,42 @@ HUD_HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <style>
-        :root{--bg:#020404;--panel:rgba(3,12,14,.82);--line:#04d9e8;--soft:rgba(4,217,232,.32);--text:#edfaff;--muted:#8fb0b8;--green:#28f077;--red:#ff3d4f;--yellow:#ffc629}
+        :root{--bg:#010303;--panel:rgba(1,10,12,.68);--line:#00e5f0;--soft:rgba(0,229,240,.36);--text:#f4fdff;--muted:#8ab1ba;--green:#1cff73;--red:#ff3148;--yellow:#ffc400}
         *{box-sizing:border-box}
-        body{margin:0; min-height:100vh; color:var(--text); font-family:Segoe UI, Arial, sans-serif; background:#020404;}
-        .hud{min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; gap:14px; padding:18px; background:radial-gradient(circle at 50% 50%, rgba(2,2,2,.12) 0 26%, rgba(2,4,4,.98) 55%);}
-        .top,.bottom,.panel{border:1px solid var(--soft); background:var(--panel); box-shadow:0 0 20px rgba(4,217,232,.12); clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 16px,100% calc(100% - 16px),calc(100% - 16px) 100%,16px 100%,0 calc(100% - 16px),0 16px);}
-        .top{display:grid; grid-template-columns:1fr auto 1fr; gap:18px; align-items:center; padding:12px 18px;}
-        .time{font-size:18px}.title{text-align:center}.title h1{margin:0; font-size:34px; line-height:1}.title p{margin:6px 0 0; color:var(--muted)}.market{text-align:right; color:var(--green); font-weight:900;}
+        body{margin:0; min-height:100vh; color:var(--text); font-family:Segoe UI, Arial, sans-serif; background:#010303;}
+        .hud{min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; gap:14px; padding:16px; background:radial-gradient(circle at 50% 50%, rgba(0,229,240,.035) 0 22%, rgba(1,3,3,.3) 38%, #010303 72%);}
+        .top,.bottom,.panel{position:relative; border:1px solid var(--soft); background:linear-gradient(180deg, rgba(2,15,18,.78), rgba(0,5,6,.62)); box-shadow:0 0 22px rgba(0,229,240,.13), inset 0 0 18px rgba(0,229,240,.04); clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px);}
+        .top:before,.bottom:before,.panel:before{content:""; position:absolute; inset:7px; pointer-events:none; border-top:1px solid rgba(0,229,240,.4); border-bottom:1px solid rgba(0,229,240,.13);}
+        .top{display:grid; grid-template-columns:minmax(260px,1fr) auto minmax(260px,1fr); gap:18px; align-items:center; padding:12px 18px;}
+        .time{font-size:18px; font-weight:900}.title{text-align:center}.title h1{margin:0; font-size:40px; line-height:.95; text-shadow:0 0 18px rgba(255,255,255,.2)}.title p{margin:7px 0 0; color:#b5e9f0; text-transform:uppercase}.market{text-align:right; color:var(--green); font-weight:900; font-size:20px;}
         .tabs{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px;}
         .tabs a{color:var(--muted); text-decoration:none; padding:7px 10px; border:1px solid var(--soft); font-size:12px; font-weight:800; background:#031014;}
         .tabs a.active{color:var(--text); border-color:var(--line)}
-        .grid{display:grid; grid-template-columns:360px 1fr 380px; gap:18px; min-height:0;}
+        .grid{display:grid; grid-template-columns:360px minmax(460px,1fr) 380px; gap:16px; min-height:0;}
         .side{display:grid; align-content:start; gap:14px; min-width:0;}
         .panel{padding:14px; min-width:0;}
-        .ar-space{position:relative; min-height:520px; border:1px solid rgba(4,217,232,.18); background:radial-gradient(circle at center, rgba(4,217,232,.04), rgba(0,0,0,0) 56%);}
-        .ar-space:before,.ar-space:after{content:""; position:absolute; width:70px; height:70px; border-color:var(--line); opacity:.9;}
-        .ar-space:before{left:8%; top:12%; border-left:2px solid; border-top:2px solid}.ar-space:after{right:8%; bottom:12%; border-right:2px solid; border-bottom:2px solid}
+        .ar-space{position:relative; min-height:640px; border:0; background:radial-gradient(circle at center, rgba(0,229,240,.05), rgba(0,0,0,0) 43%);}
+        .ar-space:before,.ar-space:after,.reticle-a,.reticle-b{content:""; position:absolute; width:82px; height:82px; border-color:var(--line); opacity:.9;}
+        .ar-space:before{left:4%; top:12%; border-left:2px solid; border-top:2px solid}.ar-space:after{right:4%; bottom:12%; border-right:2px solid; border-bottom:2px solid}
+        .reticle-a{right:4%; top:12%; border-right:2px solid; border-top:2px solid}.reticle-b{left:4%; bottom:12%; border-left:2px solid; border-bottom:2px solid}
+        .center-readout{position:absolute; left:50%; top:12%; transform:translateX(-50%); text-align:center; pointer-events:none;}
+        .center-readout .symbol{font-size:76px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.25)}
+        .center-readout .price{font-size:76px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.34)}
+        .center-readout .bias{font-size:22px; color:var(--green); font-weight:900}
         .panel-title{display:flex; justify-content:space-between; gap:10px; color:var(--muted); text-transform:uppercase; font-size:13px; font-weight:900; margin-bottom:10px;}
-        .chart-mini{height:320px; overflow:hidden; background:#03080a;}
+        .chart-mini{height:300px; overflow:hidden; background:#03080a; border:1px solid rgba(0,229,240,.12);}
         .chart-mini .plotly-graph-div{width:100% !important; height:100% !important;}
-        .signal{text-align:center}.signal strong{display:block; color:var(--green); font-size:38px; line-height:1; margin-top:8px;}
-        .ring{height:96px; width:96px; border-radius:50%; border:9px solid rgba(40,240,119,.35); display:grid; place-items:center; font-size:24px; font-weight:900;}
+        .signal{text-align:center}.signal strong{display:block; color:var(--green); font-size:40px; line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.35);}
+        .bars{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:12px}.bars i{height:6px; background:rgba(138,177,186,.2)}.bars i.on{background:var(--green); box-shadow:0 0 10px rgba(28,255,115,.45)}
+        .ring{height:96px; width:96px; border-radius:50%; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); display:grid; place-items:center; font-size:24px; font-weight:900; box-shadow:0 0 18px rgba(28,255,115,.2);}
+        .ring span{height:68px; width:68px; border-radius:50%; display:grid; place-items:center; background:#041014;}
         .confidence{display:grid; grid-template-columns:100px 1fr; gap:10px; align-items:center;}
         ul{margin:0; padding-left:18px; line-height:1.55; font-size:13px;}
         table{width:100%; border-collapse:collapse}td{padding:8px 4px; border-bottom:1px solid rgba(143,176,184,.2); font-size:13px;}td:last-child{text-align:right}
         .green{color:var(--green); font-weight:900}.red{color:var(--red); font-weight:900}.yellow{color:var(--yellow); font-weight:900}.muted{color:var(--muted)}
         .bottom{display:flex; gap:26px; align-items:center; overflow:auto; white-space:nowrap; padding:12px 18px}.bottom b{color:var(--line); margin-right:6px}
         .err{color:var(--red); font-weight:900; font-size:18px}
-        @media (max-width: 1200px){.grid{grid-template-columns:1fr}.ar-space{min-height:280px}.top{grid-template-columns:1fr}.market,.time{text-align:center}}
+        @media (max-width: 1280px){.grid{grid-template-columns:1fr}.ar-space{min-height:420px}.top{grid-template-columns:1fr}.market,.time{text-align:center}.center-readout{top:22%}}
     </style>
 </head>
 <body>
@@ -556,9 +620,10 @@ HUD_HTML = """
             <section class="panel signal">
                 <span>Trade Signal</span>
                 <strong>{{ data.bias_label }}</strong>
+                <div class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="{{ 'on' if data.confidence >= 80 else '' }}"></i><i class="{{ 'on' if data.confidence >= 95 else '' }}"></i></div>
             </section>
             <section class="panel confidence">
-                <div class="ring">{{ data.confidence }}%</div>
+                <div class="ring" style="--score:{{ data.confidence }}"><span>{{ data.confidence }}%</span></div>
                 <ul>
                     {% for note in data.setup_notes %}
                     <li>{{ note }}</li>
@@ -576,7 +641,16 @@ HUD_HTML = """
             </section>
         </aside>
 
-        <section class="ar-space" aria-label="Transparent AR alignment area"></section>
+        <section class="ar-space" aria-label="Transparent AR alignment area">
+            <span class="reticle-a"></span>
+            <span class="reticle-b"></span>
+            <div class="center-readout">
+                <div class="muted">S&P 500 INDEX</div>
+                <div class="symbol">SPX</div>
+                <div class="price">{{ data.price }}</div>
+                <div class="bias">{{ data.bias_label }}</div>
+            </div>
+        </section>
 
         <aside class="side">
             <section class="panel">
