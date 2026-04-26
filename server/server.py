@@ -675,7 +675,7 @@ TERMINAL_HTML = """
     </section>
     <section class="market-grid">
         <section class="panel">
-            <div class="panel-title"><span>Market Snapshot</span><span>Oracle {{ data.source_table }}</span></div>
+            <div class="panel-title"><span>Market Snapshot</span><span></span></div>
             <table class="snapshot-table">
                 <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td><td>Prev Day High</td><td>{{ data.prev_day_high }}</td></tr>
                 <tr><td>Price vs VWAP</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td><td>Prev Day Low</td><td>{{ data.prev_day_low }}</td></tr>
@@ -2955,6 +2955,8 @@ def make_chart(
             tickmode="array",
             tickvals=tickvals,
             ticktext=ticktext,
+            tickangle=0,
+            tickfont=dict(size=9),
             automargin=True,
             fixedrange=False,
             showline=False,
@@ -2978,6 +2980,8 @@ def make_chart(
             tickmode="array",
             tickvals=tickvals,
             ticktext=ticktext,
+            tickangle=0,
+            tickfont=dict(size=9),
             automargin=True,
             fixedrange=False,
             showline=False,
