@@ -445,13 +445,13 @@ TERMINAL_HTML = """
         .symbol{font-size:74px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
         .price{font-size:76px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36), 0 0 44px rgba(66,240,186,.18);}
         .change{font-size:22px; font-weight:900;}
-        .signal{position:relative; text-align:center; padding:22px 20px; display:grid; grid-template-columns:minmax(64px,82px) minmax(0,1fr) minmax(64px,82px); grid-template-rows:1fr auto; column-gap:14px; row-gap:14px; align-items:center;}
-        .signal-content{position:relative; z-index:1; grid-column:2; min-width:0;}
+        .signal{position:relative; text-align:center; padding:20px; display:grid; grid-template-columns:minmax(64px,82px) minmax(0,1fr) minmax(64px,82px); grid-template-rows:minmax(86px,1fr) auto; column-gap:14px; row-gap:14px; align-items:center;}
+        .signal-content{position:relative; z-index:1; grid-column:2; grid-row:1; min-width:0; align-self:center;}
         .signal-icons{display:contents; pointer-events:none;}
         .signal-icon{width:82px; height:76px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease; align-self:center; justify-self:center;}
         .signal-icon img{width:100%; height:100%; object-fit:contain;}
-        .signal-icon.bull{grid-column:1;}
-        .signal-icon.bear{grid-column:3;}
+        .signal-icon.bull{grid-column:1; grid-row:1;}
+        .signal-icon.bear{grid-column:3; grid-row:1;}
         .signal-icon.active{opacity:1; filter:drop-shadow(0 0 16px rgba(28,255,115,.44));}
         .signal-icon.bear.active{filter:drop-shadow(0 0 16px rgba(255,49,72,.42));}
         .signal span{color:#c8f8ff; text-transform:uppercase; font-weight:900; font-size:15px;}
