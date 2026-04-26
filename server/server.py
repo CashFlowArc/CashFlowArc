@@ -359,12 +359,13 @@ TERMINAL_HTML = """
             font-family:Segoe UI, Arial, sans-serif;
             color:var(--text);
             background:
-                linear-gradient(90deg, rgba(0,229,240,.035) 1px, transparent 1px),
-                linear-gradient(0deg, rgba(0,229,240,.025) 1px, transparent 1px),
-                radial-gradient(circle at 50% 18%, rgba(14,83,95,.62) 0%, rgba(2,5,6,.9) 38%, #010303 72%);
-            background-size:44px 44px,44px 44px,auto;
+                linear-gradient(180deg, rgba(1,7,10,.12), rgba(1,3,5,.72)),
+                radial-gradient(circle at 50% 115%, rgba(38,103,119,.55) 0 7%, transparent 34%),
+                repeating-linear-gradient(90deg, rgba(0,229,240,.026) 0 1px, transparent 1px 118px),
+                repeating-linear-gradient(0deg, rgba(0,229,240,.02) 0 1px, transparent 1px 92px),
+                radial-gradient(circle at 50% 20%, rgba(9,44,54,.72) 0%, rgba(2,7,9,.92) 38%, #010303 74%);
         }
-        .shell{min-height:100vh; padding:18px; display:grid; grid-template-rows:auto 1fr auto; gap:14px;}
+        .shell{min-height:100vh; padding:16px; display:grid; grid-template-rows:auto 1fr auto; gap:14px;}
         .topbar,.tickerbar,.panel{
             position:relative;
             border:1px solid var(--cyan-soft);
@@ -378,52 +379,64 @@ TERMINAL_HTML = """
             border-bottom:1px solid rgba(0,229,240,.14);
             clip-path:polygon(14px 0,42% 0,42% 1px,14px 1px,14px 14px,13px 14px,13px 0,0 0,0 13px,1px 13px,1px 1px,14px 1px);
         }
-        .topbar{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:18px; padding:12px 18px;}
+        .topbar{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:18px; padding:10px 18px; min-height:70px;}
         .brand{text-align:center}
-        .brand h1{margin:0; font-size:38px; letter-spacing:0; line-height:.95; text-shadow:0 0 16px rgba(255,255,255,.22);}
+        .brand h1{margin:0; font-size:34px; letter-spacing:0; line-height:.95; text-shadow:0 0 16px rgba(255,255,255,.22);}
         .brand p{margin:8px 0 0; color:#b5e9f0; font-size:13px; text-transform:uppercase;}
         .timeblock{display:flex; gap:18px; align-items:center; color:var(--text); font-size:16px; font-weight:800;}
         .nav-links{display:flex; justify-content:flex-end; gap:7px; flex-wrap:wrap;}
         .nav-link{color:var(--muted); text-decoration:none; font-size:12px; font-weight:900; padding:8px 10px; border:1px solid rgba(0,229,240,.25); background:rgba(0,10,14,.7); text-transform:uppercase;}
         .nav-link.active{color:var(--text); border-color:var(--cyan); box-shadow:0 0 12px rgba(0,229,240,.2), inset 0 0 0 1px rgba(0,229,240,.35);}
         .market{color:var(--green); font-weight:900; text-align:right; text-transform:uppercase;}
-        .layout{display:grid; grid-template-columns:minmax(440px,1.08fr) minmax(310px,.72fr) minmax(470px,1fr); gap:14px; align-items:stretch;}
+        .layout{display:grid; grid-template-columns:minmax(520px,1.1fr) minmax(330px,.72fr) minmax(510px,1.05fr); gap:14px; align-items:stretch;}
         .stack{display:grid; gap:14px; align-content:start;}
+        .left-stack{grid-template-rows:auto auto;}
+        .center-stack{grid-template-rows:230px 118px 104px;}
+        .right-stack{grid-template-rows:auto auto;}
         .panel{padding:14px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; color:#c8f8ff; text-transform:uppercase; font-size:13px; font-weight:900; letter-spacing:.02em;}
         .panel-title span:last-child{color:var(--cyan)}
-        .chart-wrap{height:520px; overflow:hidden; background:rgba(0,8,11,.76); border:1px solid rgba(0,229,240,.18);}
+        .chart-wrap{height:372px; overflow:hidden; background:rgba(0,8,11,.76); border:1px solid rgba(0,229,240,.18);}
         .chart-wrap .plotly-graph-div{width:100% !important; height:100% !important;}
-        .hero{min-height:295px; display:grid; place-items:center; text-align:center;}
+        .hero{display:grid; place-items:center; text-align:center;}
         .hero-inner{width:100%; display:grid; justify-items:center; gap:8px;}
-        .symbol{font-size:74px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
-        .price{font-size:74px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36);}
-        .change{font-size:22px; color:var(--green); font-weight:900;}
-        .signal{text-align:center; padding:22px 18px;}
+        .symbol{font-size:56px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
+        .price{font-size:56px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36);}
+        .change{font-size:18px; color:var(--green); font-weight:900;}
+        .signal{text-align:center; padding:14px 18px;}
         .signal span{color:#c8f8ff; text-transform:uppercase; font-weight:900; font-size:14px;}
-        .signal strong{display:block; color:var(--green); font-size:48px; line-height:1; margin-top:10px; text-shadow:0 0 18px rgba(28,255,115,.32);}
+        .signal strong{display:block; color:var(--green); font-size:34px; line-height:1; margin-top:6px; text-shadow:0 0 18px rgba(28,255,115,.32);}
         .bars{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:14px;}
         .bars i{height:6px; background:rgba(142,170,179,.24); border-radius:1px;}
         .bars i.on{background:var(--green); box-shadow:0 0 10px rgba(28,255,115,.45);}
         .confidence{display:grid; grid-template-columns:112px 1fr; gap:14px; align-items:center;}
-        .ring{height:104px; width:104px; border-radius:50%; display:grid; place-items:center; color:var(--text); font-size:26px; font-weight:900; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); box-shadow:0 0 20px rgba(28,255,115,.18);}
-        .ring span{height:74px; width:74px; border-radius:50%; display:grid; place-items:center; background:#061016;}
+        .ring{height:92px; width:92px; border-radius:50%; display:grid; place-items:center; color:var(--text); font-size:24px; font-weight:900; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); box-shadow:0 0 20px rgba(28,255,115,.18);}
+        .ring span{height:64px; width:64px; border-radius:50%; display:grid; place-items:center; background:#061016;}
         .notes{margin:0; padding-left:18px; color:var(--text); line-height:1.65; font-size:14px;}
-        .metric-grid{display:grid; grid-template-columns:1fr 1fr; gap:0 14px;}
+        .market-grid{display:grid; grid-template-columns:minmax(430px,.8fr) minmax(520px,1fr); gap:14px;}
+        .market-grid .panel{min-height:150px;}
         table{width:100%; border-collapse:collapse;}
-        td,th{padding:9px 6px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px; white-space:nowrap;}
+        td,th{padding:7px 6px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px; white-space:nowrap;}
         th{color:var(--muted); text-align:left; font-size:12px; text-transform:uppercase;}
         td:last-child,th:last-child{text-align:right;}
         .option-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
         .ladder td{font-size:13px; padding:7px 6px;}
         .selected-short{outline:1px solid var(--red); color:var(--red);}
         .selected-long{outline:1px solid var(--green); color:var(--green);}
+        .placeholder{color:var(--yellow); font-weight:900;}
+        .pl-profile{height:106px; margin-top:10px; position:relative; border:1px solid rgba(0,229,240,.16); background:linear-gradient(180deg, rgba(2,11,14,.78), rgba(0,5,7,.7)); overflow:hidden;}
+        .pl-profile:before{content:""; position:absolute; inset:12px; background:linear-gradient(rgba(142,170,179,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(142,170,179,.16) 1px, transparent 1px); background-size:100% 50%,25% 100%;}
+        .pl-line{position:absolute; left:28px; right:24px; top:14px; height:72px;}
+        .pl-line svg{width:100%; height:100%; overflow:visible;}
+        .radar{height:112px; width:112px; border-radius:50%; margin:auto; position:relative; background:radial-gradient(circle, rgba(28,255,115,.95) 0 5px, transparent 6px), repeating-radial-gradient(circle, rgba(0,229,240,.28) 0 1px, transparent 1px 15px), conic-gradient(from 180deg, rgba(28,255,115,.38), transparent 35%, rgba(0,229,240,.15) 70%, transparent);}
+        .radar:before,.radar:after{content:""; position:absolute; left:50%; top:0; bottom:0; border-left:1px solid rgba(0,229,240,.35);}
+        .radar:after{transform:rotate(90deg);}
         .green{color:var(--green); font-weight:900}.red{color:var(--red); font-weight:900}.yellow{color:var(--yellow); font-weight:900}.muted{color:var(--muted)}
-        .tickerbar{display:flex; align-items:center; gap:30px; overflow:auto; white-space:nowrap; padding:12px 18px;}
+        .tickerbar{display:flex; align-items:center; gap:30px; overflow:auto; white-space:nowrap; padding:10px 18px;}
         .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 1460px){.layout{grid-template-columns:1fr 1fr}.layout>.stack:first-child{grid-column:1 / -1}.chart-wrap{height:430px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-links{justify-content:center}.timeblock{justify-content:center}}
-        @media (max-width: 860px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.metric-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}}
+        @media (max-width: 1460px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:430px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-links{justify-content:center}.timeblock{justify-content:center}}
+        @media (max-width: 860px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}}
     </style>
 </head>
 <body>
@@ -451,23 +464,14 @@ TERMINAL_HTML = """
     <section class="panel"><div class="err">{{ data.error }}</div></section>
     {% else %}
     <section class="layout">
-        <div class="stack">
+        <div class="stack left-stack">
             <section class="panel">
                 <div class="panel-title"><span>SPX {{ data.chart_interval }}</span><span>{{ data.price }}</span></div>
                 <div class="chart-wrap">{{ data.chart_html|safe }}</div>
             </section>
-            <section class="panel">
-                <div class="panel-title"><span>Market Snapshot</span><span>Oracle {{ data.source_table }}</span></div>
-                <table>
-                    <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td></tr>
-                    <tr><td>Open</td><td>{{ data.open_price }}</td><td class="{{ 'green' if data.open_distance else 'yellow' }}">{{ data.open_distance_pct }}%</td></tr>
-                    <tr><td>Day High / Low</td><td>{{ data.current_day_high }}</td><td>{{ data.current_day_low }}</td></tr>
-                    <tr><td>Prev High / Low</td><td>{{ data.prev_day_high }}</td><td>{{ data.prev_day_low }}</td></tr>
-                </table>
-            </section>
         </div>
 
-        <div class="stack">
+        <div class="stack center-stack">
             <section class="panel hero">
                 <div class="hero-inner">
                     <div class="muted">S&P 500 INDEX</div>
@@ -491,7 +495,7 @@ TERMINAL_HTML = """
             </section>
         </div>
 
-        <div class="stack">
+        <div class="stack right-stack">
             <section class="panel">
                 <div class="panel-title"><span>Trade Setup</span><span>{{ data.trade }}</span></div>
                 <div class="option-grid">
@@ -499,31 +503,57 @@ TERMINAL_HTML = """
                         <tr><td>Type</td><td class="{{ 'green' if data.trade != 'NO TRADE' else 'yellow' }}">{{ data.trade_type }}</td></tr>
                         <tr><td>Short Strike</td><td class="red">{{ data.short_strike }}</td></tr>
                         <tr><td>Long Strike</td><td class="green">{{ data.long_strike }}</td></tr>
-                        <tr><td>Credit</td><td>{{ data.credit }}</td></tr>
-                        <tr><td>Max Profit</td><td class="green">{{ data.max_profit }}</td></tr>
-                        <tr><td>Max Risk</td><td class="red">{{ data.max_risk }}</td></tr>
+                        <tr><td>Credit</td><td class="placeholder">{{ data.credit }}</td></tr>
+                        <tr><td>Delta (Net)</td><td class="placeholder">Needs option Greeks</td></tr>
+                        <tr><td>Max Profit</td><td class="placeholder">{{ data.max_profit }}</td></tr>
+                        <tr><td>Max Risk</td><td class="placeholder">{{ data.max_risk }}</td></tr>
+                        <tr><td>POP</td><td class="placeholder">Needs probability model</td></tr>
+                        <tr><td>Breakeven</td><td class="placeholder">Needs option pricing</td></tr>
                         <tr><td>Net GEX</td><td>{{ data.net_gex_billions }}</td></tr>
                     </table>
                     <table class="ladder">
                         <tr><th>Strike</th><th>Put</th><th>Call</th></tr>
-                        <tr><td>{{ data.price + 30 }}</td><td>8.10</td><td>1.20</td></tr>
-                        <tr><td>{{ data.price + 20 }}</td><td>5.80</td><td>1.65</td></tr>
-                        <tr><td>{{ data.price + 10 }}</td><td>3.25</td><td>2.35</td></tr>
-                        <tr class="selected-short"><td>{{ data.short_strike }}</td><td>1.65</td><td>3.10</td></tr>
-                        <tr class="selected-long"><td>{{ data.long_strike }}</td><td>0.55</td><td>4.40</td></tr>
-                        <tr><td>{{ data.price - 30 }}</td><td>0.28</td><td>6.20</td></tr>
+                        <tr><td>{{ data.price + 30 }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
+                        <tr><td>{{ data.price + 20 }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
+                        <tr><td>{{ data.price + 10 }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
+                        <tr class="selected-short"><td>{{ data.short_strike }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
+                        <tr class="selected-long"><td>{{ data.long_strike }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
+                        <tr><td>{{ data.price - 30 }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
                     </table>
                 </div>
+                <div class="pl-profile">
+                    <div class="pl-line">
+                        <svg viewBox="0 0 500 100" preserveAspectRatio="none" aria-hidden="true">
+                            <polyline points="0,82 80,82 170,12 320,12 420,76 500,76" fill="none" stroke="#1cff73" stroke-width="4"/>
+                            <polyline points="0,82 80,82 170,12" fill="none" stroke="#ff3148" stroke-width="4"/>
+                            <polyline points="420,76 500,76" fill="none" stroke="#ff3148" stroke-width="4"/>
+                        </svg>
+                    </div>
+                </div>
             </section>
-            <section class="panel">
-                <div class="panel-title"><span>Alerts & Checklist</span><span>Rules</span></div>
+        </div>
+    </section>
+    <section class="market-grid">
+        <section class="panel">
+            <div class="panel-title"><span>Market Snapshot</span><span>Oracle {{ data.source_table }}</span></div>
+            <table>
+                <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td><td>SPY {{ data.spy_price }}</td></tr>
+                <tr><td>Price vs VWAP</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td><td>Open {{ data.open_price }}</td></tr>
+                <tr><td>Prev Day High</td><td>{{ data.prev_day_high }}</td><td>Prev Day Low {{ data.prev_day_low }}</td></tr>
+                <tr><td>Day High</td><td>{{ data.current_day_high }}</td><td>Day Low {{ data.current_day_low }}</td></tr>
+            </table>
+        </section>
+        <section class="panel">
+            <div class="panel-title"><span>Alerts & Checklist</span><span>All systems nominal</span></div>
+            <div style="display:grid; grid-template-columns:1fr 128px; gap:18px; align-items:center;">
                 <table>
                     {% for item in data.checklist %}
                     <tr><td>{{ item.label }}</td><td class="{{ item.class }}">{{ item.status }}</td></tr>
                     {% endfor %}
                 </table>
-            </section>
-        </div>
+                <div class="radar" aria-hidden="true"></div>
+            </div>
+        </section>
     </section>
     {% endif %}
 
@@ -554,39 +584,46 @@ HUD_HTML = """
         :root{--bg:#010303;--panel:rgba(1,10,12,.68);--line:#00e5f0;--soft:rgba(0,229,240,.36);--text:#f4fdff;--muted:#8ab1ba;--green:#1cff73;--red:#ff3148;--yellow:#ffc400}
         *{box-sizing:border-box}
         body{margin:0; min-height:100vh; color:var(--text); font-family:Segoe UI, Arial, sans-serif; background:#010303;}
-        .hud{min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; gap:14px; padding:16px; background:radial-gradient(circle at 50% 50%, rgba(0,229,240,.035) 0 22%, rgba(1,3,3,.3) 38%, #010303 72%);}
+        .hud{min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; gap:12px; padding:14px; background:radial-gradient(circle at 50% 50%, rgba(0,229,240,.035) 0 22%, rgba(1,3,3,.3) 38%, #010303 72%);}
         .top,.bottom,.panel{position:relative; border:1px solid var(--soft); background:linear-gradient(180deg, rgba(2,15,18,.78), rgba(0,5,6,.62)); box-shadow:0 0 22px rgba(0,229,240,.13), inset 0 0 18px rgba(0,229,240,.04); clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px);}
         .top:before,.bottom:before,.panel:before{content:""; position:absolute; inset:7px; pointer-events:none; border-top:1px solid rgba(0,229,240,.4); border-bottom:1px solid rgba(0,229,240,.13);}
-        .top{display:grid; grid-template-columns:minmax(260px,1fr) auto minmax(260px,1fr); gap:18px; align-items:center; padding:12px 18px;}
-        .time{font-size:18px; font-weight:900}.title{text-align:center}.title h1{margin:0; font-size:40px; line-height:.95; text-shadow:0 0 18px rgba(255,255,255,.2)}.title p{margin:7px 0 0; color:#b5e9f0; text-transform:uppercase}.market{text-align:right; color:var(--green); font-weight:900; font-size:20px;}
-        .tabs{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px;}
+        .top{display:grid; grid-template-columns:minmax(260px,1fr) auto minmax(260px,1fr); gap:18px; align-items:center; padding:8px 18px;}
+        .time{font-size:18px; font-weight:900}.title{text-align:center}.title h1{margin:0; font-size:34px; line-height:.95; text-shadow:0 0 18px rgba(255,255,255,.2)}.title p{margin:5px 0 0; color:#b5e9f0; text-transform:uppercase}.market{text-align:right; color:var(--green); font-weight:900; font-size:20px;}
+        .tabs{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:8px;}
         .tabs a{color:var(--muted); text-decoration:none; padding:7px 10px; border:1px solid var(--soft); font-size:12px; font-weight:800; background:#031014;}
         .tabs a.active{color:var(--text); border-color:var(--line)}
-        .grid{display:grid; grid-template-columns:360px minmax(460px,1fr) 380px; gap:16px; min-height:0;}
+        .grid{display:grid; grid-template-columns:370px minmax(520px,1fr) 370px; gap:16px; min-height:0;}
         .side{display:grid; align-content:start; gap:14px; min-width:0;}
         .panel{padding:14px; min-width:0;}
-        .ar-space{position:relative; min-height:640px; border:0; background:radial-gradient(circle at center, rgba(0,229,240,.05), rgba(0,0,0,0) 43%);}
+        .ar-space{position:relative; min-height:455px; border:0; background:radial-gradient(circle at center, rgba(0,229,240,.035), rgba(0,0,0,0) 38%);}
         .ar-space:before,.ar-space:after,.reticle-a,.reticle-b{content:""; position:absolute; width:82px; height:82px; border-color:var(--line); opacity:.9;}
         .ar-space:before{left:4%; top:12%; border-left:2px solid; border-top:2px solid}.ar-space:after{right:4%; bottom:12%; border-right:2px solid; border-bottom:2px solid}
         .reticle-a{right:4%; top:12%; border-right:2px solid; border-top:2px solid}.reticle-b{left:4%; bottom:12%; border-left:2px solid; border-bottom:2px solid}
-        .center-readout{position:absolute; left:50%; top:12%; transform:translateX(-50%); text-align:center; pointer-events:none;}
-        .center-readout .symbol{font-size:76px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.25)}
-        .center-readout .price{font-size:76px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.34)}
-        .center-readout .bias{font-size:22px; color:var(--green); font-weight:900}
+        .ar-guide{position:absolute; left:50%; top:50%; width:min(58vw,760px); height:min(44vh,430px); transform:translate(-50%,-50%); pointer-events:none;}
+        .ar-guide:before,.ar-guide:after{content:""; position:absolute; width:86px; height:86px; border-color:var(--line); opacity:.9}
+        .ar-guide:before{left:0; top:0; border-left:2px solid; border-top:2px solid}.ar-guide:after{right:0; bottom:0; border-right:2px solid; border-bottom:2px solid}
         .panel-title{display:flex; justify-content:space-between; gap:10px; color:var(--muted); text-transform:uppercase; font-size:13px; font-weight:900; margin-bottom:10px;}
-        .chart-mini{height:300px; overflow:hidden; background:#03080a; border:1px solid rgba(0,229,240,.12);}
+        .chart-mini{height:220px; overflow:hidden; background:#03080a; border:1px solid rgba(0,229,240,.12);}
         .chart-mini .plotly-graph-div{width:100% !important; height:100% !important;}
-        .signal{text-align:center}.signal strong{display:block; color:var(--green); font-size:40px; line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.35);}
+        .signal{text-align:center}.signal strong{display:block; color:var(--green); font-size:34px; line-height:1; margin-top:6px; text-shadow:0 0 18px rgba(28,255,115,.35);}
         .bars{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:12px}.bars i{height:6px; background:rgba(138,177,186,.2)}.bars i.on{background:var(--green); box-shadow:0 0 10px rgba(28,255,115,.45)}
-        .ring{height:96px; width:96px; border-radius:50%; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); display:grid; place-items:center; font-size:24px; font-weight:900; box-shadow:0 0 18px rgba(28,255,115,.2);}
-        .ring span{height:68px; width:68px; border-radius:50%; display:grid; place-items:center; background:#041014;}
-        .confidence{display:grid; grid-template-columns:100px 1fr; gap:10px; align-items:center;}
+        .ring{height:82px; width:82px; border-radius:50%; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); display:grid; place-items:center; font-size:22px; font-weight:900; box-shadow:0 0 18px rgba(28,255,115,.2);}
+        .ring span{height:58px; width:58px; border-radius:50%; display:grid; place-items:center; background:#041014;}
+        .confidence{display:grid; grid-template-columns:86px 1fr; gap:10px; align-items:center;}
+        .hud-lower{display:grid; grid-template-columns:minmax(380px,.74fr) minmax(520px,1fr); gap:16px; margin-top:12px;}
+        .placeholder{color:var(--yellow); font-weight:900;}
+        .pl-profile{height:90px; margin-top:8px; position:relative; border:1px solid rgba(0,229,240,.16); background:linear-gradient(180deg, rgba(2,11,14,.78), rgba(0,5,7,.7)); overflow:hidden;}
+        .pl-profile:before{content:""; position:absolute; inset:12px; background:linear-gradient(rgba(142,170,179,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(142,170,179,.16) 1px, transparent 1px); background-size:100% 50%,25% 100%;}
+        .pl-profile svg{position:absolute; left:22px; right:22px; top:10px; width:calc(100% - 44px); height:66px; overflow:visible;}
+        .radar{height:112px; width:112px; border-radius:50%; margin:auto; position:relative; background:radial-gradient(circle, rgba(28,255,115,.95) 0 5px, transparent 6px), repeating-radial-gradient(circle, rgba(0,229,240,.28) 0 1px, transparent 1px 15px), conic-gradient(from 180deg, rgba(28,255,115,.38), transparent 35%, rgba(0,229,240,.15) 70%, transparent);}
+        .radar:before,.radar:after{content:""; position:absolute; left:50%; top:0; bottom:0; border-left:1px solid rgba(0,229,240,.35);}
+        .radar:after{transform:rotate(90deg);}
         ul{margin:0; padding-left:18px; line-height:1.55; font-size:13px;}
-        table{width:100%; border-collapse:collapse}td{padding:8px 4px; border-bottom:1px solid rgba(143,176,184,.2); font-size:13px;}td:last-child{text-align:right}
+        table{width:100%; border-collapse:collapse}td{padding:6px 4px; border-bottom:1px solid rgba(143,176,184,.2); font-size:13px;}td:last-child{text-align:right}
         .green{color:var(--green); font-weight:900}.red{color:var(--red); font-weight:900}.yellow{color:var(--yellow); font-weight:900}.muted{color:var(--muted)}
-        .bottom{display:flex; gap:26px; align-items:center; overflow:auto; white-space:nowrap; padding:12px 18px}.bottom b{color:var(--line); margin-right:6px}
+        .bottom{display:flex; gap:26px; align-items:center; overflow:auto; white-space:nowrap; padding:10px 18px}.bottom b{color:var(--line); margin-right:6px}
         .err{color:var(--red); font-weight:900; font-size:18px}
-        @media (max-width: 1280px){.grid{grid-template-columns:1fr}.ar-space{min-height:420px}.top{grid-template-columns:1fr}.market,.time{text-align:center}.center-readout{top:22%}}
+        @media (max-width: 1280px){.grid,.hud-lower{grid-template-columns:1fr}.ar-space{min-height:420px}.top{grid-template-columns:1fr}.market,.time{text-align:center}}
     </style>
 </head>
 <body>
@@ -630,26 +667,12 @@ HUD_HTML = """
                     {% endfor %}
                 </ul>
             </section>
-            <section class="panel">
-                <div class="panel-title"><span>Market Snapshot</span><span>Oracle</span></div>
-                <table>
-                    <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td></tr>
-                    <tr><td>Price vs VWAP</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td></tr>
-                    <tr><td>Day High</td><td>{{ data.current_day_high }}</td></tr>
-                    <tr><td>Day Low</td><td>{{ data.current_day_low }}</td></tr>
-                </table>
-            </section>
         </aside>
 
         <section class="ar-space" aria-label="Transparent AR alignment area">
             <span class="reticle-a"></span>
             <span class="reticle-b"></span>
-            <div class="center-readout">
-                <div class="muted">S&P 500 INDEX</div>
-                <div class="symbol">SPX</div>
-                <div class="price">{{ data.price }}</div>
-                <div class="bias">{{ data.bias_label }}</div>
-            </div>
+            <div class="ar-guide"></div>
         </section>
 
         <aside class="side">
@@ -658,21 +681,45 @@ HUD_HTML = """
                 <table>
                     <tr><td>Short Strike</td><td>{{ data.short_strike }}</td></tr>
                     <tr><td>Long Strike</td><td>{{ data.long_strike }}</td></tr>
-                    <tr><td>Credit</td><td>{{ data.credit }}</td></tr>
-                    <tr><td>Max Profit</td><td class="green">{{ data.max_profit }}</td></tr>
-                    <tr><td>Max Risk</td><td class="red">{{ data.max_risk }}</td></tr>
+                    <tr><td>Credit</td><td class="placeholder">{{ data.credit }}</td></tr>
+                    <tr><td>Delta (Net)</td><td class="placeholder">Needs option Greeks</td></tr>
+                    <tr><td>Max Profit</td><td class="placeholder">{{ data.max_profit }}</td></tr>
+                    <tr><td>Max Risk</td><td class="placeholder">{{ data.max_risk }}</td></tr>
+                    <tr><td>POP</td><td class="placeholder">Needs probability model</td></tr>
+                    <tr><td>Breakeven</td><td class="placeholder">Needs option pricing</td></tr>
                     <tr><td>Net GEX</td><td>{{ data.net_gex_billions }}</td></tr>
                 </table>
+                <div class="pl-profile">
+                    <svg viewBox="0 0 500 100" preserveAspectRatio="none" aria-hidden="true">
+                        <polyline points="0,82 80,82 170,12 320,12 420,76 500,76" fill="none" stroke="#1cff73" stroke-width="4"/>
+                        <polyline points="0,82 80,82 170,12" fill="none" stroke="#ff3148" stroke-width="4"/>
+                        <polyline points="420,76 500,76" fill="none" stroke="#ff3148" stroke-width="4"/>
+                    </svg>
+                </div>
             </section>
-            <section class="panel">
-                <div class="panel-title"><span>Alerts & Checklist</span><span>Rules</span></div>
+        </aside>
+    </section>
+    <section class="hud-lower">
+        <section class="panel">
+            <div class="panel-title"><span>Market Snapshot</span><span>Oracle</span></div>
+            <table>
+                <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td><td>SPY {{ data.spy_price }}</td></tr>
+                <tr><td>Price vs VWAP</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td><td>Open {{ data.open_price }}</td></tr>
+                <tr><td>Day High</td><td>{{ data.current_day_high }}</td><td>Day Low {{ data.current_day_low }}</td></tr>
+                <tr><td>Prev High</td><td>{{ data.prev_day_high }}</td><td>Prev Low {{ data.prev_day_low }}</td></tr>
+            </table>
+        </section>
+        <section class="panel">
+            <div class="panel-title"><span>Alerts & Checklist</span><span>All systems nominal</span></div>
+            <div style="display:grid; grid-template-columns:1fr 128px; gap:18px; align-items:center;">
                 <table>
                     {% for item in data.checklist %}
                     <tr><td>{{ item.label }}</td><td class="{{ item.class }}">{{ item.status }}</td></tr>
                     {% endfor %}
                 </table>
-            </section>
-        </aside>
+                <div class="radar" aria-hidden="true"></div>
+            </div>
+        </section>
     </section>
     {% endif %}
 
