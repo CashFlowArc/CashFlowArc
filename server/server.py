@@ -405,11 +405,11 @@ TERMINAL_HTML = """
         .nav-link{color:var(--muted); text-decoration:none; font-size:11px; font-weight:900; padding:8px 11px; border:1px solid rgba(0,229,240,.18); background:rgba(0,10,14,.38); text-transform:uppercase;}
         .nav-link.active{color:#dffcff; border-color:rgba(0,229,240,.48); box-shadow:inset 0 0 0 1px rgba(0,229,240,.18);}
         .market{color:var(--green); font-weight:900; text-align:right; text-transform:uppercase;}
-        .layout{display:grid; grid-template-columns:minmax(640px,1.15fr) minmax(390px,.72fr) minmax(580px,1.05fr); gap:18px; align-items:stretch;}
+        .layout{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px; align-items:stretch;}
         .stack{display:grid; gap:18px; align-content:start;}
         .left-stack{grid-template-rows:auto auto;}
         .center-stack{grid-template-rows:300px 176px 154px;}
-        .right-stack{grid-template-rows:auto auto;}
+        .right-stack{grid-template-rows:auto auto; min-width:0; overflow:hidden;}
         .panel{padding:16px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:#c8f8ff; text-transform:uppercase; font-size:14px; font-weight:900; letter-spacing:.02em;}
         .panel-title span:last-child{color:var(--cyan)}
@@ -446,7 +446,8 @@ TERMINAL_HTML = """
         td,th{padding:9px 7px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px; white-space:nowrap;}
         th{color:var(--muted); text-align:left; font-size:12px; text-transform:uppercase;}
         td:last-child,th:last-child{text-align:right;}
-        .option-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+        .option-grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(170px,.72fr); gap:14px; min-width:0; overflow:hidden;}
+        .option-grid table{min-width:0;}
         .ladder td{font-size:13px; padding:7px 6px;}
         .selected-short{outline:1px solid var(--red); color:var(--red); background:rgba(255,49,72,.08);}
         .selected-long{outline:1px solid var(--green); color:var(--green); background:rgba(28,255,115,.08);}
@@ -462,8 +463,8 @@ TERMINAL_HTML = """
         .tickerbar{display:flex; align-items:center; gap:34px; overflow:auto; white-space:nowrap; padding:12px 20px;}
         .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 1220px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 160px 136px}}
-        @media (max-width: 860px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}.chart-wrap{height:430px}}
+        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 160px 136px}}
+        @media (max-width: 760px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}.chart-wrap{height:430px}}
     </style>
 </head>
 <body>
@@ -514,14 +515,16 @@ TERMINAL_HTML = """
             <section class="panel signal">
                 <div class="signal-icons">
                     <div class="signal-icon bull {{ 'active' if data.bullish else '' }}" aria-hidden="true">
-                        <svg viewBox="0 0 128 128" fill="none">
-                            <path d="M22 17C37 22 47 31 52 45C40 42 30 35 22 17Z" fill="rgba(28,255,115,.18)" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
-                            <path d="M106 17C91 22 81 31 76 45C88 42 98 35 106 17Z" fill="rgba(28,255,115,.18)" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
-                            <path d="M38 43C44 34 53 30 64 30C75 30 84 34 90 43L85 78C82 96 73 107 64 107C55 107 46 96 43 78L38 43Z" fill="rgba(3,13,17,.92)" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
-                            <path d="M43 79C34 75 30 68 31 57C37 59 42 63 47 69" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
-                            <path d="M85 69C90 63 95 59 101 57C102 68 98 75 89 79" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
-                            <path d="M53 67H53.5M74.5 67H75" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
-                            <path d="M57 89C62 93 66 93 71 89" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+                        <svg viewBox="0 0 140 112" fill="none">
+                            <path d="M53 40C45 25 31 18 19 16C21 34 33 47 51 49" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M87 40C95 25 109 18 121 16C119 34 107 47 89 49" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M41 51C47 36 57 29 70 29C83 29 93 36 99 51" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+                            <path d="M43 48C43 48 47 69 50 84C53 99 61 107 70 107C79 107 87 99 90 84C93 69 97 48 97 48C88 55 79 58 70 58C61 58 52 55 43 48Z" fill="rgba(3,13,17,.96)" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
+                            <path d="M47 62C36 58 29 51 26 40" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M93 62C104 58 111 51 114 40" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M56 68L62 70M84 68L78 70" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M62 88C65 86 75 86 78 88" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M58 96C62 100 78 100 82 96" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".7"/>
                         </svg>
                     </div>
                     <div class="signal-icon bear {{ 'active' if data.bearish else '' }}" aria-hidden="true">
