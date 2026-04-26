@@ -365,12 +365,25 @@ TERMINAL_HTML = """
                 repeating-linear-gradient(0deg, rgba(0,229,240,.02) 0 1px, transparent 1px 92px),
                 radial-gradient(circle at 50% 20%, rgba(9,44,54,.72) 0%, rgba(2,7,9,.92) 38%, #010303 74%);
         }
+        body:before{
+            content:"";
+            position:fixed;
+            inset:0;
+            pointer-events:none;
+            background:linear-gradient(180deg, transparent 0 48%, rgba(0,229,240,.035) 50%, transparent 52%);
+            background-size:100% 7px;
+            opacity:.38;
+            mix-blend-mode:screen;
+        }
         .shell{min-height:100vh; padding:16px; display:grid; grid-template-rows:auto 1fr auto; gap:14px;}
         .topbar,.tickerbar,.panel{
             position:relative;
             border:1px solid var(--cyan-soft);
-            background:linear-gradient(180deg, rgba(6,19,24,.88), rgba(1,6,8,.92));
-            box-shadow:0 0 26px rgba(0,229,240,.12), inset 0 0 28px rgba(0,229,240,.035);
+            background:
+                linear-gradient(135deg, rgba(255,255,255,.045), transparent 28%),
+                linear-gradient(180deg, rgba(5,23,29,.9), rgba(1,6,8,.94));
+            box-shadow:0 0 30px rgba(0,229,240,.16), inset 0 0 36px rgba(0,229,240,.045);
+            backdrop-filter:blur(10px);
             clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 18px,100% calc(100% - 18px),calc(100% - 18px) 100%,18px 100%,0 calc(100% - 18px),0 18px);
         }
         .topbar:before,.tickerbar:before,.panel:before{
@@ -381,7 +394,7 @@ TERMINAL_HTML = """
         }
         .topbar{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:18px; padding:10px 18px; min-height:70px;}
         .brand{text-align:center}
-        .brand h1{margin:0; font-size:34px; letter-spacing:0; line-height:.95; text-shadow:0 0 16px rgba(255,255,255,.22);}
+        .brand h1{margin:0; font-size:34px; letter-spacing:0; line-height:.95; text-shadow:0 0 16px rgba(255,255,255,.22), 0 0 24px rgba(0,229,240,.22);}
         .brand p{margin:8px 0 0; color:#b5e9f0; font-size:13px; text-transform:uppercase;}
         .timeblock{display:flex; gap:18px; align-items:center; color:var(--text); font-size:16px; font-weight:800;}
         .nav-links{display:flex; justify-content:flex-end; gap:7px; flex-wrap:wrap;}
@@ -396,12 +409,12 @@ TERMINAL_HTML = """
         .panel{padding:14px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; color:#c8f8ff; text-transform:uppercase; font-size:13px; font-weight:900; letter-spacing:.02em;}
         .panel-title span:last-child{color:var(--cyan)}
-        .chart-wrap{height:372px; overflow:hidden; background:rgba(0,8,11,.76); border:1px solid rgba(0,229,240,.18);}
+        .chart-wrap{height:372px; overflow:hidden; background:radial-gradient(circle at 50% 10%, rgba(0,229,240,.06), rgba(0,8,11,.9) 56%); border:1px solid rgba(0,229,240,.22); box-shadow:inset 0 0 28px rgba(0,229,240,.045);}
         .chart-wrap .plotly-graph-div{width:100% !important; height:100% !important;}
         .hero{display:grid; place-items:center; text-align:center;}
         .hero-inner{width:100%; display:grid; justify-items:center; gap:8px;}
         .symbol{font-size:56px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
-        .price{font-size:56px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36);}
+        .price{font-size:56px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36), 0 0 44px rgba(66,240,186,.18);}
         .change{font-size:18px; color:var(--green); font-weight:900;}
         .signal{text-align:center; padding:14px 18px;}
         .signal span{color:#c8f8ff; text-transform:uppercase; font-weight:900; font-size:14px;}
@@ -421,8 +434,8 @@ TERMINAL_HTML = """
         td:last-child,th:last-child{text-align:right;}
         .option-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
         .ladder td{font-size:13px; padding:7px 6px;}
-        .selected-short{outline:1px solid var(--red); color:var(--red);}
-        .selected-long{outline:1px solid var(--green); color:var(--green);}
+        .selected-short{outline:1px solid var(--red); color:var(--red); background:rgba(255,49,72,.08);}
+        .selected-long{outline:1px solid var(--green); color:var(--green); background:rgba(28,255,115,.08);}
         .placeholder{color:var(--yellow); font-weight:900;}
         .pl-profile{height:106px; margin-top:10px; position:relative; border:1px solid rgba(0,229,240,.16); background:linear-gradient(180deg, rgba(2,11,14,.78), rgba(0,5,7,.7)); overflow:hidden;}
         .pl-profile:before{content:""; position:absolute; inset:12px; background:linear-gradient(rgba(142,170,179,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(142,170,179,.16) 1px, transparent 1px); background-size:100% 50%,25% 100%;}
@@ -2529,6 +2542,17 @@ def intraday_session_mask(ts_series: pd.Series) -> pd.Series:
     return weekdays & (times >= dt.time(9, 30)) & (times <= dt.time(16, 0))
 
 
+def chart_interval_minutes(chart_interval: str) -> int:
+    return {"5min": 5, "15min": 15, "1h": 60}.get(chart_interval, 5)
+
+
+def rolling_regular_session_candle_count(chart_interval: str) -> int:
+    regular_session_minutes = 390
+    interval_minutes = chart_interval_minutes(chart_interval)
+    full_session_candles = math.ceil(regular_session_minutes / interval_minutes)
+    return max(1, full_session_candles + math.ceil(full_session_candles / 2))
+
+
 def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
@@ -2543,11 +2567,6 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
 
     if working.empty:
         return "<div style='padding:20px;color:#ff5d5d;'>No chart data available.</div>"
-
-    session_dates = sorted(working["ts"].dt.date.unique())
-    if len(session_dates) >= 2:
-        keep_dates = set(session_dates[-2:])
-        working = working[working["ts"].dt.date.isin(keep_dates)].copy()
 
     spx_resampled = (
         working[["ts", "open_price", "high_price", "low_price", "close_price", "ema9_spx", "ema21_spx", "vwap_spx_proxy"]]
@@ -2569,6 +2588,7 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
         return "<div style='padding:20px;color:#ff5d5d;'>No chart data available.</div>"
 
     spx_resampled = spx_resampled.sort_values("ts").reset_index(drop=True)
+    spx_resampled = spx_resampled.tail(rolling_regular_session_candle_count(chart_interval)).reset_index(drop=True)
     spx_resampled["xpos"] = range(len(spx_resampled))
     spx_resampled["date_str"] = spx_resampled["ts"].dt.strftime("%b %-d")
     spx_resampled["time_str"] = spx_resampled["ts"].dt.strftime("%H:%M")
