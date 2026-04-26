@@ -26,6 +26,9 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_SETTINGS = {
     "refresh_interval": 31,
     "chart_interval": "5min",
+    "debug_mode": False,
+    "debug_trade_date": "",
+    "debug_time": "",
     "simulator_speed": 60.0,
     "simulator_points": 70.0,
     "simulator_wide": 20.0,
@@ -49,6 +52,20 @@ LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "5"))
 GEX_CONTRACT_SIZE = int(os.environ.get("GEX_CONTRACT_SIZE", "100"))
 GEX_MIN_TIME_SECONDS = int(os.environ.get("GEX_MIN_TIME_SECONDS", "60"))
 GEX_STRIKE_WINDOW = float(os.environ.get("GEX_STRIKE_WINDOW", "50"))
+
+
+def regular_session_time_options() -> list[str]:
+    start = dt.datetime.combine(dt.date(2000, 1, 1), dt.time(9, 30))
+    end = dt.datetime.combine(dt.date(2000, 1, 1), dt.time(16, 0))
+    options = []
+    current = start
+    while current <= end:
+        options.append(current.strftime("%H:%M"))
+        current += dt.timedelta(minutes=5)
+    return options
+
+
+DEBUG_TIME_OPTIONS = regular_session_time_options()
 
 
 class NoOpenInterestInFeedError(Exception):
@@ -404,6 +421,14 @@ TERMINAL_HTML = """
         .nav-links{display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; opacity:.68;}
         .nav-link{color:var(--muted); text-decoration:none; font-size:11px; font-weight:900; padding:8px 11px; border:1px solid rgba(0,229,240,.18); background:rgba(0,10,14,.38); text-transform:uppercase;}
         .nav-link.active{color:#dffcff; border-color:rgba(0,229,240,.48); box-shadow:inset 0 0 0 1px rgba(0,229,240,.18);}
+        .debug-form{grid-column:1 / -1; justify-self:end; display:flex; align-items:center; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:11px; text-transform:uppercase;}
+        .debug-form input,.debug-form select{height:28px; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 8px; font:inherit;}
+        .debug-switch{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
+        .debug-switch input{position:absolute; opacity:0; pointer-events:none;}
+        .debug-slider{width:38px; height:20px; border:1px solid rgba(0,229,240,.3); background:rgba(142,170,179,.16); position:relative;}
+        .debug-slider:after{content:""; position:absolute; width:14px; height:14px; left:2px; top:2px; background:var(--muted); transition:transform .18s ease, background .18s ease;}
+        .debug-switch input:checked + .debug-slider:after{transform:translateX(18px); background:var(--yellow);}
+        .debug-switch input:checked + .debug-slider{border-color:var(--yellow); box-shadow:0 0 12px rgba(255,196,0,.18);}
         .market{color:var(--green); font-weight:900; text-align:right; text-transform:uppercase;}
         .layout{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px; align-items:stretch;}
         .stack{display:grid; gap:18px; align-content:start;}
@@ -424,7 +449,7 @@ TERMINAL_HTML = """
         .signal-content{position:relative; z-index:1;}
         .signal-icons{position:absolute; inset:22px 24px auto 24px; display:flex; justify-content:space-between; pointer-events:none;}
         .signal-icon{width:96px; height:72px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease;}
-        .signal-icon svg{width:100%; height:100%;}
+        .signal-icon img,.signal-icon svg{width:100%; height:100%; object-fit:contain;}
         .signal-icon.active{opacity:1; filter:drop-shadow(0 0 16px rgba(28,255,115,.44));}
         .signal-icon.bear.active{filter:drop-shadow(0 0 16px rgba(255,49,72,.42));}
         .signal-icon.bull{color:var(--green);}
@@ -463,7 +488,7 @@ TERMINAL_HTML = """
         .tickerbar{display:flex; align-items:center; gap:34px; overflow:auto; white-space:nowrap; padding:12px 20px;}
         .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 160px 136px}}
+        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 160px 136px}}
         @media (max-width: 760px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}.chart-wrap{height:430px}}
     </style>
 </head>
@@ -477,7 +502,6 @@ TERMINAL_HTML = """
         </div>
         <div class="brand">
             <h1>CashFlowArc Terminal</h1>
-            <p>S&P 500 Index - SPX - Last update {{ data.time }}</p>
         </div>
         <div class="nav-panel">
             <div class="market-readout"><b class="{{ data.market_status_class }}">{{ data.market_status }}</b>{{ data.market_hours }}</div>
@@ -489,6 +513,23 @@ TERMINAL_HTML = """
                 <a class="nav-link" href="/option-chain">Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
             </nav>
+            <form class="debug-form" method="post" action="/settings">
+                <input type="hidden" name="refresh_interval" value="{{ data.refresh_interval }}">
+                <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+                <input type="hidden" name="debug_mode" value="0">
+                <label class="debug-switch">
+                    <span>Debug</span>
+                    <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
+                    <span class="debug-slider"></span>
+                </label>
+                <input type="date" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+                <select name="debug_time">
+                    <option value="">Time</option>
+                    {% for option in data.debug_time_options %}
+                    <option value="{{ option }}" {% if data.debug_time == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </form>
         </div>
     </header>
 
@@ -515,17 +556,7 @@ TERMINAL_HTML = """
             <section class="panel signal">
                 <div class="signal-icons">
                     <div class="signal-icon bull {{ 'active' if data.bullish else '' }}" aria-hidden="true">
-                        <svg viewBox="0 0 140 112" fill="none">
-                            <path d="M53 40C45 25 31 18 19 16C21 34 33 47 51 49" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M87 40C95 25 109 18 121 16C119 34 107 47 89 49" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M41 51C47 36 57 29 70 29C83 29 93 36 99 51" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
-                            <path d="M43 48C43 48 47 69 50 84C53 99 61 107 70 107C79 107 87 99 90 84C93 69 97 48 97 48C88 55 79 58 70 58C61 58 52 55 43 48Z" fill="rgba(3,13,17,.96)" stroke="currentColor" stroke-width="6" stroke-linejoin="round"/>
-                            <path d="M47 62C36 58 29 51 26 40" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-                            <path d="M93 62C104 58 111 51 114 40" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-                            <path d="M56 68L62 70M84 68L78 70" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-                            <path d="M62 88C65 86 75 86 78 88" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-                            <path d="M58 96C62 100 78 100 82 96" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".7"/>
-                        </svg>
+                        <img src="{{ url_for('static', filename='bull-signal.png') }}" alt="">
                     </div>
                     <div class="signal-icon bear {{ 'active' if data.bearish else '' }}" aria-hidden="true">
                         <svg viewBox="0 0 96 72" fill="none">
@@ -626,6 +657,13 @@ TERMINAL_HTML = """
     </footer>
 </main>
 <script>
+document.querySelectorAll('.debug-form').forEach(function(form) {
+    form.addEventListener('change', function() {
+        fetch('/settings', { method: 'POST', body: new FormData(form) })
+            .then(function() { window.location.reload(); })
+            .catch(function() {});
+    });
+});
 setTimeout(function(){ window.location.reload(); }, Math.max(15, Number({{ data.refresh_interval }})) * 1000);
 </script>
 </body>
@@ -1715,6 +1753,9 @@ def load_settings() -> dict:
             out.update(data)
             out["refresh_interval"] = max(15, min(3600, int(out.get("refresh_interval", 30))))
             out["chart_interval"] = str(out.get("chart_interval", "5min"))
+            out["debug_mode"] = bool(out.get("debug_mode", False))
+            out["debug_trade_date"] = str(out.get("debug_trade_date", "") or "")
+            out["debug_time"] = normalize_simulator_time(out.get("debug_time", ""), "")
             out["simulator_speed"] = max(0.5, min(360.0, float(out.get("simulator_speed", 60.0))))
             out["simulator_points"] = max(0.0, float(out.get("simulator_points", 70.0)))
             out["simulator_wide"] = max(0.0, float(out.get("simulator_wide", 20.0)))
@@ -1723,6 +1764,8 @@ def load_settings() -> dict:
             out["simulator_execution_end_time"] = normalize_execution_end_time(out.get("simulator_execution_end_time", "14:00"))
             if out["chart_interval"] not in {"5min", "15min", "1h"}:
                 out["chart_interval"] = "5min"
+            if out["debug_time"] and out["debug_time"] not in DEBUG_TIME_OPTIONS:
+                out["debug_time"] = ""
             return out
         except Exception:
             pass
@@ -2617,6 +2660,20 @@ def market_status_info(now_et: pd.Timestamp) -> dict:
     }
 
 
+def debug_as_of_timestamp(settings: dict) -> Optional[pd.Timestamp]:
+    if not settings.get("debug_mode"):
+        return None
+    raw_date = str(settings.get("debug_trade_date", "") or "").strip()
+    raw_time = str(settings.get("debug_time", "") or "").strip()
+    if not raw_date or not raw_time:
+        return None
+    try:
+        parsed = pd.Timestamp(f"{raw_date} {raw_time}", tz=TIMEZONE)
+    except Exception:
+        return None
+    return parsed
+
+
 def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
     interval_map = {"5min": "5min", "15min": "15min", "1h": "1h"}
     label_map = {"5min": "5 Minute", "15min": "15 Minute", "1h": "1 Hour"}
@@ -2753,10 +2810,10 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     )
     fig.add_annotation(
         x=start_of_day_x,
-        y=0.94,
+        y=0.88,
         xref="x",
         yref="paper",
-        text="Start",
+        text="Start Of Day",
         showarrow=False,
         xanchor="left",
         yanchor="top",
@@ -3009,9 +3066,10 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
 
 
 def run_web_service(settings: dict) -> dict:
-    now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    start_utc = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=LOOKBACK_DAYS)
-    now_et = pd.Timestamp.now(tz=TIMEZONE)
+    as_of_et = debug_as_of_timestamp(settings)
+    now_et = as_of_et or pd.Timestamp.now(tz=TIMEZONE)
+    now = now_et.strftime("%Y-%m-%d %H:%M:%S")
+    start_utc = now_et.tz_convert("UTC").to_pydatetime() - dt.timedelta(days=LOOKBACK_DAYS)
     current_et_date = now_et.date()
     market_info = market_status_info(now_et)
     net_gex_billions = "N/A"
@@ -3031,9 +3089,18 @@ def run_web_service(settings: dict) -> dict:
 
     spx = spx.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
     spy = spy.drop_duplicates(subset=["ts"]).sort_values("ts").reset_index(drop=True)
+    if as_of_et is not None:
+        as_of_naive = as_of_et.tz_localize(None)
+        spx = spx[spx["ts"] <= as_of_naive].copy()
+        spy = spy[spy["ts"] <= as_of_naive].copy()
 
-    current_date = spx["ts"].max().date()
-    prior_dates = sorted({x.date() for x in spx["ts"] if x.date() < current_date})
+    spx_regular = spx[intraday_session_mask(spx["ts"])].copy()
+    spy_regular = spy[intraday_session_mask(spy["ts"])].copy()
+    if spx_regular.empty or spy_regular.empty:
+        return {"time": now, "error": f"No regular-session rows found in {SOURCE_TABLE} for the selected time.", **settings}
+
+    current_date = spx_regular["ts"].max().date()
+    prior_dates = sorted({x.date() for x in spx_regular["ts"] if x.date() < current_date})
     if not prior_dates:
         return {"time": now, "error": f"Need at least two trading days in {SOURCE_TABLE}.", **settings}
     prev_date = prior_dates[-1]
@@ -3051,8 +3118,8 @@ def run_web_service(settings: dict) -> dict:
     spy["trade_date"] = spy["ts"].dt.date
     spx["trade_date"] = spx["ts"].dt.date
 
-    spy_session = spy[intraday_session_mask(spy["ts"])].copy()
-    spx_session = spx[intraday_session_mask(spx["ts"])].copy()
+    spy_session = spy_regular.copy()
+    spx_session = spx_regular.copy()
 
     spy_session["vwap_spy"] = (
         spy_session.groupby("trade_date", group_keys=False).apply(calculate_vwap).reset_index(level=0, drop=True)
@@ -3251,6 +3318,10 @@ def run_web_service(settings: dict) -> dict:
         "chart_html": chart_html,
         "refresh_interval": settings["refresh_interval"],
         "chart_interval": settings["chart_interval"],
+        "debug_mode": settings.get("debug_mode", False),
+        "debug_trade_date": settings.get("debug_trade_date", ""),
+        "debug_time": settings.get("debug_time", ""),
+        "debug_time_options": DEBUG_TIME_OPTIONS,
         "source_table": SOURCE_TABLE,
         "error": None,
     }
@@ -3293,6 +3364,10 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "market_status": "MARKET CLOSED",
         "market_status_class": "yellow",
         "market_hours": "TRADING HOURS - 09:30 AM - 04:00 PM ET",
+        "debug_mode": False,
+        "debug_trade_date": "",
+        "debug_time": "",
+        "debug_time_options": DEBUG_TIME_OPTIONS,
         "chart_html": "",
         "source_table": SOURCE_TABLE,
     }
@@ -3312,6 +3387,15 @@ def update_settings():
     chart_interval = str(request.form.get("chart_interval", current.get("chart_interval", "5min")))
     if chart_interval not in {"5min", "15min", "1h"}:
         chart_interval = current.get("chart_interval", "5min")
+
+    if "debug_mode" in request.form:
+        debug_mode = str(request.form.get("debug_mode", "0")) == "1"
+    else:
+        debug_mode = bool(current.get("debug_mode", False))
+    debug_trade_date = str(request.form.get("debug_trade_date", current.get("debug_trade_date", "")) or "")
+    debug_time = normalize_simulator_time(request.form.get("debug_time", current.get("debug_time", "")), "")
+    if debug_time and debug_time not in DEBUG_TIME_OPTIONS:
+        debug_time = ""
 
     try:
         simulator_speed = float(request.form.get("simulator_speed", current.get("simulator_speed", 60.0)))
@@ -3338,6 +3422,9 @@ def update_settings():
     save_settings({
         "refresh_interval": max(15, min(3600, refresh_interval)),
         "chart_interval": chart_interval,
+        "debug_mode": debug_mode,
+        "debug_trade_date": debug_trade_date,
+        "debug_time": debug_time,
         "simulator_speed": simulator_speed,
         "simulator_points": simulator_points,
         "simulator_wide": simulator_wide,
