@@ -495,7 +495,7 @@ TERMINAL_HTML = """
         .notes li.red{color:var(--red); font-weight:800;}
         .market-grid{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px;}
         .market-grid .panel{min-height:170px;}
-        .market-grid .panel:first-child{grid-column:1 / 3;}
+        .market-grid .panel:first-child{grid-column:1;}
         .market-grid .panel:nth-child(2){grid-column:3;}
         table{width:100%; border-collapse:collapse;}
         td,th{padding:9px 7px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px;}
