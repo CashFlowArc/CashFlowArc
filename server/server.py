@@ -64,6 +64,11 @@ def db_storage_ticker(ticker: str) -> str:
     }
     return mapping.get(ticker.upper(), ticker.upper())
 
+
+def nav_class(active_tab: str, tab: str) -> str:
+    return "nav-link active" if active_tab == tab else "nav-link"
+
+
 HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -187,7 +192,9 @@ HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link active" href="/">Trading Terminal</a>
+                <a class="nav-link" href="/terminal">Modern Terminal</a>
+                <a class="nav-link" href="/hud">AR HUD</a>
+                <a class="nav-link active" href="/">Classic Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
                 <a class="nav-link" href="/option-chain">SPX Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
@@ -322,6 +329,293 @@ HTML = """
 </html>
 """
 
+TERMINAL_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>CashFlowArc Terminal</title>
+    <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        :root{
+            --bg:#050709;
+            --panel:#091016;
+            --panel-2:#0e1820;
+            --line:#0ad7e7;
+            --line-soft:rgba(10,215,231,.28);
+            --text:#eef7fb;
+            --muted:#91a8b5;
+            --green:#28f077;
+            --red:#ff3d4f;
+            --yellow:#ffc629;
+        }
+        *{box-sizing:border-box}
+        body{margin:0; font-family:Segoe UI, Arial, sans-serif; background:radial-gradient(circle at 50% 20%, #12212a 0%, #050709 42%, #020304 100%); color:var(--text);}
+        .shell{min-height:100vh; padding:22px; display:grid; grid-template-rows:auto 1fr auto; gap:16px;}
+        .topbar,.tickerbar{border:1px solid var(--line-soft); background:rgba(5,12,16,.86); box-shadow:0 0 22px rgba(10,215,231,.11); clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px); padding:14px 18px;}
+        .topbar{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+        .brand h1{margin:0; font-size:34px; letter-spacing:0; line-height:1;}
+        .brand p{margin:6px 0 0; color:var(--muted); font-size:13px;}
+        .nav-links{display:flex; gap:8px; flex-wrap:wrap;}
+        .nav-link{color:var(--muted); text-decoration:none; font-size:13px; font-weight:800; padding:9px 12px; border:1px solid rgba(10,215,231,.25); background:#071018;}
+        .nav-link.active{color:var(--text); border-color:var(--line); box-shadow:inset 0 0 0 1px rgba(10,215,231,.45);}
+        .market{font-weight:900; color:var(--green);}
+        .layout{display:grid; grid-template-columns:minmax(420px,1.15fr) minmax(300px,.75fr) minmax(420px,1fr); gap:16px; align-items:stretch;}
+        .stack{display:grid; gap:16px;}
+        .panel{border:1px solid var(--line-soft); background:linear-gradient(180deg,rgba(9,16,22,.93),rgba(4,8,11,.93)); padding:14px; min-width:0; box-shadow:0 0 18px rgba(0,0,0,.34);}
+        .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; color:var(--muted); text-transform:uppercase; font-size:13px; font-weight:900;}
+        .chart-wrap{height:510px; overflow:hidden; background:#05090d; border:1px solid rgba(10,215,231,.12);}
+        .chart-wrap .plotly-graph-div{width:100% !important; height:100% !important;}
+        .hero{display:grid; align-content:center; justify-items:center; gap:14px; min-height:360px; text-align:center;}
+        .symbol{font-size:64px; font-weight:900; line-height:.95;}
+        .price{font-size:66px; color:#43e8b1; font-weight:900; text-shadow:0 0 24px rgba(67,232,177,.32);}
+        .signal{border:1px solid var(--line-soft); padding:20px; width:100%; text-align:center;}
+        .signal strong{display:block; color:var(--green); font-size:44px; line-height:1; margin-top:8px;}
+        .confidence{display:grid; grid-template-columns:120px 1fr; gap:14px; align-items:center;}
+        .ring{height:112px; width:112px; border-radius:50%; border:10px solid rgba(40,240,119,.25); display:grid; place-items:center; color:var(--text); font-size:28px; font-weight:900; box-shadow:inset 0 0 0 8px #071018;}
+        .notes{margin:0; padding-left:18px; color:var(--text); line-height:1.65; font-size:14px;}
+        table{width:100%; border-collapse:collapse;}
+        td,th{padding:9px 6px; border-bottom:1px solid rgba(145,168,181,.18); font-size:14px; white-space:nowrap;}
+        th{color:var(--muted); text-align:left; font-size:12px;}
+        td:last-child,th:last-child{text-align:right;}
+        .green{color:var(--green); font-weight:900}.red{color:var(--red); font-weight:900}.yellow{color:var(--yellow); font-weight:900}.muted{color:var(--muted)}
+        .tickerbar{display:flex; align-items:center; gap:26px; overflow:auto; white-space:nowrap;}
+        .tickerbar b{color:var(--line); margin-right:6px;}
+        .err{color:var(--red); font-weight:900; font-size:18px;}
+        @media (max-width: 1380px){.layout{grid-template-columns:1fr 1fr}.layout>.stack:first-child{grid-column:1 / -1}.chart-wrap{height:420px}}
+        @media (max-width: 820px){.shell{padding:12px}.layout{grid-template-columns:1fr}.price{font-size:48px}.symbol{font-size:46px}.confidence{grid-template-columns:1fr}.ring{margin:auto}}
+    </style>
+</head>
+<body>
+<main class="shell">
+    <header class="topbar">
+        <div class="brand">
+            <h1>CashFlowArc Terminal</h1>
+            <p>S&P 500 Index - SPX - Last update {{ data.time }}</p>
+        </div>
+        <nav class="nav-links">
+            <a class="nav-link active" href="/terminal">Modern Terminal</a>
+            <a class="nav-link" href="/hud">AR HUD</a>
+            <a class="nav-link" href="/">Classic Terminal</a>
+            <a class="nav-link" href="/gex">SPX GEX</a>
+            <a class="nav-link" href="/option-chain">Option Chain</a>
+            <a class="nav-link" href="/simulator">Simulator</a>
+        </nav>
+        <div class="market">MARKET DATA LIVE</div>
+    </header>
+
+    {% if data.error %}
+    <section class="panel"><div class="err">{{ data.error }}</div></section>
+    {% else %}
+    <section class="layout">
+        <div class="stack">
+            <section class="panel">
+                <div class="panel-title"><span>SPX {{ data.chart_interval }}</span><span>{{ data.price }}</span></div>
+                <div class="chart-wrap">{{ data.chart_html|safe }}</div>
+            </section>
+            <section class="panel">
+                <div class="panel-title"><span>Market Snapshot</span><span>Oracle {{ data.source_table }}</span></div>
+                <table>
+                    <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td></tr>
+                    <tr><td>Open</td><td>{{ data.open_price }}</td><td class="{{ 'green' if data.open_distance else 'yellow' }}">{{ data.open_distance_pct }}%</td></tr>
+                    <tr><td>Day High / Low</td><td>{{ data.current_day_high }}</td><td>{{ data.current_day_low }}</td></tr>
+                    <tr><td>Prev High / Low</td><td>{{ data.prev_day_high }}</td><td>{{ data.prev_day_low }}</td></tr>
+                </table>
+            </section>
+        </div>
+
+        <div class="stack">
+            <section class="panel hero">
+                <div class="symbol">SPX</div>
+                <div class="price">{{ data.price }}</div>
+                <div class="{{ 'green' if data.bullish else ('red' if data.bearish else 'yellow') }}">{{ data.bias_label }}</div>
+            </section>
+            <section class="panel signal">
+                <span>TRADE SIGNAL</span>
+                <strong>{{ data.bias_label }}</strong>
+            </section>
+            <section class="panel confidence">
+                <div class="ring">{{ data.confidence }}%</div>
+                <ul class="notes">
+                    {% for note in data.setup_notes %}
+                    <li>{{ note }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+
+        <div class="stack">
+            <section class="panel">
+                <div class="panel-title"><span>Trade Setup</span><span>{{ data.trade }}</span></div>
+                <table>
+                    <tr><td>Type</td><td class="{{ 'green' if data.trade != 'NO TRADE' else 'yellow' }}">{{ data.trade_type }}</td></tr>
+                    <tr><td>Short Strike</td><td>{{ data.short_strike }}</td></tr>
+                    <tr><td>Long Strike</td><td>{{ data.long_strike }}</td></tr>
+                    <tr><td>Credit</td><td>{{ data.credit }}</td></tr>
+                    <tr><td>Max Profit</td><td class="green">{{ data.max_profit }}</td></tr>
+                    <tr><td>Max Risk</td><td class="red">{{ data.max_risk }}</td></tr>
+                    <tr><td>Net GEX</td><td>{{ data.net_gex_billions }}</td></tr>
+                </table>
+            </section>
+            <section class="panel">
+                <div class="panel-title"><span>Alerts & Checklist</span><span>Rules</span></div>
+                <table>
+                    {% for item in data.checklist %}
+                    <tr><td>{{ item.label }}</td><td class="{{ item.class }}">{{ item.status }}</td></tr>
+                    {% endfor %}
+                </table>
+            </section>
+        </div>
+    </section>
+    {% endif %}
+
+    <footer class="tickerbar">
+        <span><b>WATCHLIST</b></span>
+        <span>SPX <span class="green">{{ data.price }}</span></span>
+        <span>SPY <span class="green">{{ data.spy_price }}</span></span>
+        <span class="muted">Refresh {{ data.refresh_interval }}s</span>
+    </footer>
+</main>
+<script>
+setTimeout(function(){ window.location.reload(); }, Math.max(15, Number({{ data.refresh_interval }})) * 1000);
+</script>
+</body>
+</html>
+"""
+
+HUD_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>CashFlowArc HUD</title>
+    <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        :root{--bg:#020404;--panel:rgba(3,12,14,.82);--line:#04d9e8;--soft:rgba(4,217,232,.32);--text:#edfaff;--muted:#8fb0b8;--green:#28f077;--red:#ff3d4f;--yellow:#ffc629}
+        *{box-sizing:border-box}
+        body{margin:0; min-height:100vh; color:var(--text); font-family:Segoe UI, Arial, sans-serif; background:#020404;}
+        .hud{min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; gap:14px; padding:18px; background:radial-gradient(circle at 50% 50%, rgba(2,2,2,.12) 0 26%, rgba(2,4,4,.98) 55%);}
+        .top,.bottom,.panel{border:1px solid var(--soft); background:var(--panel); box-shadow:0 0 20px rgba(4,217,232,.12); clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 16px,100% calc(100% - 16px),calc(100% - 16px) 100%,16px 100%,0 calc(100% - 16px),0 16px);}
+        .top{display:grid; grid-template-columns:1fr auto 1fr; gap:18px; align-items:center; padding:12px 18px;}
+        .time{font-size:18px}.title{text-align:center}.title h1{margin:0; font-size:34px; line-height:1}.title p{margin:6px 0 0; color:var(--muted)}.market{text-align:right; color:var(--green); font-weight:900;}
+        .tabs{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px;}
+        .tabs a{color:var(--muted); text-decoration:none; padding:7px 10px; border:1px solid var(--soft); font-size:12px; font-weight:800; background:#031014;}
+        .tabs a.active{color:var(--text); border-color:var(--line)}
+        .grid{display:grid; grid-template-columns:360px 1fr 380px; gap:18px; min-height:0;}
+        .side{display:grid; align-content:start; gap:14px; min-width:0;}
+        .panel{padding:14px; min-width:0;}
+        .ar-space{position:relative; min-height:520px; border:1px solid rgba(4,217,232,.18); background:radial-gradient(circle at center, rgba(4,217,232,.04), rgba(0,0,0,0) 56%);}
+        .ar-space:before,.ar-space:after{content:""; position:absolute; width:70px; height:70px; border-color:var(--line); opacity:.9;}
+        .ar-space:before{left:8%; top:12%; border-left:2px solid; border-top:2px solid}.ar-space:after{right:8%; bottom:12%; border-right:2px solid; border-bottom:2px solid}
+        .panel-title{display:flex; justify-content:space-between; gap:10px; color:var(--muted); text-transform:uppercase; font-size:13px; font-weight:900; margin-bottom:10px;}
+        .chart-mini{height:320px; overflow:hidden; background:#03080a;}
+        .chart-mini .plotly-graph-div{width:100% !important; height:100% !important;}
+        .signal{text-align:center}.signal strong{display:block; color:var(--green); font-size:38px; line-height:1; margin-top:8px;}
+        .ring{height:96px; width:96px; border-radius:50%; border:9px solid rgba(40,240,119,.35); display:grid; place-items:center; font-size:24px; font-weight:900;}
+        .confidence{display:grid; grid-template-columns:100px 1fr; gap:10px; align-items:center;}
+        ul{margin:0; padding-left:18px; line-height:1.55; font-size:13px;}
+        table{width:100%; border-collapse:collapse}td{padding:8px 4px; border-bottom:1px solid rgba(143,176,184,.2); font-size:13px;}td:last-child{text-align:right}
+        .green{color:var(--green); font-weight:900}.red{color:var(--red); font-weight:900}.yellow{color:var(--yellow); font-weight:900}.muted{color:var(--muted)}
+        .bottom{display:flex; gap:26px; align-items:center; overflow:auto; white-space:nowrap; padding:12px 18px}.bottom b{color:var(--line); margin-right:6px}
+        .err{color:var(--red); font-weight:900; font-size:18px}
+        @media (max-width: 1200px){.grid{grid-template-columns:1fr}.ar-space{min-height:280px}.top{grid-template-columns:1fr}.market,.time{text-align:center}}
+    </style>
+</head>
+<body>
+<main class="hud">
+    <header class="top">
+        <div class="time">{{ data.time }}</div>
+        <div class="title">
+            <h1>CashFlowArc HUD</h1>
+            <p>S&P 500 Index - SPX</p>
+            <nav class="tabs">
+                <a href="/terminal">Modern Terminal</a>
+                <a class="active" href="/hud">AR HUD</a>
+                <a href="/">Classic Terminal</a>
+                <a href="/gex">SPX GEX</a>
+                <a href="/option-chain">Option Chain</a>
+                <a href="/simulator">Simulator</a>
+            </nav>
+        </div>
+        <div class="market">MARKET DATA LIVE</div>
+    </header>
+
+    {% if data.error %}
+    <section class="panel"><div class="err">{{ data.error }}</div></section>
+    {% else %}
+    <section class="grid">
+        <aside class="side">
+            <section class="panel">
+                <div class="panel-title"><span>SPX {{ data.chart_interval }}</span><span>{{ data.price }}</span></div>
+                <div class="chart-mini">{{ data.chart_html|safe }}</div>
+            </section>
+            <section class="panel signal">
+                <span>Trade Signal</span>
+                <strong>{{ data.bias_label }}</strong>
+            </section>
+            <section class="panel confidence">
+                <div class="ring">{{ data.confidence }}%</div>
+                <ul>
+                    {% for note in data.setup_notes %}
+                    <li>{{ note }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+            <section class="panel">
+                <div class="panel-title"><span>Market Snapshot</span><span>Oracle</span></div>
+                <table>
+                    <tr><td>VWAP Proxy</td><td>{{ data.vwap }}</td></tr>
+                    <tr><td>Price vs VWAP</td><td class="{{ 'green' if data.price > data.vwap else 'red' }}">{{ data.vwap_distance_pct }}%</td></tr>
+                    <tr><td>Day High</td><td>{{ data.current_day_high }}</td></tr>
+                    <tr><td>Day Low</td><td>{{ data.current_day_low }}</td></tr>
+                </table>
+            </section>
+        </aside>
+
+        <section class="ar-space" aria-label="Transparent AR alignment area"></section>
+
+        <aside class="side">
+            <section class="panel">
+                <div class="panel-title"><span>Trade Setup</span><span>{{ data.trade_type }}</span></div>
+                <table>
+                    <tr><td>Short Strike</td><td>{{ data.short_strike }}</td></tr>
+                    <tr><td>Long Strike</td><td>{{ data.long_strike }}</td></tr>
+                    <tr><td>Credit</td><td>{{ data.credit }}</td></tr>
+                    <tr><td>Max Profit</td><td class="green">{{ data.max_profit }}</td></tr>
+                    <tr><td>Max Risk</td><td class="red">{{ data.max_risk }}</td></tr>
+                    <tr><td>Net GEX</td><td>{{ data.net_gex_billions }}</td></tr>
+                </table>
+            </section>
+            <section class="panel">
+                <div class="panel-title"><span>Alerts & Checklist</span><span>Rules</span></div>
+                <table>
+                    {% for item in data.checklist %}
+                    <tr><td>{{ item.label }}</td><td class="{{ item.class }}">{{ item.status }}</td></tr>
+                    {% endfor %}
+                </table>
+            </section>
+        </aside>
+    </section>
+    {% endif %}
+
+    <footer class="bottom">
+        <span><b>WATCHLIST</b></span>
+        <span>SPX <span class="green">{{ data.price }}</span></span>
+        <span>SPY <span class="green">{{ data.spy_price }}</span></span>
+        <span class="muted">Refresh {{ data.refresh_interval }}s</span>
+    </footer>
+</main>
+<script>
+setTimeout(function(){ window.location.reload(); }, Math.max(15, Number({{ data.refresh_interval }})) * 1000);
+</script>
+</body>
+</html>
+"""
+
 GEX_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -419,7 +713,9 @@ GEX_HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link" href="/">Trading Terminal</a>
+                <a class="nav-link" href="/terminal">Modern Terminal</a>
+                <a class="nav-link" href="/hud">AR HUD</a>
+                <a class="nav-link" href="/">Classic Terminal</a>
                 <a class="nav-link active" href="/gex">SPX GEX</a>
                 <a class="nav-link" href="/option-chain">SPX Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
@@ -585,7 +881,9 @@ OPTION_CHAIN_HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link" href="/">Trading Terminal</a>
+                <a class="nav-link" href="/terminal">Modern Terminal</a>
+                <a class="nav-link" href="/hud">AR HUD</a>
+                <a class="nav-link" href="/">Classic Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
                 <a class="nav-link active" href="/option-chain">SPX Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
@@ -791,7 +1089,9 @@ SIMULATOR_HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link" href="/">Trading Terminal</a>
+                <a class="nav-link" href="/terminal">Modern Terminal</a>
+                <a class="nav-link" href="/hud">AR HUD</a>
+                <a class="nav-link" href="/">Classic Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
                 <a class="nav-link" href="/option-chain">SPX Option Chain</a>
                 <a class="nav-link active" href="/simulator">Simulator</a>
@@ -2602,6 +2902,7 @@ def run_web_service(settings: dict) -> dict:
 
     bullish = (latest_price > open_price) and (latest_price > latest_vwap) and (latest_ema9 > latest_ema21)
     bearish = (latest_price < open_price) and (latest_price < latest_vwap) and (latest_ema9 < latest_ema21)
+    bias_label = "BULLISH" if bullish else ("BEARISH" if bearish else "NEUTRAL")
 
     trade = "NO TRADE"
     structure = "No trade today."
@@ -2612,6 +2913,51 @@ def run_web_service(settings: dict) -> dict:
         elif bearish:
             trade = "SELL CALL SPREAD"
             structure = "Sell 10 call credit spreads, 20 points wide, short strike near 0.10 delta, stop at 2x credit received."
+
+    checklist = [
+        {
+            "label": "Price > VWAP" if not bearish else "Price < VWAP",
+            "status": "PASS" if ((latest_price > latest_vwap and not bearish) or (latest_price < latest_vwap and bearish)) else "WATCH",
+            "class": "green" if ((latest_price > latest_vwap and not bearish) or (latest_price < latest_vwap and bearish)) else "yellow",
+        },
+        {
+            "label": "EMA9 > EMA21" if not bearish else "EMA9 < EMA21",
+            "status": "PASS" if ((latest_ema9 > latest_ema21 and not bearish) or (latest_ema9 < latest_ema21 and bearish)) else "WATCH",
+            "class": "green" if ((latest_ema9 > latest_ema21 and not bearish) or (latest_ema9 < latest_ema21 and bearish)) else "yellow",
+        },
+        {
+            "label": "Outside Opening Range",
+            "status": "PASS" if outside_range else "WATCH",
+            "class": "green" if outside_range else "yellow",
+        },
+        {
+            "label": "Distance from VWAP OK",
+            "status": "PASS" if vwap_distance else "WATCH",
+            "class": "green" if vwap_distance else "yellow",
+        },
+    ]
+    confidence = int(round(sum(1 for item in checklist if item["status"] == "PASS") / len(checklist) * 100))
+    setup_notes = [
+        "Price above VWAP" if latest_price > latest_vwap else "Price below VWAP",
+        "EMA9 above EMA21" if latest_ema9 > latest_ema21 else "EMA9 below EMA21",
+        "Breakout beyond opening range" if outside_range else "Inside opening range",
+        "VWAP distance threshold met" if vwap_distance else "VWAP distance below threshold",
+    ]
+
+    spy_latest = last_valid_number(spy_current["close_price"]) if not spy_current.empty else None
+    strike_points = float(settings.get("simulator_points", 70.0))
+    spread_width = float(settings.get("simulator_wide", 20.0))
+    if trade == "SELL PUT SPREAD":
+        short_strike_value = latest_price - strike_points
+        long_strike_value = short_strike_value - spread_width
+    elif trade == "SELL CALL SPREAD":
+        short_strike_value = latest_price + strike_points
+        long_strike_value = short_strike_value + spread_width
+    else:
+        short_strike_value = None
+        long_strike_value = None
+
+    trade_type = "Bull Put Credit Spread" if trade == "SELL PUT SPREAD" else ("Bear Call Credit Spread" if trade == "SELL CALL SPREAD" else "No trade")
 
     try:
         gex_snapshot = get_net_gex_snapshot()
@@ -2647,12 +2993,14 @@ def run_web_service(settings: dict) -> dict:
         "vwap": int(round(latest_vwap, 0)),
         "ema9": int(round(latest_ema9, 0)),
         "ema21": int(round(latest_ema21, 0)),
+        "open_price": int(round(open_price, 0)),
         "range_high": int(round(range_high, 0)),
         "range_low": int(round(range_low, 0)),
         "prev_day_high": int(round(prev_day_high, 0)),
         "prev_day_low": int(round(prev_day_low, 0)),
         "current_day_high": int(round(current_day_high, 0)),
         "current_day_low": int(round(current_day_low, 0)),
+        "spy_price": "N/A" if spy_latest is None else f"{spy_latest:,.2f}",
         "vwap_distance_pct": "N/A" if pd.isna(vwap_distance_pct) else round(vwap_distance_pct, 3),
         "open_distance_pct": "N/A" if pd.isna(open_distance_pct) else round(open_distance_pct, 3),
         "outside_range": outside_range,
@@ -2664,7 +3012,17 @@ def run_web_service(settings: dict) -> dict:
         "net_gex_subtext": net_gex_subtext,
         "bullish": bullish,
         "bearish": bearish,
+        "bias_label": bias_label,
+        "confidence": confidence,
+        "setup_notes": setup_notes,
+        "checklist": checklist,
         "trade": trade,
+        "trade_type": trade_type,
+        "short_strike": "N/A" if short_strike_value is None else f"{short_strike_value:,.0f}",
+        "long_strike": "N/A" if long_strike_value is None else f"{long_strike_value:,.0f}",
+        "credit": "Needs option Greeks/selection",
+        "max_profit": "N/A",
+        "max_risk": "N/A",
         "structure": structure,
         "chart_html": chart_html,
         "refresh_interval": settings["refresh_interval"],
@@ -2672,6 +3030,42 @@ def run_web_service(settings: dict) -> dict:
         "source_table": SOURCE_TABLE,
         "error": None,
     }
+
+
+def ensure_terminal_display_data(data: dict) -> dict:
+    defaults = {
+        "price": "N/A",
+        "spy_price": "N/A",
+        "vwap": "N/A",
+        "open_price": "N/A",
+        "ema9": "N/A",
+        "ema21": "N/A",
+        "range_high": "N/A",
+        "range_low": "N/A",
+        "prev_day_high": "N/A",
+        "prev_day_low": "N/A",
+        "current_day_high": "N/A",
+        "current_day_low": "N/A",
+        "vwap_distance_pct": "N/A",
+        "open_distance_pct": "N/A",
+        "bias_label": "NEUTRAL",
+        "confidence": 0,
+        "setup_notes": ["Waiting for Oracle market data"],
+        "checklist": [{"label": "Oracle data available", "status": "WATCH", "class": "yellow"}],
+        "trade": "NO TRADE",
+        "trade_type": "No trade",
+        "short_strike": "N/A",
+        "long_strike": "N/A",
+        "credit": "N/A",
+        "max_profit": "N/A",
+        "max_risk": "N/A",
+        "net_gex_billions": "N/A",
+        "chart_html": "",
+        "source_table": SOURCE_TABLE,
+    }
+    for key, value in defaults.items():
+        data.setdefault(key, value)
+    return data
 
 
 @app.route("/settings", methods=["POST"])
@@ -2736,6 +3130,20 @@ def index():
     settings = load_settings()
     data = run_web_service(settings)
     return render_template_string(HTML, data=data, favicon_version=FAVICON_VERSION)
+
+
+@app.route("/terminal")
+def modern_terminal():
+    settings = load_settings()
+    data = ensure_terminal_display_data(run_web_service(settings))
+    return render_template_string(TERMINAL_HTML, data=data, favicon_version=FAVICON_VERSION)
+
+
+@app.route("/hud")
+def hud():
+    settings = load_settings()
+    data = ensure_terminal_display_data(run_web_service(settings))
+    return render_template_string(HUD_HTML, data=data, favicon_version=FAVICON_VERSION)
 
 
 @app.route("/gex")

@@ -58,15 +58,15 @@ logger = logging.getLogger("ticker-collector")
 def normalize_input_tickers(argv: List[str]) -> List[str]:
     """
     Accept either:
-      python3 script.py SPY SPX QQQ
-      python3 script.py SPY,SPX,QQQ
-      python3 script.py SPY-SPX-QQQ
-      python3 script.py SPY_SPX_QQQ
+      python3 script.py SPY SPX
+      python3 script.py SPY,SPX
+      python3 script.py SPY-SPX
+      python3 script.py SPY_SPX
     """
     if len(argv) < 2:
         print("Usage: python3 getTickerData.py <TICKER1> [TICKER2 ...]")
-        print("   or: python3 getTickerData.py SPY,SPX,QQQ")
-        print("   or: python3 getTickerData.py SPY-SPX-QQQ")
+        print("   or: python3 getTickerData.py SPY,SPX")
+        print("   or: python3 getTickerData.py SPY-SPX")
         sys.exit(1)
 
     raw = []
