@@ -506,8 +506,8 @@ TERMINAL_HTML = """
         .setup-table td:first-child{width:34%; color:#dffcff;}
         .setup-table td:last-child{width:66%; white-space:normal; overflow-wrap:anywhere;}
         .trade-state{font-weight:900; text-transform:uppercase;}
-        .trade-state.trade{color:var(--green);}
-        .trade-state.no-trade{color:var(--red);}
+        .panel-title .trade-state.trade{color:var(--green);}
+        .panel-title .trade-state.no-trade{color:var(--red);}
         .option-grid table{min-width:0;}
         .ladder td{font-size:13px; padding:7px 6px;}
         .selected-short{outline:1px solid var(--red); color:var(--red); background:rgba(255,49,72,.08);}
