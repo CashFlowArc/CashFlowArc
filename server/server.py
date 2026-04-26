@@ -399,14 +399,18 @@ TERMINAL_HTML = """
             inset:0;
             pointer-events:none;
             background:
-                linear-gradient(90deg, transparent 0 8%, rgba(0,229,240,.14) 12%, transparent 16% 54%, rgba(82,165,255,.10) 58%, transparent 62%),
-                linear-gradient(0deg, transparent 0 18%, rgba(0,229,240,.10) 19%, transparent 20% 72%, rgba(0,229,240,.08) 73%, transparent 74%);
-            background-size:620px 100%,100% 360px;
-            animation:pulse-lines 7s linear infinite;
-            opacity:.24;
+                radial-gradient(circle, rgba(82,165,255,.75) 0 2px, transparent 3px),
+                radial-gradient(circle, rgba(0,229,240,.65) 0 2px, transparent 3px),
+                linear-gradient(90deg, transparent 0 9%, rgba(0,229,240,.13) 9% 9.25%, transparent 9.25% 28%, rgba(0,229,240,.10) 28% 28.25%, transparent 28.25%),
+                linear-gradient(0deg, transparent 0 18%, rgba(0,229,240,.10) 18% 18.25%, transparent 18.25% 58%, rgba(82,165,255,.09) 58% 58.25%, transparent 58.25%),
+                linear-gradient(135deg, transparent 0 48%, rgba(0,229,240,.08) 48% 48.3%, transparent 48.3%);
+            background-size:360px 220px,420px 280px,360px 220px,360px 220px,280px 280px;
+            background-position:0 0,130px 80px,0 0,0 0,0 0;
+            animation:circuit-pulse 6.5s linear infinite;
+            opacity:.26;
             mix-blend-mode:screen;
         }
-        @keyframes pulse-lines{0%{background-position:-620px 0,0 -360px; opacity:.13}45%{opacity:.27}100%{background-position:620px 0,0 360px; opacity:.13}}
+        @keyframes circuit-pulse{0%{background-position:-40px 38px,130px -30px,0 0,0 0,0 0}50%{opacity:.34}100%{background-position:320px 38px,130px 250px,0 0,0 0,0 0}}
         .shell{min-height:100vh; padding:18px; display:grid; grid-template-rows:auto 1fr auto; gap:18px;}
         .topbar,.controlbar,.tickerbar,.panel{
             position:relative;
@@ -484,7 +488,11 @@ TERMINAL_HTML = """
         .confidence-label{color:#c8f8ff; text-transform:uppercase; font-size:11px; font-weight:900; letter-spacing:.06em;}
         .ring{height:118px; width:118px; border-radius:50%; display:grid; place-items:center; color:var(--text); font-size:30px; font-weight:900; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); box-shadow:0 0 20px rgba(28,255,115,.18);}
         .ring span{height:82px; width:82px; border-radius:50%; display:grid; place-items:center; background:#061016;}
-        .notes{margin:0; padding-left:18px; color:var(--text); line-height:1.65; font-size:14px;}
+        .notes{margin:0; padding-left:24px; line-height:1.58; font-size:14px;}
+        .notes li{padding-left:4px;}
+        .notes li::marker{font-size:1.42em;}
+        .notes li.green{color:var(--green); font-weight:800;}
+        .notes li.red{color:var(--red); font-weight:800;}
         .market-grid{display:grid; grid-template-columns:minmax(560px,.8fr) minmax(680px,1fr); gap:18px;}
         .market-grid .panel{min-height:170px;}
         table{width:100%; border-collapse:collapse;}
@@ -507,9 +515,16 @@ TERMINAL_HTML = """
         .pl-profile:before{content:""; position:absolute; inset:12px; background:linear-gradient(rgba(142,170,179,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(142,170,179,.16) 1px, transparent 1px); background-size:100% 50%,25% 100%;}
         .pl-line{position:absolute; left:28px; right:24px; top:22px; height:92px;}
         .pl-line svg{width:100%; height:100%; overflow:visible;}
+        .radar-wrap{display:grid; justify-items:center; gap:6px;}
         .radar{height:112px; width:112px; border-radius:50%; margin:auto; position:relative; background:radial-gradient(circle, rgba(28,255,115,.95) 0 5px, transparent 6px), repeating-radial-gradient(circle, rgba(0,229,240,.28) 0 1px, transparent 1px 15px), conic-gradient(from 180deg, rgba(28,255,115,.38), transparent 35%, rgba(0,229,240,.15) 70%, transparent);}
         .radar:before,.radar:after{content:""; position:absolute; left:50%; top:0; bottom:0; border-left:1px solid rgba(0,229,240,.35);}
         .radar:after{transform:rotate(90deg);}
+        .radar b{position:absolute; color:#8eaab3; font-size:10px; font-weight:900;}
+        .radar .n{top:-2px; left:50%; transform:translateX(-50%);}
+        .radar .e{right:5px; top:50%; transform:translateY(-50%);}
+        .radar .s{bottom:-2px; left:50%; transform:translateX(-50%);}
+        .radar .w{left:5px; top:50%; transform:translateY(-50%);}
+        .radar-caption{color:var(--cyan); font-size:10px; text-transform:uppercase; font-weight:900; letter-spacing:.08em;}
         .snapshot-table{table-layout:fixed;}
         .snapshot-table td{white-space:nowrap;}
         .snapshot-table td:nth-child(2),.snapshot-table td:nth-child(4){text-align:right;}
@@ -582,7 +597,7 @@ TERMINAL_HTML = """
                 <div class="hero-inner">
                     <div class="muted">S&P 500 INDEX</div>
                     <div class="symbol">SPX</div>
-                    <div class="price">{{ data.price }}</div>
+                    <div class="price">{{ data.price_display }}</div>
                     <div class="change {{ data.daily_change_class }}">{{ data.daily_change }} ({{ data.daily_change_pct }}%)</div>
                 </div>
             </section>
@@ -612,7 +627,7 @@ TERMINAL_HTML = """
                 </div>
                 <ul class="notes">
                     {% for note in data.setup_notes %}
-                    <li>{{ note }}</li>
+                    <li class="{{ note.class }}">{{ note.label }}</li>
                     {% endfor %}
                 </ul>
             </section>
@@ -675,7 +690,10 @@ TERMINAL_HTML = """
                     <tr><td>{{ item.label }}</td><td class="{{ item.class }}">{{ item.status }}</td></tr>
                     {% endfor %}
                 </table>
-                <div class="radar" aria-hidden="true"></div>
+                <div class="radar-wrap" aria-hidden="true">
+                    <div class="radar"><b class="n">N</b><b class="e">E</b><b class="s">S</b><b class="w">W</b></div>
+                    <div class="radar-caption">Range Scan</div>
+                </div>
             </div>
         </section>
     </section>
@@ -798,7 +816,7 @@ HUD_HTML = """
                 <div class="ring" style="--score:{{ data.confidence }}"><span>{{ data.confidence }}%</span></div>
                 <ul>
                     {% for note in data.setup_notes %}
-                    <li>{{ note }}</li>
+                    <li>{{ note.label }}</li>
                     {% endfor %}
                 </ul>
             </section>
@@ -3318,10 +3336,22 @@ def run_web_service(settings: dict) -> dict:
     active_signal_bars = int(round(pass_count / len(checklist) * 6))
     signal_bars = [i < active_signal_bars for i in range(6)]
     setup_notes = [
-        "Price above VWAP" if latest_price > latest_vwap else "Price below VWAP",
-        "EMA9 above EMA21" if latest_ema9 > latest_ema21 else "EMA9 below EMA21",
-        "Breakout beyond opening range" if outside_range else "Inside opening range",
-        "VWAP distance threshold met" if vwap_distance else "VWAP distance below threshold",
+        {
+            "label": "Price above VWAP" if latest_price > latest_vwap else "Price below VWAP",
+            "class": "green" if ((latest_price > latest_vwap and not bearish) or (latest_price < latest_vwap and bearish)) else "red",
+        },
+        {
+            "label": "EMA9 above EMA21" if latest_ema9 > latest_ema21 else "EMA9 below EMA21",
+            "class": "green" if ((latest_ema9 > latest_ema21 and not bearish) or (latest_ema9 < latest_ema21 and bearish)) else "red",
+        },
+        {
+            "label": "Breakout beyond opening range" if outside_range else "Inside opening range",
+            "class": "green" if outside_range else "red",
+        },
+        {
+            "label": "VWAP distance threshold met" if vwap_distance else "VWAP distance below threshold",
+            "class": "green" if vwap_distance else "red",
+        },
     ]
 
     spy_latest = last_valid_number(spy_current["close_price"]) if not spy_current.empty else None
@@ -3378,6 +3408,7 @@ def run_web_service(settings: dict) -> dict:
         "header_date": now_et.strftime("%b %d, %Y").upper(),
         "header_weekday": now_et.strftime("%a").upper(),
         "price": int(round(latest_price, 0)),
+        "price_display": f"{latest_price:,.2f}",
         "vwap": int(round(latest_vwap, 0)),
         "ema9": int(round(latest_ema9, 0)),
         "ema21": int(round(latest_ema21, 0)),
@@ -3439,6 +3470,7 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "header_date": "",
         "header_weekday": "",
         "price": "N/A",
+        "price_display": "N/A",
         "spy_price": "N/A",
         "vwap": "N/A",
         "open_price": "N/A",
@@ -3461,7 +3493,7 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "bias_label": "NEUTRAL",
         "confidence": 0,
         "signal_bars": [False, False, False, False, False, False],
-        "setup_notes": ["Waiting for Oracle market data"],
+        "setup_notes": [{"label": "Waiting for Oracle market data", "class": "red"}],
         "checklist": [{"label": "Oracle data available", "status": "WATCH", "class": "yellow"}],
         "trade": "NO TRADE",
         "trade_type": "No trade",
