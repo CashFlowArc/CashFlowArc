@@ -392,19 +392,23 @@ TERMINAL_HTML = """
             border-bottom:1px solid rgba(0,229,240,.14);
             clip-path:polygon(14px 0,42% 0,42% 1px,14px 1px,14px 14px,13px 14px,13px 0,0 0,0 13px,1px 13px,1px 1px,14px 1px);
         }
-        .topbar{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:18px; padding:10px 18px; min-height:70px;}
+        .topbar{display:grid; grid-template-columns:minmax(280px,1fr) auto minmax(440px,1fr); align-items:center; gap:18px; padding:10px 18px; min-height:76px;}
         .brand{text-align:center}
         .brand h1{margin:0; font-size:34px; letter-spacing:0; line-height:.95; text-shadow:0 0 16px rgba(255,255,255,.22), 0 0 24px rgba(0,229,240,.22);}
         .brand p{margin:8px 0 0; color:#b5e9f0; font-size:13px; text-transform:uppercase;}
-        .timeblock{display:flex; gap:18px; align-items:center; color:var(--text); font-size:16px; font-weight:800;}
-        .nav-links{display:flex; justify-content:flex-end; gap:7px; flex-wrap:wrap;}
-        .nav-link{color:var(--muted); text-decoration:none; font-size:12px; font-weight:900; padding:8px 10px; border:1px solid rgba(0,229,240,.25); background:rgba(0,10,14,.7); text-transform:uppercase;}
-        .nav-link.active{color:var(--text); border-color:var(--cyan); box-shadow:0 0 12px rgba(0,229,240,.2), inset 0 0 0 1px rgba(0,229,240,.35);}
+        .timeblock{justify-self:start; display:grid; grid-template-columns:auto auto; gap:8px 16px; align-items:center; color:var(--text); font-size:15px; font-weight:800; padding:12px 18px; min-width:280px; border:1px solid rgba(0,229,240,.25); background:linear-gradient(135deg, rgba(0,229,240,.10), rgba(0,9,13,.55)); clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);}
+        .timeblock .label{grid-column:1 / -1; color:var(--muted); font-size:10px; letter-spacing:.08em; text-transform:uppercase;}
+        .nav-panel{justify-self:end; display:grid; gap:6px; justify-items:end;}
+        .market-readout{text-align:right; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.02em;}
+        .market-readout b{display:inline-block; margin-right:8px; font-size:16px;}
+        .nav-links{display:flex; justify-content:flex-end; gap:7px; flex-wrap:wrap; opacity:.74;}
+        .nav-link{color:var(--muted); text-decoration:none; font-size:11px; font-weight:900; padding:7px 9px; border:1px solid rgba(0,229,240,.18); background:rgba(0,10,14,.38); text-transform:uppercase;}
+        .nav-link.active{color:#dffcff; border-color:rgba(0,229,240,.48); box-shadow:inset 0 0 0 1px rgba(0,229,240,.18);}
         .market{color:var(--green); font-weight:900; text-align:right; text-transform:uppercase;}
         .layout{display:grid; grid-template-columns:minmax(520px,1.1fr) minmax(330px,.72fr) minmax(510px,1.05fr); gap:14px; align-items:stretch;}
         .stack{display:grid; gap:14px; align-content:start;}
         .left-stack{grid-template-rows:auto auto;}
-        .center-stack{grid-template-rows:230px 118px 104px;}
+        .center-stack{grid-template-rows:224px 148px 124px;}
         .right-stack{grid-template-rows:auto auto;}
         .panel{padding:14px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; color:#c8f8ff; text-transform:uppercase; font-size:13px; font-weight:900; letter-spacing:.02em;}
@@ -415,14 +419,24 @@ TERMINAL_HTML = """
         .hero-inner{width:100%; display:grid; justify-items:center; gap:8px;}
         .symbol{font-size:56px; font-weight:900; line-height:.9; text-shadow:0 0 18px rgba(255,255,255,.24);}
         .price{font-size:56px; color:#42f0ba; font-weight:900; line-height:.95; text-shadow:0 0 26px rgba(28,255,115,.36), 0 0 44px rgba(66,240,186,.18);}
-        .change{font-size:18px; color:var(--green); font-weight:900;}
-        .signal{text-align:center; padding:14px 18px;}
+        .change{font-size:18px; font-weight:900;}
+        .signal{position:relative; text-align:center; padding:14px 18px;}
+        .signal-content{position:relative; z-index:1;}
+        .signal-icons{position:absolute; inset:16px 20px auto 20px; display:flex; justify-content:space-between; pointer-events:none;}
+        .signal-icon{width:78px; height:58px; opacity:.16; filter:drop-shadow(0 0 0 transparent); transition:opacity .2s ease, filter .2s ease;}
+        .signal-icon svg{width:100%; height:100%;}
+        .signal-icon.active{opacity:1; filter:drop-shadow(0 0 16px rgba(28,255,115,.44));}
+        .signal-icon.bear.active{filter:drop-shadow(0 0 16px rgba(255,49,72,.42));}
+        .signal-icon.bull{color:var(--green);}
+        .signal-icon.bear{color:var(--red);}
         .signal span{color:#c8f8ff; text-transform:uppercase; font-weight:900; font-size:14px;}
         .signal strong{display:block; color:var(--green); font-size:34px; line-height:1; margin-top:6px; text-shadow:0 0 18px rgba(28,255,115,.32);}
+        .signal strong.red{color:var(--red); text-shadow:0 0 18px rgba(255,49,72,.30);}
+        .signal strong.yellow{color:var(--yellow); text-shadow:0 0 18px rgba(255,196,0,.24);}
         .bars{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:14px;}
         .bars i{height:6px; background:rgba(142,170,179,.24); border-radius:1px;}
         .bars i.on{background:var(--green); box-shadow:0 0 10px rgba(28,255,115,.45);}
-        .confidence{display:grid; grid-template-columns:112px 1fr; gap:14px; align-items:center;}
+        .confidence{display:grid; grid-template-columns:112px 1fr; gap:18px; align-items:center;}
         .ring{height:92px; width:92px; border-radius:50%; display:grid; place-items:center; color:var(--text); font-size:24px; font-weight:900; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); box-shadow:0 0 20px rgba(28,255,115,.18);}
         .ring span{height:64px; width:64px; border-radius:50%; display:grid; place-items:center; background:#061016;}
         .notes{margin:0; padding-left:18px; color:var(--text); line-height:1.65; font-size:14px;}
@@ -448,7 +462,7 @@ TERMINAL_HTML = """
         .tickerbar{display:flex; align-items:center; gap:30px; overflow:auto; white-space:nowrap; padding:10px 18px;}
         .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 1460px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:430px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-links{justify-content:center}.timeblock{justify-content:center}}
+        @media (max-width: 1460px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.chart-wrap{height:430px}.topbar{grid-template-columns:1fr}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.timeblock{justify-self:center;justify-content:center}}
         @media (max-width: 860px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}}
     </style>
 </head>
@@ -456,6 +470,7 @@ TERMINAL_HTML = """
 <main class="shell">
     <header class="topbar">
         <div class="timeblock">
+            <span class="label">Session Timestamp</span>
             <span>{{ data.time }}</span>
             <span>SPX</span>
         </div>
@@ -463,14 +478,17 @@ TERMINAL_HTML = """
             <h1>CashFlowArc Terminal</h1>
             <p>S&P 500 Index - SPX - Last update {{ data.time }}</p>
         </div>
-        <nav class="nav-links">
-            <a class="nav-link active" href="/terminal">Modern Terminal</a>
-            <a class="nav-link" href="/hud">AR HUD</a>
-            <a class="nav-link" href="/">Classic Terminal</a>
-            <a class="nav-link" href="/gex">SPX GEX</a>
-            <a class="nav-link" href="/option-chain">Option Chain</a>
-            <a class="nav-link" href="/simulator">Simulator</a>
-        </nav>
+        <div class="nav-panel">
+            <div class="market-readout"><b class="{{ data.market_status_class }}">{{ data.market_status }}</b>{{ data.market_hours }}</div>
+            <nav class="nav-links">
+                <a class="nav-link active" href="/terminal">Modern Terminal</a>
+                <a class="nav-link" href="/hud">AR HUD</a>
+                <a class="nav-link" href="/">Classic Terminal</a>
+                <a class="nav-link" href="/gex">SPX GEX</a>
+                <a class="nav-link" href="/option-chain">Option Chain</a>
+                <a class="nav-link" href="/simulator">Simulator</a>
+            </nav>
+        </div>
     </header>
 
     {% if data.error %}
@@ -479,7 +497,7 @@ TERMINAL_HTML = """
     <section class="layout">
         <div class="stack left-stack">
             <section class="panel">
-                <div class="panel-title"><span>SPX {{ data.chart_interval }}</span><span>{{ data.price }}</span></div>
+                <div class="panel-title"><span>SPX {{ data.chart_interval }}</span><span>Updated {{ data.last_update_date }}</span></div>
                 <div class="chart-wrap">{{ data.chart_html|safe }}</div>
             </section>
         </div>
@@ -490,13 +508,38 @@ TERMINAL_HTML = """
                     <div class="muted">S&P 500 INDEX</div>
                     <div class="symbol">SPX</div>
                     <div class="price">{{ data.price }}</div>
-                    <div class="change">VWAP {{ data.vwap_distance_pct }}% - {{ data.bias_label }}</div>
+                    <div class="change {{ data.daily_change_class }}">{{ data.daily_change }} ({{ data.daily_change_pct }}%)</div>
                 </div>
             </section>
             <section class="panel signal">
-                <span>TRADE SIGNAL</span>
-                <strong>{{ data.bias_label }}</strong>
-                <div class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="{{ 'on' if data.confidence >= 80 else '' }}"></i><i class="{{ 'on' if data.confidence >= 95 else '' }}"></i></div>
+                <div class="signal-icons">
+                    <div class="signal-icon bull {{ 'active' if data.bullish else '' }}" aria-hidden="true">
+                        <svg viewBox="0 0 96 72" fill="none">
+                            <path d="M25 28C12 21 9 10 10 4C22 8 31 14 36 23" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M71 28C84 21 87 10 86 4C74 8 65 14 60 23" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M25 34C25 21 36 14 48 14C60 14 71 21 71 34C71 50 61 62 48 62C35 62 25 50 25 34Z" stroke="currentColor" stroke-width="5"/>
+                            <path d="M39 39H39.5M56.5 39H57" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+                            <path d="M42 51C46 54 50 54 54 51" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="signal-icon bear {{ 'active' if data.bearish else '' }}" aria-hidden="true">
+                        <svg viewBox="0 0 96 72" fill="none">
+                            <path d="M25 24C21 12 27 7 36 15M71 24C75 12 69 7 60 15" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                            <path d="M22 38C22 24 34 13 48 13C62 13 74 24 74 38C74 53 63 63 48 63C33 63 22 53 22 38Z" stroke="currentColor" stroke-width="5"/>
+                            <path d="M38 36H38.5M57.5 36H58" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+                            <path d="M39 52C45 47 51 47 57 52" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="signal-content">
+                    <span>TRADE SIGNAL</span>
+                    <strong class="{{ 'green' if data.bullish else ('red' if data.bearish else 'yellow') }}">{{ data.bias_label }}</strong>
+                    <div class="bars">
+                        {% for bar_on in data.signal_bars %}
+                        <i class="{{ 'on' if bar_on else '' }}"></i>
+                        {% endfor %}
+                    </div>
+                </div>
             </section>
             <section class="panel confidence">
                 <div class="ring" style="--score:{{ data.confidence }}"><span>{{ data.confidence }}%</span></div>
@@ -514,15 +557,15 @@ TERMINAL_HTML = """
                 <div class="option-grid">
                     <table>
                         <tr><td>Type</td><td class="{{ 'green' if data.trade != 'NO TRADE' else 'yellow' }}">{{ data.trade_type }}</td></tr>
-                        <tr><td>Short Strike</td><td class="red">{{ data.short_strike }}</td></tr>
-                        <tr><td>Long Strike</td><td class="green">{{ data.long_strike }}</td></tr>
+                        <tr><td>Short Strike</td><td>{{ data.short_strike }}</td></tr>
+                        <tr><td>Long Strike</td><td>{{ data.long_strike }}</td></tr>
                         <tr><td>Credit</td><td class="placeholder">{{ data.credit }}</td></tr>
                         <tr><td>Delta (Net)</td><td class="placeholder">Needs option Greeks</td></tr>
                         <tr><td>Max Profit</td><td class="placeholder">{{ data.max_profit }}</td></tr>
                         <tr><td>Max Risk</td><td class="placeholder">{{ data.max_risk }}</td></tr>
                         <tr><td>POP</td><td class="placeholder">Needs probability model</td></tr>
                         <tr><td>Breakeven</td><td class="placeholder">Needs option pricing</td></tr>
-                        <tr><td>Net GEX</td><td>{{ data.net_gex_billions }}</td></tr>
+                        <tr><td>Net GEX</td><td class="{{ data.net_gex_signal_class }}">{{ data.net_gex_billions }}</td></tr>
                     </table>
                     <table class="ladder">
                         <tr><th>Strike</th><th>Put</th><th>Call</th></tr>
@@ -670,7 +713,11 @@ HUD_HTML = """
             <section class="panel signal">
                 <span>Trade Signal</span>
                 <strong>{{ data.bias_label }}</strong>
-                <div class="bars"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="{{ 'on' if data.confidence >= 80 else '' }}"></i><i class="{{ 'on' if data.confidence >= 95 else '' }}"></i></div>
+                <div class="bars">
+                    {% for bar_on in data.signal_bars %}
+                    <i class="{{ 'on' if bar_on else '' }}"></i>
+                    {% endfor %}
+                </div>
             </section>
             <section class="panel confidence">
                 <div class="ring" style="--score:{{ data.confidence }}"><span>{{ data.confidence }}%</span></div>
@@ -2549,8 +2596,20 @@ def chart_interval_minutes(chart_interval: str) -> int:
 def rolling_regular_session_candle_count(chart_interval: str) -> int:
     regular_session_minutes = 390
     interval_minutes = chart_interval_minutes(chart_interval)
-    full_session_candles = math.ceil(regular_session_minutes / interval_minutes)
-    return max(1, full_session_candles + math.ceil(full_session_candles / 2))
+    full_session_candles = math.floor(regular_session_minutes / interval_minutes) + 1
+    return max(1, full_session_candles + math.ceil(full_session_candles / 4))
+
+
+def market_status_info(now_et: pd.Timestamp) -> dict:
+    market_open = dt.time(9, 30)
+    market_close = dt.time(16, 0)
+    is_weekday = now_et.weekday() < 5
+    is_open = is_weekday and market_open <= now_et.time() < market_close
+    return {
+        "market_status": "MARKET OPEN" if is_open else "MARKET CLOSED",
+        "market_status_class": "green" if is_open else "yellow",
+        "market_hours": "TRADING HOURS - 09:30 AM - 04:00 PM ET",
+    }
 
 
 def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_day_high: float, prev_day_low: float, chart_interval: str, start_of_day: pd.Timestamp) -> str:
@@ -2689,15 +2748,16 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
     )
     fig.add_annotation(
         x=start_of_day_x,
-        y=1,
+        y=0.94,
         xref="x",
         yref="paper",
-        text="Start of Day",
+        text="Start",
         showarrow=False,
         xanchor="left",
-        yanchor="bottom",
-        font=dict(color="#4da3ff", size=12),
-        bgcolor="#17202b",
+        yanchor="top",
+        xshift=8,
+        font=dict(color="#4da3ff", size=11),
+        bgcolor="rgba(23,32,43,0.78)",
         borderpad=2,
     )
 
@@ -2946,10 +3006,13 @@ def make_chart(spx_1m: pd.DataFrame, range_high: float, range_low: float, prev_d
 def run_web_service(settings: dict) -> dict:
     now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     start_utc = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=LOOKBACK_DAYS)
-    current_et_date = pd.Timestamp.now(tz=TIMEZONE).date()
+    now_et = pd.Timestamp.now(tz=TIMEZONE)
+    current_et_date = now_et.date()
+    market_info = market_status_info(now_et)
     net_gex_billions = "N/A"
     net_gex_date = ""
     net_gex_class = ""
+    net_gex_signal_class = "yellow"
     net_gex_subtext = "Stored options snapshot unavailable"
 
     with get_connection() as conn:
@@ -3014,8 +3077,9 @@ def run_web_service(settings: dict) -> dict:
     latest_ema21 = last_valid_number(spx_current["ema21_spx"])
     open_price = first_valid_number(spx_current["open_price"])
     latest_vwap = last_valid_number(spx_current["vwap_spx_proxy"])
+    prev_close = last_valid_number(chart_spx[chart_spx["ts"].dt.date == prev_date]["close_price"])
 
-    if None in {latest_price, latest_ema9, latest_ema21, open_price, latest_vwap}:
+    if None in {latest_price, latest_ema9, latest_ema21, open_price, latest_vwap, prev_close}:
         return {"time": now, "error": f"Missing current-session values in {SOURCE_TABLE}.", **settings}
 
     opening_df = spx_current[
@@ -3037,6 +3101,8 @@ def run_web_service(settings: dict) -> dict:
     outside_range = (latest_price > range_high) or (latest_price < range_low)
     vwap_distance_pct = abs(latest_price - latest_vwap) / latest_price * 100.0 if latest_price else float("nan")
     open_distance_pct = abs(latest_price - open_price) / open_price * 100.0 if open_price else float("nan")
+    daily_change = latest_price - prev_close
+    daily_change_pct = daily_change / prev_close * 100.0 if prev_close else float("nan")
 
     vwap_distance = pd.notna(vwap_distance_pct) and vwap_distance_pct >= 0.15
     open_distance = pd.notna(open_distance_pct) and open_distance_pct > 0.30
@@ -3078,6 +3144,9 @@ def run_web_service(settings: dict) -> dict:
         },
     ]
     confidence = int(round(sum(1 for item in checklist if item["status"] == "PASS") / len(checklist) * 100))
+    pass_count = sum(1 for item in checklist if item["status"] == "PASS")
+    active_signal_bars = int(round(pass_count / len(checklist) * 6))
+    signal_bars = [i < active_signal_bars for i in range(6)]
     setup_notes = [
         "Price above VWAP" if latest_price > latest_vwap else "Price below VWAP",
         "EMA9 above EMA21" if latest_ema9 > latest_ema21 else "EMA9 below EMA21",
@@ -3109,9 +3178,11 @@ def run_web_service(settings: dict) -> dict:
             net_gex_date = expiration_date.isoformat()
         if net_gex > 0:
             net_gex_class = "gex-positive"
+            net_gex_signal_class = "green"
             net_gex_subtext = "Positive gamma regime"
         elif net_gex < 0:
             net_gex_class = "gex-negative"
+            net_gex_signal_class = "red"
             net_gex_subtext = "Negative gamma regime"
         else:
             net_gex_subtext = "Flat gamma regime"
@@ -3141,7 +3212,11 @@ def run_web_service(settings: dict) -> dict:
         "prev_day_low": int(round(prev_day_low, 0)),
         "current_day_high": int(round(current_day_high, 0)),
         "current_day_low": int(round(current_day_low, 0)),
+        "last_update_date": current_et_date.isoformat(),
         "spy_price": "N/A" if spy_latest is None else f"{spy_latest:,.2f}",
+        "daily_change": f"{daily_change:+,.2f}",
+        "daily_change_pct": "N/A" if pd.isna(daily_change_pct) else f"{daily_change_pct:+.2f}",
+        "daily_change_class": "green" if daily_change >= 0 else "red",
         "vwap_distance_pct": "N/A" if pd.isna(vwap_distance_pct) else round(vwap_distance_pct, 3),
         "open_distance_pct": "N/A" if pd.isna(open_distance_pct) else round(open_distance_pct, 3),
         "outside_range": outside_range,
@@ -3150,11 +3225,14 @@ def run_web_service(settings: dict) -> dict:
         "net_gex_billions": net_gex_billions,
         "net_gex_date": net_gex_date,
         "net_gex_class": net_gex_class,
+        "net_gex_signal_class": net_gex_signal_class,
         "net_gex_subtext": net_gex_subtext,
+        **market_info,
         "bullish": bullish,
         "bearish": bearish,
         "bias_label": bias_label,
         "confidence": confidence,
+        "signal_bars": signal_bars,
         "setup_notes": setup_notes,
         "checklist": checklist,
         "trade": trade,
@@ -3187,10 +3265,15 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "prev_day_low": "N/A",
         "current_day_high": "N/A",
         "current_day_low": "N/A",
+        "last_update_date": dt.date.today().isoformat(),
+        "daily_change": "N/A",
+        "daily_change_pct": "N/A",
+        "daily_change_class": "yellow",
         "vwap_distance_pct": "N/A",
         "open_distance_pct": "N/A",
         "bias_label": "NEUTRAL",
         "confidence": 0,
+        "signal_bars": [False, False, False, False, False, False],
         "setup_notes": ["Waiting for Oracle market data"],
         "checklist": [{"label": "Oracle data available", "status": "WATCH", "class": "yellow"}],
         "trade": "NO TRADE",
@@ -3201,6 +3284,10 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "max_profit": "N/A",
         "max_risk": "N/A",
         "net_gex_billions": "N/A",
+        "net_gex_signal_class": "yellow",
+        "market_status": "MARKET CLOSED",
+        "market_status_class": "yellow",
+        "market_hours": "TRADING HOURS - 09:30 AM - 04:00 PM ET",
         "chart_html": "",
         "source_table": SOURCE_TABLE,
     }
