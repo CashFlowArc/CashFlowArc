@@ -1944,7 +1944,9 @@ TERMINAL_PAGE_HTML = """
                 <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
                 <span class="debug-slider"></span>
             </label>
+            {% if data.active_tab != 'simulator' %}
             <input type="date" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+            {% endif %}
             <select name="debug_time">
                 <option value="">Time</option>
                 {% for option in data.debug_time_options %}
@@ -2097,7 +2099,7 @@ OPTION_CHAIN_TERMINAL_CONTENT = """
 
 SIMULATOR_TERMINAL_CONTENT = """
 <section class="panel">
-    <div class="panel-title"><span>Simulator</span><span>Debug Date {{ data.trade_date or data.debug_trade_date or 'Not Selected' }}</span></div>
+    <div class="panel-title"><span>Simulator</span><span>Playback Date {{ data.trade_date or 'Not Selected' }}</span></div>
     <form id="simulator-form" method="get" action="/simulator" class="simulator-controls">
         <span class="control-label">Ticker</span>
         <input id="simulator-ticker" class="ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
@@ -2116,10 +2118,10 @@ SIMULATOR_TERMINAL_CONTENT = """
     <section class="panel terminal-metric simulator-status">
         <div class="metric-label">Status</div>
         <div id="simulator-status" class="metric-value">Ready</div>
-        <div class="metric-sub">Simulation clock. Date is controlled by the debug date in the header.</div>
+        <div class="metric-sub">Simulation clock. Debug mode uses the selected debug date; live mode uses today.</div>
     </section>
     <div id="simulator-chart" class="chart-wrap simulator-chart"></div>
-    <p class="terminal-note" style="margin-top:16px;">Simulation uses the terminal debug date and Oracle data aggregated into 5-minute candles. Rendering stops after the final intraday candle for the session.</p>
+    <p class="terminal-note" style="margin-top:16px;">Simulation uses the selected debug date when debug mode is enabled; otherwise it uses today's Eastern date. Rendering stops after the final intraday candle for the session.</p>
 </section>
 """
 
@@ -3922,6 +3924,13 @@ def render_terminal_page(
     )
 
 
+def get_simulator_effective_trade_date(settings: dict) -> str:
+    today = pd.Timestamp.now(tz=TIMEZONE).date().isoformat()
+    if not settings.get("debug_mode", False):
+        return today
+    return str(settings.get("debug_trade_date", "") or "").strip() or today
+
+
 @app.route("/settings", methods=["POST"])
 def update_settings():
     current = load_settings()
@@ -4115,7 +4124,7 @@ def simulator():
     raw_wide = request.args.get("wide")
     raw_execute_time = request.args.get("execute_time")
     raw_execution_end_time = request.args.get("execution_end_time")
-    effective_trade_date = str(settings.get("debug_trade_date", "") or "").strip() or None
+    effective_trade_date = get_simulator_effective_trade_date(settings)
     try:
         data = run_simulator_service(
             settings,
