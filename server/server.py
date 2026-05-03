@@ -614,7 +614,7 @@ TERMINAL_HTML = """
         .debug-form{display:flex; align-items:center; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:11px; text-transform:uppercase;}
         .debug-form input,.debug-form select{height:28px; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 8px; font:inherit;}
         .debug-form .refresh-input{width:68px;}
-        .debug-readout{height:28px; display:inline-flex; align-items:center; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.58); color:#dffcff; padding:0 9px; font-weight:900;}
+        .debug-date-readout{height:28px; min-width:128px; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 8px; font:inherit; text-transform:none;}
         .debug-switch{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
         .debug-switch input{position:absolute; opacity:0; pointer-events:none;}
         .debug-slider{width:38px; height:20px; border:1px solid rgba(0,229,240,.3); background:rgba(142,170,179,.16); position:relative;}
@@ -742,7 +742,12 @@ TERMINAL_HTML = """
                 <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
                 <span class="debug-slider"></span>
             </label>
-            <input type="date" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+            {% if data.debug_mode %}
+            <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}">
+            {% else %}
+            <input type="hidden" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+            <span class="debug-date-readout">{{ data.debug_control_date }}</span>
+            {% endif %}
             <select name="debug_time">
                 <option value="">Time</option>
                 {% for option in data.debug_time_options %}
@@ -1908,7 +1913,7 @@ TERMINAL_PAGE_HTML = """
         .terminal-button{height:32px; cursor:pointer; border:1px solid rgba(0,229,240,.34); background:linear-gradient(135deg, rgba(0,229,240,.92), rgba(223,252,255,.92)); color:#031014; font-size:11px; font-weight:900; text-transform:uppercase; padding:0 12px;}
         .terminal-button:hover{filter:brightness(1.08);}
         .debug-form .refresh-input{width:68px;}
-        .debug-readout{height:28px; display:inline-flex; align-items:center; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.58); color:#dffcff; padding:0 9px; font-weight:900; white-space:nowrap;}
+        .debug-date-readout{height:28px; min-width:128px; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 8px; font:inherit; text-transform:none; white-space:nowrap;}
         .simulator-status{margin-bottom:16px;}
         .simulator-status .metric-value{font-size:20px; line-height:1.35; white-space:normal; overflow-wrap:anywhere;}
         .simulator-chart{height:640px;}
@@ -1950,10 +1955,11 @@ TERMINAL_PAGE_HTML = """
                 <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
                 <span class="debug-slider"></span>
             </label>
-            {% if data.active_tab != 'simulator' %}
-            <input type="date" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+            {% if data.debug_mode %}
+            <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}">
             {% else %}
-            <span class="debug-readout">Date {{ data.trade_date or data.debug_trade_date or data.last_update_date }}</span>
+            <input type="hidden" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+            <span class="debug-date-readout">{{ data.debug_control_date }}</span>
             {% endif %}
             <select name="debug_time">
                 <option value="">Time</option>
@@ -2107,7 +2113,7 @@ OPTION_CHAIN_TERMINAL_CONTENT = """
 
 SIMULATOR_TERMINAL_CONTENT = """
 <section class="panel">
-    <div class="panel-title"><span>Simulator</span><span>Playback Date {{ data.trade_date or 'Not Selected' }}</span></div>
+    <div class="panel-title"><span>Simulator</span><span>{{ data.debug_control_date }}</span></div>
     <form id="simulator-form" method="get" action="/simulator" class="simulator-controls">
         <span class="control-label">Ticker</span>
         <input id="simulator-ticker" class="ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
@@ -3896,6 +3902,7 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "chart_interval": DEFAULT_SETTINGS["chart_interval"],
         "debug_mode": False,
         "debug_trade_date": "",
+        "debug_control_date": dt.date.today().isoformat(),
         "debug_time": "",
         "debug_time_options": DEBUG_TIME_OPTIONS,
         "chart_html": "",
@@ -3906,6 +3913,9 @@ def ensure_terminal_display_data(data: dict) -> dict:
     }
     for key, value in defaults.items():
         data.setdefault(key, value)
+    today = pd.Timestamp.now(tz=TIMEZONE).date().isoformat()
+    saved_debug_date = str(data.get("debug_trade_date", "") or "").strip()
+    data["debug_control_date"] = (saved_debug_date or today) if data.get("debug_mode", False) else today
     return data
 
 
