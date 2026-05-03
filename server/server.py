@@ -828,18 +828,18 @@ TERMINAL_HTML = """
                 <div class="panel-title"><span>Trade Setup</span><span class="trade-state {{ 'no-trade' if data.trade == 'NO TRADE' else 'trade' }}">{{ data.trade }}</span></div>
                 <div class="option-grid">
                     <table class="setup-table">
-                        <tr><td>Short Strike</td><td>{{ data.short_strike }}</td></tr>
-                        <tr><td>Long Strike</td><td>{{ data.long_strike }}</td></tr>
-                        <tr><td>Credit</td><td class="placeholder">{{ data.credit }}</td></tr>
+                        <tr><td>Short Strikes</td><td>{{ data.short_strike }}</td></tr>
+                        <tr><td>Long Strikes</td><td>{{ data.long_strike }}</td></tr>
+                        <tr><td>Credit</td><td class="{{ data.credit_class }}">{{ data.credit }}</td></tr>
                         <tr><td>Delta (Net)</td><td class="placeholder">Needs option Greeks</td></tr>
-                        <tr><td>Max Profit</td><td class="placeholder">{{ data.max_profit }}</td></tr>
-                        <tr><td>Max Risk</td><td class="placeholder">{{ data.max_risk }}</td></tr>
+                        <tr><td>Max Profit</td><td class="{{ data.max_profit_class }}">{{ data.max_profit }}</td></tr>
+                        <tr><td>Max Risk</td><td class="{{ data.max_risk_class }}">{{ data.max_risk }}</td></tr>
                         <tr><td>POP</td><td class="placeholder">Needs probability model</td></tr>
                         <tr><td>Breakeven</td><td class="placeholder">Needs option pricing</td></tr>
                         <tr><td>Net GEX</td><td class="{{ data.net_gex_signal_class }}">{{ data.net_gex_billions }}</td></tr>
                     </table>
                     <table class="condor-ladder" aria-label="Doug6 iron condor puts and calls">
-                        <tr><th>Doug6 Leg</th><th>Side</th><th>Strike</th></tr>
+                        <tr><th>Legs</th><th>Side</th><th>Strike</th></tr>
                         <tr class="long-leg put-leg"><td>Long Put</td><td>PUT</td><td>{{ data.condor_long_put }}</td></tr>
                         <tr class="short-leg put-leg"><td>Short Put</td><td>PUT</td><td>{{ data.condor_short_put }}</td></tr>
                         <tr class="short-leg call-leg"><td>Short Call</td><td>CALL</td><td>{{ data.condor_short_call }}</td></tr>
@@ -3161,6 +3161,95 @@ def format_strike(value: Optional[float]) -> str:
     return f"{value:,.0f}"
 
 
+def format_trade_currency(value: Optional[float]) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"${float(value):,.2f}"
+
+
+def option_leg_row(options: pd.DataFrame, option_type: str, target_strike: float) -> Optional[pd.Series]:
+    if options is None or options.empty:
+        return None
+    working = options[options["option_type"] == option_type].copy()
+    if working.empty:
+        return None
+    working["strike"] = pd.to_numeric(working.get("strike"), errors="coerce")
+    working = working.dropna(subset=["strike"])
+    if working.empty:
+        return None
+    idx = (working["strike"] - target_strike).abs().idxmin()
+    return working.loc[idx]
+
+
+def option_leg_price(row: Optional[pd.Series], column: str) -> Optional[float]:
+    if row is None:
+        return None
+    value = pd.to_numeric(pd.Series([row.get(column)]), errors="coerce").dropna()
+    if value.empty:
+        return None
+    return float(value.iloc[0])
+
+
+def doug6_as_of_timestamp(trade_date: dt.date, settings: dict) -> pd.Timestamp:
+    execute_time = normalize_execute_time(settings.get("simulator_execute_time", "10:30"))
+    return pd.Timestamp(f"{trade_date.isoformat()} {execute_time}", tz=TIMEZONE)
+
+
+def build_doug6_trade_setup(trade_date: dt.date, settings: dict) -> dict:
+    strike_points = float(settings.get("simulator_points", 70.0))
+    spread_width = float(settings.get("simulator_wide", 20.0))
+    now_et = doug6_as_of_timestamp(trade_date, settings)
+    options, underlying, _, snapshot_ts = fetch_spx_option_chain_for_session(now_et)
+    snapshot_et = pd.Timestamp(snapshot_ts, tz="UTC").tz_convert(TIMEZONE)
+    if snapshot_et.date() != trade_date:
+        raise ValueError("No Doug6 option snapshot was available for the selected trade date at 10:30.")
+    spot_price = float(
+        underlying.get("regularMarketPrice")
+        or underlying.get("postMarketPrice")
+        or underlying.get("preMarketPrice")
+        or underlying.get("previousClose")
+        or 0.0
+    )
+    if spot_price <= 0:
+        raise ValueError("Could not determine Doug6 SPX price from the 10:30 option snapshot.")
+
+    short_put_target = spot_price - strike_points
+    long_put_target = short_put_target - spread_width
+    short_call_target = spot_price + strike_points
+    long_call_target = short_call_target + spread_width
+
+    long_put = option_leg_row(options, "put", long_put_target)
+    short_put = option_leg_row(options, "put", short_put_target)
+    short_call = option_leg_row(options, "call", short_call_target)
+    long_call = option_leg_row(options, "call", long_call_target)
+
+    short_put_bid = option_leg_price(short_put, "bid_price")
+    short_call_bid = option_leg_price(short_call, "bid_price")
+    long_put_ask = option_leg_price(long_put, "ask_price")
+    long_call_ask = option_leg_price(long_call, "ask_price")
+
+    credit: Optional[float] = None
+    max_risk: Optional[float] = None
+    if None not in {short_put_bid, short_call_bid, long_put_ask, long_call_ask}:
+        credit = max(0.0, float(short_put_bid + short_call_bid - long_put_ask - long_call_ask))
+        put_width = abs(float(short_put["strike"]) - float(long_put["strike"])) if short_put is not None and long_put is not None else spread_width
+        call_width = abs(float(long_call["strike"]) - float(short_call["strike"])) if short_call is not None and long_call is not None else spread_width
+        max_risk = max(0.0, max(put_width, call_width) - credit)
+
+    return {
+        "short_strike": f"{format_strike(option_leg_price(short_put, 'strike'))}P / {format_strike(option_leg_price(short_call, 'strike'))}C",
+        "long_strike": f"{format_strike(option_leg_price(long_put, 'strike'))}P / {format_strike(option_leg_price(long_call, 'strike'))}C",
+        "condor_long_put": format_strike(option_leg_price(long_put, "strike")),
+        "condor_short_put": format_strike(option_leg_price(short_put, "strike")),
+        "condor_short_call": format_strike(option_leg_price(short_call, "strike")),
+        "condor_long_call": format_strike(option_leg_price(long_call, "strike")),
+        "credit": format_trade_currency(credit),
+        "max_profit": format_trade_currency(credit),
+        "max_risk": format_trade_currency(max_risk),
+        "doug6_snapshot_time": snapshot_et.strftime("%H:%M %Z"),
+    }
+
+
 def intraday_session_mask(ts_series: pd.Series) -> pd.Series:
     times = ts_series.dt.time
     weekdays = ts_series.dt.weekday < 5
@@ -3845,21 +3934,22 @@ def run_web_service(settings: dict) -> dict:
     ]
 
     spy_latest = last_valid_number(spy_current["close_price"]) if not spy_current.empty else None
-    strike_points = float(settings.get("simulator_points", 70.0))
-    spread_width = float(settings.get("simulator_wide", 20.0))
-    condor_short_put_value = latest_price - strike_points
-    condor_long_put_value = condor_short_put_value - spread_width
-    condor_short_call_value = latest_price + strike_points
-    condor_long_call_value = condor_short_call_value + spread_width
-    if trade == "SELL PUT SPREAD":
-        short_strike_value = condor_short_put_value
-        long_strike_value = condor_long_put_value
-    elif trade == "SELL CALL SPREAD":
-        short_strike_value = condor_short_call_value
-        long_strike_value = condor_long_call_value
-    else:
-        short_strike_value = None
-        long_strike_value = None
+    doug6_setup = {
+        "short_strike": "N/A",
+        "long_strike": "N/A",
+        "condor_long_put": "N/A",
+        "condor_short_put": "N/A",
+        "condor_short_call": "N/A",
+        "condor_long_call": "N/A",
+        "credit": "N/A",
+        "max_profit": "N/A",
+        "max_risk": "N/A",
+        "doug6_snapshot_time": "10:30 ET",
+    }
+    try:
+        doug6_setup.update(build_doug6_trade_setup(current_et_date, settings))
+    except Exception:
+        pass
 
     trade_type = "Bull Put Credit Spread" if trade == "SELL PUT SPREAD" else ("Bear Call Credit Spread" if trade == "SELL CALL SPREAD" else "No trade")
 
@@ -3941,15 +4031,18 @@ def run_web_service(settings: dict) -> dict:
         "checklist": checklist,
         "trade": trade,
         "trade_type": trade_type,
-        "short_strike": format_strike(short_strike_value),
-        "long_strike": format_strike(long_strike_value),
-        "condor_long_put": format_strike(condor_long_put_value),
-        "condor_short_put": format_strike(condor_short_put_value),
-        "condor_short_call": format_strike(condor_short_call_value),
-        "condor_long_call": format_strike(condor_long_call_value),
-        "credit": "Needs option Greeks/selection",
-        "max_profit": "N/A",
-        "max_risk": "N/A",
+        "short_strike": doug6_setup["short_strike"],
+        "long_strike": doug6_setup["long_strike"],
+        "condor_long_put": doug6_setup["condor_long_put"],
+        "condor_short_put": doug6_setup["condor_short_put"],
+        "condor_short_call": doug6_setup["condor_short_call"],
+        "condor_long_call": doug6_setup["condor_long_call"],
+        "credit": doug6_setup["credit"],
+        "credit_class": "placeholder" if doug6_setup["credit"] == "N/A" else "green",
+        "max_profit": doug6_setup["max_profit"],
+        "max_profit_class": "placeholder" if doug6_setup["max_profit"] == "N/A" else "green",
+        "max_risk": doug6_setup["max_risk"],
+        "max_risk_class": "placeholder" if doug6_setup["max_risk"] == "N/A" else "red",
         "structure": structure,
         "chart_html": chart_html,
         "refresh_interval": settings["refresh_interval"],
@@ -4004,8 +4097,11 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "condor_short_call": "N/A",
         "condor_long_call": "N/A",
         "credit": "N/A",
+        "credit_class": "placeholder",
         "max_profit": "N/A",
+        "max_profit_class": "placeholder",
         "max_risk": "N/A",
+        "max_risk_class": "placeholder",
         "net_gex_billions": "N/A",
         "net_gex_signal_class": "yellow",
         "market_status": "MARKET CLOSED",
