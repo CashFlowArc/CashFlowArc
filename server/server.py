@@ -2768,10 +2768,20 @@ def run_simulator_service(
         raise ValueError("Invalid simulator date. Use YYYY-MM-DD.") from exc
 
     with get_connection() as conn:
-        if get_latest_trade_date(conn, ticker, INTERVAL_NAME) is None:
+        latest_trade_date = get_latest_trade_date(conn, ticker, INTERVAL_NAME)
+        if latest_trade_date is None:
             raise ValueError(f"No {ticker} rows were found in {SOURCE_TABLE}.")
 
         day_rows = query_ticker_day(conn, ticker, INTERVAL_NAME, trade_date)
+        today = pd.Timestamp.now(tz=TIMEZONE).date()
+        if (
+            day_rows.empty
+            and not settings.get("debug_mode", False)
+            and trade_date == today
+            and latest_trade_date < trade_date
+        ):
+            trade_date = latest_trade_date
+            day_rows = query_ticker_day(conn, ticker, INTERVAL_NAME, trade_date)
 
     payload = build_simulator_payload(day_rows)
     if not payload:
@@ -2874,10 +2884,12 @@ def query_ticker_history(conn, ticker: str, interval_name: str, start_utc: dt.da
         },
     )
 
+    df.columns = [c.lower() for c in df.columns]
     if df.empty:
+        if "ts" not in df.columns:
+            df["ts"] = pd.to_datetime([])
         return df
 
-    df.columns = [c.lower() for c in df.columns]
     df["ts_utc"] = pd.to_datetime(df["ts_utc"], utc=True)
     df["ts"] = df["ts_utc"].dt.tz_convert(TIMEZONE).dt.tz_localize(None)
     return df.sort_values("ts").reset_index(drop=True)
@@ -2959,6 +2971,9 @@ def query_ticker_day(conn, ticker: str, interval_name: str, trade_date: dt.date)
 
 
 def build_simulator_payload(df: pd.DataFrame) -> list[dict]:
+    if df.empty or "ts" not in df.columns:
+        return []
+
     working = df.copy()
     working = working[intraday_session_mask(working["ts"])].copy()
     working = working[working["ts"].dt.time <= dt.time(16, 0)].copy()
