@@ -750,7 +750,7 @@ TERMINAL_HTML = """
                 <span class="debug-slider"></span>
             </label>
             <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
-                <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
+                <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" max="{{ data.debug_max_date }}" {% if not data.debug_mode %}disabled{% endif %}>
                 <button class="debug-picker-button" type="button" aria-label="Open debug date picker" {% if not data.debug_mode %}disabled{% endif %}></button>
             </span>
             <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
@@ -1982,7 +1982,7 @@ TERMINAL_PAGE_HTML = """
                 <span class="debug-slider"></span>
             </label>
             <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
-                <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
+                <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" max="{{ data.debug_max_date }}" {% if not data.debug_mode %}disabled{% endif %}>
                 <button class="debug-picker-button" type="button" aria-label="Open debug date picker" {% if not data.debug_mode %}disabled{% endif %}></button>
             </span>
             <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
@@ -2198,7 +2198,7 @@ def load_settings() -> dict:
             out["refresh_interval"] = max(15, min(3600, int(out.get("refresh_interval", 30))))
             out["chart_interval"] = str(out.get("chart_interval", "5min"))
             out["debug_mode"] = bool(out.get("debug_mode", False))
-            out["debug_trade_date"] = str(out.get("debug_trade_date", "") or "")
+            out["debug_trade_date"] = normalize_debug_trade_date(out.get("debug_trade_date", ""))
             out["debug_time"] = normalize_simulator_time(out.get("debug_time", ""), "")
             out["simulator_speed"] = max(0.5, min(360.0, float(out.get("simulator_speed", 60.0))))
             out["simulator_points"] = max(0.0, float(out.get("simulator_points", 70.0)))
@@ -2228,6 +2228,26 @@ def normalize_simulator_time(value: Optional[str], default: str) -> str:
         return parsed.strftime("%H:%M")
     except ValueError:
         return default
+
+
+def normalize_debug_trade_date(value: Optional[str], max_date: Optional[str] = None) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parsed = dt.date.fromisoformat(raw[:10])
+    except ValueError:
+        return ""
+    if max_date:
+        try:
+            limit = dt.date.fromisoformat(str(max_date)[:10])
+        except ValueError:
+            limit = pd.Timestamp.now(tz=TIMEZONE).date()
+    else:
+        limit = pd.Timestamp.now(tz=TIMEZONE).date()
+    if parsed > limit:
+        return limit.isoformat()
+    return parsed.isoformat()
 
 
 def normalize_execute_time(value: Optional[str]) -> str:
@@ -3948,6 +3968,7 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "chart_interval": DEFAULT_SETTINGS["chart_interval"],
         "debug_mode": False,
         "debug_trade_date": "",
+        "debug_max_date": dt.date.today().isoformat(),
         "debug_control_date": dt.date.today().isoformat(),
         "debug_time": "",
         "debug_control_time": dt.datetime.now().strftime("%H:%M"),
@@ -3963,8 +3984,10 @@ def ensure_terminal_display_data(data: dict) -> dict:
     now_et = pd.Timestamp.now(tz=TIMEZONE)
     today = now_et.date().isoformat()
     current_time = now_et.strftime("%H:%M")
-    saved_debug_date = str(data.get("debug_trade_date", "") or "").strip()
+    saved_debug_date = normalize_debug_trade_date(data.get("debug_trade_date", ""), today)
     saved_debug_time = normalize_simulator_time(data.get("debug_time", ""), "")
+    data["debug_trade_date"] = saved_debug_date
+    data["debug_max_date"] = today
     data["debug_control_date"] = (saved_debug_date or today) if data.get("debug_mode", False) else today
     data["debug_control_time"] = (saved_debug_time or current_time) if data.get("debug_mode", False) else current_time
     return data
@@ -4033,7 +4056,11 @@ def update_settings():
         debug_mode = str(debug_mode_values[-1]) == "1"
     else:
         debug_mode = bool(current.get("debug_mode", False))
-    debug_trade_date = str(request.form.get("debug_trade_date", current.get("debug_trade_date", "")) or "")
+    today = pd.Timestamp.now(tz=TIMEZONE).date().isoformat()
+    debug_trade_date = normalize_debug_trade_date(
+        request.form.get("debug_trade_date", current.get("debug_trade_date", "")),
+        today,
+    )
     debug_time = normalize_simulator_time(request.form.get("debug_time", current.get("debug_time", "")), "")
 
     try:
