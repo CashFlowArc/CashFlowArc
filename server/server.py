@@ -99,98 +99,241 @@ HTML = """
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <style>
         :root{
-            --panel:#121821;
-            --panel-2:#17202b;
-            --border:#273244;
-            --text:#e8eef7;
-            --muted:#8fa2b7;
-            --green:#1fce7a;
-            --red:#ff5d5d;
-            --yellow:#ffcc66;
+            --bg:#07111f;
+            --panel:rgba(11, 22, 39, 0.84);
+            --panel-2:rgba(15, 30, 52, 0.92);
+            --panel-3:rgba(20, 39, 66, 0.92);
+            --border:rgba(148, 179, 255, 0.14);
+            --text:#edf4ff;
+            --muted:#8fa6c7;
+            --green:#2ad18b;
+            --red:#ff6b6b;
+            --yellow:#ffcf70;
+            --blue:#7cc4ff;
+            --shadow:0 20px 50px rgba(0, 0, 0, 0.34);
         }
         *{box-sizing:border-box}
         body{
             margin:0;
-            font-family:Segoe UI, Arial, sans-serif;
-            background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
+            font-family:"Aptos","Segoe UI Variable","Segoe UI",sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(62, 120, 255, 0.18), transparent 30%),
+                radial-gradient(circle at top right, rgba(42, 209, 139, 0.12), transparent 24%),
+                linear-gradient(180deg, #06111d 0%, #091627 55%, #07111f 100%);
             color:var(--text);
         }
-        .wrap{max-width:1800px; margin:0 auto; padding:18px;}
+        .wrap{max-width:1840px; margin:0 auto; padding:24px;}
         .topbar{
-            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
-            gap:16px; margin-bottom:16px; padding:14px 18px;
-            background:var(--panel); border:1px solid var(--border); border-radius:14px;
+            position:relative;
+            display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap;
+            gap:18px; margin-bottom:20px; padding:22px 24px;
+            background:linear-gradient(180deg, rgba(15, 31, 52, 0.92), rgba(8, 18, 32, 0.92));
+            border:1px solid var(--border);
+            border-radius:24px;
+            box-shadow:var(--shadow);
+            overflow:hidden;
         }
-        .title h1{margin:0; font-size:28px}
-        .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
+        .topbar::after{
+            content:"";
+            position:absolute;
+            inset:auto -80px -90px auto;
+            width:220px;
+            height:220px;
+            border-radius:50%;
+            background:radial-gradient(circle, rgba(124, 196, 255, 0.22), transparent 68%);
+            pointer-events:none;
+        }
+        .title{max-width:680px}
+        .title h1{
+            margin:0;
+            font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif;
+            font-size:34px;
+            line-height:1.05;
+            letter-spacing:0;
+        }
+        .title p{margin:8px 0 0; color:var(--muted); font-size:14px; line-height:1.5}
         .top-right{
             margin-left:auto;
-            display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+            display:flex; align-items:center; justify-content:flex-end; gap:12px; flex-wrap:wrap;
         }
-        .nav-links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+        .nav-links{
+            display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+            padding:6px;
+            border-radius:999px;
+            background:rgba(255,255,255,0.03);
+            border:1px solid rgba(255,255,255,0.05);
+            backdrop-filter:blur(14px);
+        }
         .nav-link{
-            color:var(--muted); text-decoration:none; font-size:13px; font-weight:700;
-            padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
+            color:var(--muted); text-decoration:none; font-size:13px; font-weight:600;
+            padding:10px 14px; border-radius:999px; transition:all .18s ease;
         }
-        .nav-link.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
+        .nav-link:hover{color:var(--text); background:rgba(255,255,255,0.04)}
+        .nav-link.active{
+            color:#04101c;
+            background:linear-gradient(135deg, #8ed4ff, #d7f0ff);
+            box-shadow:0 8px 22px rgba(124, 196, 255, 0.28);
+        }
         .control-form{
             display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-            background:var(--panel-2); border:1px solid var(--border);
-            padding:8px 10px; border-radius:12px;
+            background:rgba(255,255,255,0.035);
+            border:1px solid rgba(255,255,255,0.05);
+            padding:10px 12px; border-radius:16px;
+            backdrop-filter:blur(14px);
         }
-        .control-label{font-size:13px; color:var(--text); font-weight:600}
+        .control-label{
+            font-size:11px; color:var(--muted); font-weight:700;
+            letter-spacing:0.08em; text-transform:uppercase;
+        }
         .text-input{
-            width:88px; background:#0f141b; color:var(--text);
-            border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
+            width:92px;
+            background:rgba(6, 14, 26, 0.82);
+            color:var(--text);
+            border:1px solid rgba(148, 179, 255, 0.18);
+            border-radius:12px;
+            padding:10px 12px;
+            font-size:13px;
+        }
+        .text-input:focus{
+            outline:none;
+            border-color:rgba(124, 196, 255, 0.56);
+            box-shadow:0 0 0 4px rgba(124, 196, 255, 0.12);
+            background:rgba(9, 20, 35, 0.95);
         }
         select.text-input{appearance:auto;}
         .status-pill{
-            padding:10px 14px; border-radius:999px; font-weight:700;
-            border:1px solid var(--border); background:var(--panel-2);
+            padding:11px 16px;
+            border-radius:999px;
+            font-weight:700;
+            font-size:12px;
+            letter-spacing:0.08em;
+            text-transform:uppercase;
+            border:1px solid transparent;
         }
-        .enter{color:#062b18; background:var(--green); border-color:var(--green)}
-        .no{color:#3b0d0d; background:var(--red); border-color:var(--red)}
-        .grid{display:grid; grid-template-columns:1.35fr 0.95fr; gap:16px; align-items:stretch;}
+        .enter{color:#042414; background:linear-gradient(135deg, #39e3a0, #9af1c9); box-shadow:0 12px 24px rgba(42, 209, 139, 0.22)}
+        .no{color:#350b0b; background:linear-gradient(135deg, #ff8f8f, #ffc0c0); box-shadow:0 12px 24px rgba(255, 107, 107, 0.2)}
+        .grid{display:grid; grid-template-columns:1.35fr 0.95fr; gap:18px; align-items:stretch;}
         @media (max-width: 1400px){ .grid{grid-template-columns:1fr;} }
+        @media (max-width: 900px){
+            .wrap{padding:16px}
+            .topbar{padding:18px}
+            .title h1{font-size:28px}
+        }
         .card{
-            background:var(--panel); border:1px solid var(--border); border-radius:14px;
-            padding:10px; overflow:hidden;
+            background:linear-gradient(180deg, rgba(11, 22, 39, 0.92), rgba(8, 17, 31, 0.92));
+            border:1px solid var(--border);
+            border-radius:24px;
+            padding:18px;
+            overflow:hidden;
+            box-shadow:var(--shadow);
         }
         .chart-card,.snapshot-card{display:flex; flex-direction:column; height:100%;}
+        .section-head{
+            display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;
+        }
+        .section-kicker{
+            margin:0 0 6px;
+            color:var(--blue);
+            font-size:11px;
+            font-weight:700;
+            letter-spacing:0.14em;
+            text-transform:uppercase;
+        }
+        .section-title{
+            margin:0;
+            font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif;
+            font-size:22px;
+            letter-spacing:0;
+        }
         .chart-wrap{
-            background:var(--panel-2); border:1px solid var(--border); border-radius:12px;
+            background:linear-gradient(180deg, rgba(14, 27, 46, 0.96), rgba(12, 24, 42, 0.92));
+            border:1px solid rgba(148, 179, 255, 0.08);
+            border-radius:20px;
             padding:0; overflow:hidden; flex:1 1 auto; min-height:300px;
         }
         .chart-wrap .plotly-graph-div{width:100% !important; height:100% !important; min-height:300px;}
-        table{width:100%; border-collapse:collapse; border-radius:12px;}
-        th, td{
-            padding:10px 8px; border-bottom:1px solid var(--border); text-align:left; font-size:13px;
-            white-space:nowrap;
+        .signal-list{display:grid; gap:10px; margin-bottom:18px;}
+        .signal-row{
+            display:grid;
+            grid-template-columns:1.25fr auto 1fr;
+            gap:12px;
+            align-items:center;
+            padding:14px 16px;
+            border-radius:18px;
+            background:rgba(255,255,255,0.03);
+            border:1px solid rgba(255,255,255,0.04);
         }
-        th{color:var(--muted); font-weight:600; background:var(--panel-2);}
+        .signal-name{font-weight:600}
+        .signal-value{color:var(--muted); font-size:13px; text-align:right}
+        .signal-badge{
+            min-width:84px;
+            text-align:center;
+            padding:8px 12px;
+            border-radius:999px;
+            font-size:11px;
+            font-weight:700;
+            letter-spacing:0.08em;
+            text-transform:uppercase;
+        }
+        .signal-badge.pass{background:rgba(42, 209, 139, 0.18); color:#8ff0bd}
+        .signal-badge.fail{background:rgba(255, 107, 107, 0.18); color:#ffb5b5}
         .metrics{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
-        .metric{
-            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:14px;
-            min-height:92px;
+        @media (max-width: 900px){ .metrics{grid-template-columns:repeat(2,1fr);} }
+        @media (max-width: 620px){
+            .metrics{grid-template-columns:1fr}
+            .signal-row{grid-template-columns:1fr}
+            .signal-value{text-align:left}
         }
-        .metric .label{color:var(--muted); font-size:12px; text-transform:uppercase;}
-        .metric .value{margin-top:8px; font-size:26px; font-weight:700}
+        .metric{
+            position:relative;
+            background:linear-gradient(180deg, rgba(18, 34, 58, 0.92), rgba(12, 24, 42, 0.94));
+            border:1px solid rgba(148, 179, 255, 0.08);
+            border-radius:20px;
+            padding:16px;
+            min-height:104px;
+            overflow:hidden;
+        }
+        .metric::before{
+            content:"";
+            position:absolute;
+            inset:0 auto auto 0;
+            width:100%;
+            height:2px;
+            background:linear-gradient(90deg, rgba(124, 196, 255, 0.7), transparent 60%);
+            opacity:0.85;
+        }
+        .metric .label{color:var(--muted); font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;}
+        .metric .value{
+            margin-top:10px;
+            font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif;
+            font-size:28px;
+            line-height:1.05;
+            letter-spacing:0;
+            font-weight:700;
+        }
         .metric .value.compact{font-size:22px; line-height:1.15}
         .metric .value .value-date{
             display:block;
-            margin-top:4px;
-            font-size:14px;
+            margin-top:6px;
+            font-size:13px;
+            font-family:"Aptos","Segoe UI Variable","Segoe UI",sans-serif;
             font-weight:600;
             color:var(--muted);
         }
-        .metric .sub{margin-top:4px; color:var(--muted); font-size:12px}
+        .metric .sub{margin-top:6px; color:var(--muted); font-size:12px; line-height:1.45}
+        .metric.hero{
+            grid-column:span 2;
+            min-height:132px;
+            background:linear-gradient(135deg, rgba(17, 39, 67, 0.98), rgba(13, 27, 47, 0.96));
+        }
+        @media (max-width: 900px){ .metric.hero{grid-column:span 1;} }
         .metric.gex-positive{
-            background:rgba(31, 206, 122, 0.12);
-            border-color:rgba(31, 206, 122, 0.45);
+            background:linear-gradient(180deg, rgba(14, 49, 36, 0.95), rgba(12, 32, 28, 0.95));
+            border-color:rgba(42, 209, 139, 0.22);
         }
         .metric.gex-negative{
-            background:rgba(255, 93, 93, 0.12);
-            border-color:rgba(255, 93, 93, 0.45);
+            background:linear-gradient(180deg, rgba(54, 23, 25, 0.96), rgba(36, 16, 18, 0.95));
+            border-color:rgba(255, 107, 107, 0.24);
         }
         .metric.gex-positive .value{color:var(--green)}
         .metric.gex-negative .value{color:var(--red)}
@@ -198,7 +341,7 @@ HTML = """
         .fail,.bear{color:var(--red); font-weight:700}
         .neutral{color:var(--yellow); font-weight:700}
         .err{color:var(--red); font-weight:700; font-size:18px}
-        .small{font-size:12px; color:var(--muted)}
+        .small{font-size:12px; color:var(--muted); margin-top:14px; line-height:1.5}
     </style>
 </head>
 <body>
@@ -232,9 +375,12 @@ HTML = """
     {% else %}
     <div class="grid">
         <div class="card chart-card">
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px;">
-                <h2 style="margin:0; color:var(--muted); font-size:16px; text-transform:uppercase;">SPX Candlestick Chart</h2>
-                <form id="chart-settings-form" method="post" action="/settings" class="control-form" style="padding:6px 8px;">
+            <div class="section-head">
+                <div>
+                    <p class="section-kicker">Execution View</p>
+                    <h2 class="section-title">SPX Candlestick Chart</h2>
+                </div>
+                <form id="chart-settings-form" method="post" action="/settings" class="control-form">
                     <input type="hidden" name="refresh_interval" value="{{ data.refresh_interval }}">
                     <span class="control-label">Candle Interval</span>
                     <select id="chart_interval" name="chart_interval" class="text-input" style="width:110px;">
@@ -250,18 +396,42 @@ HTML = """
         </div>
 
         <div class="card snapshot-card">
-            <h2 style="margin:0 0 14px; color:var(--muted); font-size:16px; text-transform:uppercase;">Market Snapshot</h2>
-            <table style="margin-bottom:16px;">
-                <tr><th>Rule</th><th>Status</th><th>Value</th></tr>
-                <tr><td>Outside 9:30–10:00 Range</td><td class="{{ 'pass' if data.outside_range else 'fail' }}">{{ 'PASS' if data.outside_range else 'FAIL' }}</td><td>{{ data.price }} vs {{ data.range_low }} / {{ data.range_high }}</td></tr>
-                <tr><td>VWAP Distance ≥ 0.15%</td><td class="{{ 'pass' if data.vwap_distance else 'fail' }}">{{ 'PASS' if data.vwap_distance else 'FAIL' }}</td><td>{{ data.vwap_distance_pct }}%</td></tr>
-                <tr><td>Distance from Open > 0.30%</td><td class="{{ 'pass' if data.open_distance else 'fail' }}">{{ 'PASS' if data.open_distance else 'FAIL' }}</td><td>{{ data.open_distance_pct }}%</td></tr>
-                <tr><td>Bullish Setup</td><td class="{{ 'pass' if data.bullish else 'fail' }}">{{ 'Yes' if data.bullish else 'No' }}</td><td><span style="color: {{ 'var(--green)' if data.price > data.vwap else 'var(--red)' }}; font-weight:700;">Price &gt; SPX VWAP Proxy</span>, <span style="color: {{ 'var(--green)' if data.ema9 > data.ema21 else 'var(--red)' }}; font-weight:700;">EMA9 &gt; EMA21</span></td></tr>
-                <tr><td>Bearish Setup</td><td class="{{ 'pass' if data.bearish else 'fail' }}">{{ 'Yes' if data.bearish else 'No' }}</td><td><span style="color: {{ 'var(--green)' if data.price < data.vwap else 'var(--red)' }}; font-weight:700;">Price &lt; SPX VWAP Proxy</span>, <span style="color: {{ 'var(--green)' if data.ema9 < data.ema21 else 'var(--red)' }}; font-weight:700;">EMA9 &lt; EMA21</span></td></tr>
-            </table>
+            <div class="section-head">
+                <div>
+                    <p class="section-kicker">Session Read</p>
+                    <h2 class="section-title">Market Snapshot</h2>
+                </div>
+            </div>
+            <div class="signal-list">
+                <div class="signal-row">
+                    <div class="signal-name">Outside 9:30&ndash;10:00 Range</div>
+                    <div class="signal-badge {{ 'pass' if data.outside_range else 'fail' }}">{{ 'Pass' if data.outside_range else 'Fail' }}</div>
+                    <div class="signal-value">{{ data.price }} vs {{ data.range_low }} / {{ data.range_high }}</div>
+                </div>
+                <div class="signal-row">
+                    <div class="signal-name">VWAP Distance &ge; 0.15%</div>
+                    <div class="signal-badge {{ 'pass' if data.vwap_distance else 'fail' }}">{{ 'Pass' if data.vwap_distance else 'Fail' }}</div>
+                    <div class="signal-value">{{ data.vwap_distance_pct }}%</div>
+                </div>
+                <div class="signal-row">
+                    <div class="signal-name">Distance from Open &gt; 0.30%</div>
+                    <div class="signal-badge {{ 'pass' if data.open_distance else 'fail' }}">{{ 'Pass' if data.open_distance else 'Fail' }}</div>
+                    <div class="signal-value">{{ data.open_distance_pct }}%</div>
+                </div>
+                <div class="signal-row">
+                    <div class="signal-name">Bullish Setup</div>
+                    <div class="signal-badge {{ 'pass' if data.bullish else 'fail' }}">{{ 'Yes' if data.bullish else 'No' }}</div>
+                    <div class="signal-value"><span style="color: {{ 'var(--green)' if data.price > data.vwap else 'var(--red)' }}; font-weight:700;">Price &gt; SPX VWAP Proxy</span>, <span style="color: {{ 'var(--green)' if data.ema9 > data.ema21 else 'var(--red)' }}; font-weight:700;">EMA9 &gt; EMA21</span></div>
+                </div>
+                <div class="signal-row">
+                    <div class="signal-name">Bearish Setup</div>
+                    <div class="signal-badge {{ 'pass' if data.bearish else 'fail' }}">{{ 'Yes' if data.bearish else 'No' }}</div>
+                    <div class="signal-value"><span style="color: {{ 'var(--green)' if data.price < data.vwap else 'var(--red)' }}; font-weight:700;">Price &lt; SPX VWAP Proxy</span>, <span style="color: {{ 'var(--green)' if data.ema9 < data.ema21 else 'var(--red)' }}; font-weight:700;">EMA9 &lt; EMA21</span></div>
+                </div>
+            </div>
 
             <div class="metrics">
-                <div class="metric"><div class="label">SPX Price</div><div class="value">{{ data.price }}</div><div class="sub">Latest SPX close</div></div>
+                <div class="metric hero"><div class="label">SPX Price</div><div class="value">{{ data.price }}</div><div class="sub">Latest stored SPX close and primary session anchor</div></div>
                 <div class="metric"><div class="label">Prev Day High</div><div class="value">{{ data.prev_day_high }}</div><div class="sub">Prior session high</div></div>
                 <div class="metric"><div class="label">Prev Day Low</div><div class="value">{{ data.prev_day_low }}</div><div class="sub">Prior session low</div></div>
 
@@ -902,83 +1072,65 @@ GEX_HTML = """
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-    <style>
+        <style>
         :root{
-            --panel:#121821;
-            --panel-2:#17202b;
-            --border:#273244;
-            --text:#e8eef7;
-            --muted:#8fa2b7;
-            --blue:#1d2ef2;
-            --line:#3493ff;
-            --green:#00a63f;
-            --orange:#ff9800;
-            --grid:#273244;
+            --panel:rgba(11, 22, 39, 0.84);
+            --panel-2:rgba(15, 30, 52, 0.92);
+            --border:rgba(148, 179, 255, 0.14);
+            --text:#edf4ff;
+            --muted:#8fa6c7;
+            --blue:#7cc4ff;
+            --green:#2ad18b;
+            --orange:#ffb14d;
+            --shadow:0 20px 50px rgba(0, 0, 0, 0.34);
         }
         *{box-sizing:border-box}
         body{
             margin:0;
-            font-family:Segoe UI, Arial, sans-serif;
-            background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
+            font-family:"Aptos","Segoe UI Variable","Segoe UI",sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(62, 120, 255, 0.16), transparent 30%),
+                radial-gradient(circle at top right, rgba(42, 209, 139, 0.1), transparent 22%),
+                linear-gradient(180deg, #06111d 0%, #091627 55%, #07111f 100%);
             color:var(--text);
         }
-        .wrap{max-width:1800px; margin:0 auto; padding:18px;}
+        .wrap{max-width:1840px; margin:0 auto; padding:24px;}
         .topbar{
-            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
-            gap:16px; margin-bottom:16px; padding:14px 18px;
-            background:var(--panel); border:1px solid var(--border); border-radius:14px;
+            display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap;
+            gap:18px; margin-bottom:20px; padding:22px 24px;
+            background:linear-gradient(180deg, rgba(15, 31, 52, 0.92), rgba(8, 18, 32, 0.92));
+            border:1px solid var(--border); border-radius:24px; box-shadow:var(--shadow);
         }
-        .title h1{margin:0; font-size:28px}
-        .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
-        .top-right{
-            margin-left:auto;
-            display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-        }
-        .nav-links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-        .nav-link{
-            color:var(--muted); text-decoration:none; font-size:13px; font-weight:700;
-            padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
-        }
-        .nav-link.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
-        .card{
-            background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
-        }
-        .controls{
-            display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;
-        }
-        .control-form{
-            display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:8px 10px;
-        }
-        .control-label{font-size:13px; color:var(--text); font-weight:700}
-        .text-input{
-            width:90px; background:#0f141b; color:var(--text);
-            border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
-        }
-        .status-pill{
-            padding:10px 14px; border-radius:999px; font-weight:700;
-            border:1px solid var(--border); background:var(--panel-2);
-        }
-        .enter{color:#062b18; background:var(--green); border-color:var(--green)}
-        .no{color:#3b0d0d; background:#ff5d5d; border-color:#ff5d5d}
-        .metrics{
-            display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px;
-        }
+        .title h1{margin:0; font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif; font-size:34px; letter-spacing:0}
+        .title p{margin:8px 0 0; color:var(--muted); font-size:14px; line-height:1.5}
+        .top-right{margin-left:auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end;}
+        .nav-links{display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:6px; border-radius:999px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);}
+        .nav-link{color:var(--muted); text-decoration:none; font-size:13px; font-weight:600; padding:10px 14px; border-radius:999px; transition:all .18s ease;}
+        .nav-link:hover{color:var(--text); background:rgba(255,255,255,0.04)}
+        .nav-link.active{color:#04101c; background:linear-gradient(135deg, #8ed4ff, #d7f0ff); box-shadow:0 8px 22px rgba(124, 196, 255, 0.28)}
+        .card{background:linear-gradient(180deg, rgba(11, 22, 39, 0.92), rgba(8, 17, 31, 0.92)); border:1px solid var(--border); border-radius:24px; padding:18px; box-shadow:var(--shadow);}
+        .controls{display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;}
+        .control-form{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(255,255,255,0.035); border:1px solid rgba(255,255,255,0.05); border-radius:16px; padding:10px 12px;}
+        .control-label{font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.08em; text-transform:uppercase}
+        .text-input{width:90px; background:rgba(6, 14, 26, 0.82); color:var(--text); border:1px solid rgba(148, 179, 255, 0.18); border-radius:12px; padding:10px 12px; font-size:13px;}
+        .text-input:focus{outline:none; border-color:rgba(124, 196, 255, 0.56); box-shadow:0 0 0 4px rgba(124, 196, 255, 0.12)}
+        .status-pill{padding:11px 16px; border-radius:999px; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase;}
+        .enter{color:#042414; background:linear-gradient(135deg, #39e3a0, #9af1c9); box-shadow:0 12px 24px rgba(42, 209, 139, 0.22)}
+        .no{color:#350b0b; background:linear-gradient(135deg, #ff8f8f, #ffc0c0); box-shadow:0 12px 24px rgba(255, 107, 107, 0.2)}
+        .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px;}
         @media (max-width: 960px){ .metrics{grid-template-columns:repeat(2,1fr);} }
-        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} }
-        .metric{
-            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:14px;
-        }
-        .metric .label{font-size:12px; color:var(--muted); text-transform:uppercase}
-        .metric .value{margin-top:8px; font-size:24px; font-weight:700}
-        .metric .sub{margin-top:4px; font-size:12px; color:var(--muted)}
-        .chart-wrap{
-            min-height:520px; background:var(--panel-2); border:1px solid var(--border); border-radius:12px; overflow:hidden;
-        }
-        .chart-wrap .plotly-graph-div{width:100% !important; height:520px !important;}
-        .error{font-size:18px; color:#b42318; font-weight:700}
-        .notes{margin-top:14px; font-size:12px; color:var(--muted); line-height:1.5}
+        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} .wrap{padding:16px} .topbar{padding:18px} .title h1{font-size:28px} }
+        .metric{background:linear-gradient(180deg, rgba(18, 34, 58, 0.92), rgba(12, 24, 42, 0.94)); border:1px solid rgba(148, 179, 255, 0.08); border-radius:20px; padding:16px; position:relative; overflow:hidden;}
+        .metric::before{content:""; position:absolute; inset:0 auto auto 0; width:100%; height:2px; background:linear-gradient(90deg, rgba(124, 196, 255, 0.7), transparent 60%);}
+        .metric .label{font-size:11px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:0.12em}
+        .metric .value{margin-top:10px; font-size:28px; font-weight:700; font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif; letter-spacing:0}
+        .metric .sub{margin-top:6px; font-size:12px; color:var(--muted); line-height:1.45}
+        .chart-wrap{min-height:540px; background:linear-gradient(180deg, rgba(14, 27, 46, 0.96), rgba(12, 24, 42, 0.92)); border:1px solid rgba(148, 179, 255, 0.08); border-radius:20px; overflow:hidden;}
+        .chart-wrap .plotly-graph-div{width:100% !important; height:540px !important;}
+        .error{font-size:18px; color:#ff9b9b; font-weight:700}
+        .notes{margin-top:16px; font-size:12px; color:var(--muted); line-height:1.6; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.04); border-radius:18px; padding:14px 16px}
     </style>
+
 </head>
 <body>
 <div class="wrap">
@@ -1063,90 +1215,58 @@ OPTION_CHAIN_HTML = """
     <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
     <meta http-equiv="refresh" content="{{ data.refresh_interval }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
+        <style>
         :root{
-            --panel:#121821;
-            --panel-2:#17202b;
-            --border:#273244;
-            --text:#e8eef7;
-            --muted:#8fa2b7;
-            --green:#1fce7a;
-            --red:#ff5d5d;
+            --panel:rgba(11, 22, 39, 0.84);
+            --panel-2:rgba(15, 30, 52, 0.92);
+            --border:rgba(148, 179, 255, 0.14);
+            --text:#edf4ff;
+            --muted:#8fa6c7;
+            --green:#53e0a4;
+            --red:#ff9d9d;
+            --shadow:0 20px 50px rgba(0, 0, 0, 0.34);
         }
         *{box-sizing:border-box}
-        body{
-            margin:0;
-            font-family:Segoe UI, Arial, sans-serif;
-            background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
-            color:var(--text);
-        }
-        .wrap{max-width:1800px; margin:0 auto; padding:18px;}
-        .topbar{
-            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
-            gap:16px; margin-bottom:16px; padding:14px 18px;
-            background:var(--panel); border:1px solid var(--border); border-radius:14px;
-        }
-        .title h1{margin:0; font-size:28px}
-        .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
-        .top-right{
-            margin-left:auto;
-            display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-        }
-        .nav-links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-        .nav-link{
-            color:var(--muted); text-decoration:none; font-size:13px; font-weight:700;
-            padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
-        }
-        .nav-link.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
-        .card{
-            background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
-        }
-        .controls{
-            display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;
-        }
-        .control-form{
-            display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:8px 10px;
-        }
-        .control-label{font-size:13px; color:var(--text); font-weight:700}
-        .text-input{
-            width:90px; background:#0f141b; color:var(--text);
-            border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
-        }
-        .status-pill{
-            padding:10px 14px; border-radius:999px; font-weight:700;
-            border:1px solid var(--border); background:var(--panel-2);
-        }
-        .enter{color:#062b18; background:var(--green); border-color:var(--green)}
-        .no{color:#3b0d0d; background:#ff5d5d; border-color:#ff5d5d}
-        .metrics{
-            display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;
-        }
+        body{margin:0; font-family:"Aptos","Segoe UI Variable","Segoe UI",sans-serif; background:radial-gradient(circle at top left, rgba(62, 120, 255, 0.16), transparent 30%), linear-gradient(180deg, #06111d 0%, #091627 55%, #07111f 100%); color:var(--text);}
+        .wrap{max-width:1840px; margin:0 auto; padding:24px;}
+        .topbar{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:18px; margin-bottom:20px; padding:22px 24px; background:linear-gradient(180deg, rgba(15, 31, 52, 0.92), rgba(8, 18, 32, 0.92)); border:1px solid var(--border); border-radius:24px; box-shadow:var(--shadow);}
+        .title h1{margin:0; font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif; font-size:34px; letter-spacing:0}
+        .title p{margin:8px 0 0; color:var(--muted); font-size:14px; line-height:1.5}
+        .top-right{margin-left:auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end;}
+        .nav-links{display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:6px; border-radius:999px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);}
+        .nav-link{color:var(--muted); text-decoration:none; font-size:13px; font-weight:600; padding:10px 14px; border-radius:999px; transition:all .18s ease;}
+        .nav-link:hover{color:var(--text); background:rgba(255,255,255,0.04)}
+        .nav-link.active{color:#04101c; background:linear-gradient(135deg, #8ed4ff, #d7f0ff); box-shadow:0 8px 22px rgba(124, 196, 255, 0.28)}
+        .card{background:linear-gradient(180deg, rgba(11, 22, 39, 0.92), rgba(8, 17, 31, 0.92)); border:1px solid var(--border); border-radius:24px; padding:18px; box-shadow:var(--shadow);}
+        .controls{display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px;}
+        .control-form{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(255,255,255,0.035); border:1px solid rgba(255,255,255,0.05); border-radius:16px; padding:10px 12px;}
+        .control-label{font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.08em; text-transform:uppercase}
+        .text-input{width:90px; background:rgba(6, 14, 26, 0.82); color:var(--text); border:1px solid rgba(148, 179, 255, 0.18); border-radius:12px; padding:10px 12px; font-size:13px;}
+        .text-input:focus{outline:none; border-color:rgba(124, 196, 255, 0.56); box-shadow:0 0 0 4px rgba(124, 196, 255, 0.12)}
+        .status-pill{padding:11px 16px; border-radius:999px; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase;}
+        .enter{color:#042414; background:linear-gradient(135deg, #39e3a0, #9af1c9); box-shadow:0 12px 24px rgba(42, 209, 139, 0.22)}
+        .no{color:#350b0b; background:linear-gradient(135deg, #ff8f8f, #ffc0c0); box-shadow:0 12px 24px rgba(255, 107, 107, 0.2)}
+        .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;}
         @media (max-width: 1100px){ .metrics{grid-template-columns:repeat(2,1fr);} }
-        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} }
-        .metric{
-            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:14px;
-        }
-        .metric .label{font-size:12px; color:var(--muted); text-transform:uppercase}
-        .metric .value{margin-top:8px; font-size:24px; font-weight:700}
-        .metric .sub{margin-top:4px; font-size:12px; color:var(--muted)}
-        .table-wrap{
-            overflow:auto; border:1px solid var(--border); border-radius:12px; background:var(--panel-2);
-            max-height:72vh;
-        }
-        table{width:100%; border-collapse:collapse}
-        th, td{
-            padding:10px 8px; border-bottom:1px solid var(--border); font-size:12px; white-space:nowrap; text-align:right;
-        }
-        th{
-            position:sticky; top:0; z-index:1; background:#111923; color:var(--muted); font-weight:700;
-        }
-        td.strike, th.strike{text-align:center; font-weight:700}
+        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} .wrap{padding:16px} .topbar{padding:18px} .title h1{font-size:28px} }
+        .metric{background:linear-gradient(180deg, rgba(18, 34, 58, 0.92), rgba(12, 24, 42, 0.94)); border:1px solid rgba(148, 179, 255, 0.08); border-radius:20px; padding:16px; position:relative; overflow:hidden;}
+        .metric::before{content:""; position:absolute; inset:0 auto auto 0; width:100%; height:2px; background:linear-gradient(90deg, rgba(124, 196, 255, 0.7), transparent 60%);}
+        .metric .label{font-size:11px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:0.12em}
+        .metric .value{margin-top:10px; font-size:28px; font-weight:700; font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif; letter-spacing:0}
+        .metric .sub{margin-top:6px; font-size:12px; color:var(--muted); line-height:1.45}
+        .table-wrap{overflow:auto; border:1px solid rgba(148, 179, 255, 0.08); border-radius:20px; background:linear-gradient(180deg, rgba(14, 27, 46, 0.96), rgba(12, 24, 42, 0.92)); max-height:72vh; box-shadow:inset 0 1px 0 rgba(255,255,255,0.02);}
+        table{width:100%; border-collapse:separate; border-spacing:0}
+        th, td{padding:12px 10px; border-bottom:1px solid rgba(148, 179, 255, 0.08); font-size:12px; white-space:nowrap; text-align:right;}
+        th{position:sticky; top:0; z-index:1; background:rgba(7, 17, 31, 0.96); color:var(--muted); font-weight:700; letter-spacing:0.06em; text-transform:uppercase; backdrop-filter:blur(10px);}
+        tbody tr:nth-child(even){background:rgba(255,255,255,0.015)}
+        tbody tr:hover{background:rgba(124, 196, 255, 0.06)}
+        td.strike, th.strike{text-align:center; font-weight:700; color:#f3f7ff; background:rgba(255,255,255,0.02)}
         td.call-last, td.call-bid, td.call-ask, td.call-oi, td.call-vol, td.call-iv{color:var(--green)}
         td.put-last, td.put-bid, td.put-ask, td.put-oi, td.put-vol, td.put-iv{color:var(--red)}
-        .error{font-size:18px; color:#b42318; font-weight:700}
-        .notes{margin-top:14px; font-size:12px; color:var(--muted); line-height:1.5}
+        .error{font-size:18px; color:#ff9b9b; font-weight:700}
+        .notes{margin-top:16px; font-size:12px; color:var(--muted); line-height:1.6; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.04); border-radius:18px; padding:14px 16px}
     </style>
+
 </head>
 <body>
 <div class="wrap">
@@ -1268,93 +1388,59 @@ SIMULATOR_HTML = """
     <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-    <style>
+        <style>
         :root{
-            --panel:#121821;
-            --panel-2:#17202b;
-            --border:#273244;
-            --text:#e8eef7;
-            --muted:#8fa2b7;
-            --green:#1fce7a;
-            --red:#ff5d5d;
-            --yellow:#ffcc66;
+            --panel:rgba(11, 22, 39, 0.84);
+            --panel-2:rgba(15, 30, 52, 0.92);
+            --border:rgba(148, 179, 255, 0.14);
+            --text:#edf4ff;
+            --muted:#8fa6c7;
+            --green:#2ad18b;
+            --red:#ff6b6b;
+            --yellow:#ffcf70;
+            --shadow:0 20px 50px rgba(0, 0, 0, 0.34);
         }
         *{box-sizing:border-box}
-        body{
-            margin:0;
-            font-family:Segoe UI, Arial, sans-serif;
-            background:linear-gradient(180deg,#0a0e13 0%, #0f141b 100%);
-            color:var(--text);
-        }
-        .wrap{max-width:1800px; margin:0 auto; padding:18px;}
-        .topbar{
-            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
-            gap:16px; margin-bottom:16px; padding:14px 18px;
-            background:var(--panel); border:1px solid var(--border); border-radius:14px;
-        }
-        .title h1{margin:0; font-size:28px}
-        .title p{margin:4px 0 0; color:var(--muted); font-size:13px}
-        .top-right{
-            margin-left:auto;
-            display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-        }
-        .nav-links{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-        .nav-link{
-            color:var(--muted); text-decoration:none; font-size:13px; font-weight:700;
-            padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:var(--panel-2);
-        }
-        .nav-link.active{color:var(--text); border-color:#4da3ff; box-shadow:inset 0 0 0 1px #4da3ff}
-        .control-form{
-            display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:8px 10px;
-        }
-        .control-label{font-size:13px; color:var(--text); font-weight:700}
-        .text-input{
-            width:110px; background:#0f141b; color:var(--text);
-            border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px;
-        }
+        body{margin:0; font-family:"Aptos","Segoe UI Variable","Segoe UI",sans-serif; background:radial-gradient(circle at top left, rgba(62, 120, 255, 0.16), transparent 30%), linear-gradient(180deg, #06111d 0%, #091627 55%, #07111f 100%); color:var(--text);}
+        .wrap{max-width:1840px; margin:0 auto; padding:24px;}
+        .topbar{display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:18px; margin-bottom:20px; padding:22px 24px; background:linear-gradient(180deg, rgba(15, 31, 52, 0.92), rgba(8, 18, 32, 0.92)); border:1px solid var(--border); border-radius:24px; box-shadow:var(--shadow);}
+        .title h1{margin:0; font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif; font-size:34px; letter-spacing:0}
+        .title p{margin:8px 0 0; color:var(--muted); font-size:14px; line-height:1.5}
+        .top-right{margin-left:auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end;}
+        .nav-links{display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:6px; border-radius:999px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);}
+        .nav-link{color:var(--muted); text-decoration:none; font-size:13px; font-weight:600; padding:10px 14px; border-radius:999px; transition:all .18s ease;}
+        .nav-link:hover{color:var(--text); background:rgba(255,255,255,0.04)}
+        .nav-link.active{color:#04101c; background:linear-gradient(135deg, #8ed4ff, #d7f0ff); box-shadow:0 8px 22px rgba(124, 196, 255, 0.28)}
+        .control-form{display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(255,255,255,0.035); border:1px solid rgba(255,255,255,0.05); border-radius:16px; padding:12px 14px; margin-bottom:16px;}
+        .control-label{font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.08em; text-transform:uppercase}
+        .text-input{width:110px; background:rgba(6, 14, 26, 0.82); color:var(--text); border:1px solid rgba(148, 179, 255, 0.18); border-radius:12px; padding:10px 12px; font-size:13px;}
+        .text-input:focus{outline:none; border-color:rgba(124, 196, 255, 0.56); box-shadow:0 0 0 4px rgba(124, 196, 255, 0.12)}
         .text-input.ticker-input{width:120px}
         .text-input.date-input{width:150px}
         .text-input.time-input{width:120px}
-        .status-pill{
-            padding:10px 14px; border-radius:999px; font-weight:700;
-            border:1px solid var(--border); background:var(--panel-2);
-        }
-        .enter{color:#062b18; background:var(--green); border-color:var(--green)}
-        .no{color:#3b0d0d; background:#ff5d5d; border-color:#ff5d5d}
-        .card{
-            background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px;
-        }
-        .metrics{
-            display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;
-        }
+        .status-pill{padding:11px 16px; border-radius:999px; font-weight:700; font-size:12px; letter-spacing:0.08em; text-transform:uppercase;}
+        .enter{color:#042414; background:linear-gradient(135deg, #39e3a0, #9af1c9); box-shadow:0 12px 24px rgba(42, 209, 139, 0.22)}
+        .no{color:#350b0b; background:linear-gradient(135deg, #ff8f8f, #ffc0c0); box-shadow:0 12px 24px rgba(255, 107, 107, 0.2)}
+        .card{background:linear-gradient(180deg, rgba(11, 22, 39, 0.92), rgba(8, 17, 31, 0.92)); border:1px solid var(--border); border-radius:24px; padding:18px; box-shadow:var(--shadow);}
+        .metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;}
         @media (max-width: 1100px){ .metrics{grid-template-columns:repeat(2,1fr);} }
-        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} }
-        .metric{
-            background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:14px;
-        }
+        @media (max-width: 640px){ .metrics{grid-template-columns:1fr;} .wrap{padding:16px} .topbar{padding:18px} .title h1{font-size:28px} }
         .metrics.simulator-metrics{grid-template-columns:1fr;}
         .metrics.simulator-metrics .metric{min-height:0;}
-        .metrics.simulator-metrics .metric .value{
-            font-size:20px;
-            line-height:1.35;
-            white-space:normal;
-            word-break:break-word;
-        }
-        .metric .label{font-size:12px; color:var(--muted); text-transform:uppercase}
-        .metric .value{margin-top:8px; font-size:24px; font-weight:700}
-        .metric .sub{margin-top:4px; font-size:12px; color:var(--muted)}
-        .chart-wrap{
-            min-height:640px; background:var(--panel-2); border:1px solid var(--border); border-radius:12px; overflow:hidden;
-        }
+        .metrics.simulator-metrics .metric .value{font-size:20px; line-height:1.35; white-space:normal; word-break:break-word;}
+        .metric{background:linear-gradient(180deg, rgba(18, 34, 58, 0.92), rgba(12, 24, 42, 0.94)); border:1px solid rgba(148, 179, 255, 0.08); border-radius:20px; padding:16px; position:relative; overflow:hidden;}
+        .metric::before{content:""; position:absolute; inset:0 auto auto 0; width:100%; height:2px; background:linear-gradient(90deg, rgba(124, 196, 255, 0.7), transparent 60%);}
+        .metric .label{font-size:11px; color:var(--muted); text-transform:uppercase; font-weight:700; letter-spacing:0.12em}
+        .metric .value{margin-top:10px; font-size:28px; font-weight:700; font-family:"Bahnschrift","Aptos Display","Segoe UI",sans-serif; letter-spacing:0}
+        .metric .sub{margin-top:6px; font-size:12px; color:var(--muted); line-height:1.45}
+        .chart-wrap{min-height:640px; background:linear-gradient(180deg, rgba(14, 27, 46, 0.96), rgba(12, 24, 42, 0.92)); border:1px solid rgba(148, 179, 255, 0.08); border-radius:20px; overflow:hidden;}
         .chart-wrap .plotly-graph-div{width:100% !important; height:640px !important;}
-        .button{
-            cursor:pointer; border:1px solid var(--border); border-radius:8px; padding:8px 12px;
-            background:#0f141b; color:var(--text); font-size:13px; font-weight:700;
-        }
-        .error{font-size:18px; color:#b42318; font-weight:700}
-        .notes{margin-top:14px; font-size:12px; color:var(--muted); line-height:1.5}
+        .button{cursor:pointer; border:1px solid rgba(124, 196, 255, 0.24); border-radius:14px; padding:11px 16px; background:linear-gradient(135deg, #8ed4ff, #d7f0ff); color:#04101c; font-size:13px; font-weight:700; box-shadow:0 10px 20px rgba(124, 196, 255, 0.18);}
+        .button:hover{transform:translateY(-1px)}
+        .error{font-size:18px; color:#ff9b9b; font-weight:700}
+        .notes{margin-top:16px; font-size:12px; color:var(--muted); line-height:1.6; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.04); border-radius:18px; padding:14px 16px}
     </style>
+
 </head>
 <body>
 <div class="wrap">
