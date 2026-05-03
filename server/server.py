@@ -3091,16 +3091,46 @@ def build_simulator_payload(df: pd.DataFrame) -> list[dict]:
 
 
 def calculate_vwap(df: pd.DataFrame) -> pd.Series:
-    typical_price = (df["high_price"] + df["low_price"] + df["close_price"]) / 3.0
-    pv = (typical_price * df["volume"]).cumsum()
-    vol = df["volume"].replace(0, pd.NA).cumsum()
-    return pv / vol
+    typical_price = pd.to_numeric(
+        (df["high_price"] + df["low_price"] + df["close_price"]) / 3.0,
+        errors="coerce",
+    )
+    volume = pd.to_numeric(df["volume"], errors="coerce").fillna(0.0)
+    positive_volume = volume.where(volume > 0, 0.0)
+    cumulative_volume = positive_volume.cumsum()
+    cumulative_pv = (typical_price * positive_volume).cumsum()
+    vwap = cumulative_pv / cumulative_volume.where(cumulative_volume > 0)
+    fallback = typical_price.expanding(min_periods=1).mean()
+    return vwap.ffill().fillna(fallback)
+
+
+def calculate_session_vwap(df: pd.DataFrame) -> pd.Series:
+    vwap = pd.Series(index=df.index, dtype="float64")
+    for _, group in df.groupby("trade_date", sort=False):
+        vwap.loc[group.index] = calculate_vwap(group).to_numpy()
+    return vwap
 
 
 def calculate_rolling_median_ratio(series: pd.Series, window: int = 15) -> pd.Series:
     return series.rolling(window=window, min_periods=1).median()
 
 
+def build_chart_spx_frame(spx_session: pd.DataFrame, spy_session: pd.DataFrame) -> pd.DataFrame:
+    spx_aligned = spx_session.copy()
+    spy_aligned = spy_session[["ts", "trade_date", "close_price", "vwap_spy"]].copy()
+    spx_aligned["ts_bucket"] = spx_aligned["ts"].dt.floor("min")
+    spy_aligned["ts_bucket"] = spy_aligned["ts"].dt.floor("min")
+    spy_aligned["spy_close"] = pd.to_numeric(spy_aligned["close_price"], errors="coerce")
+    spy_aligned["vwap_spy"] = pd.to_numeric(spy_aligned["vwap_spy"], errors="coerce")
+    spy_aligned = (
+        spy_aligned.dropna(subset=["spy_close", "vwap_spy"])
+        .sort_values("ts")
+        .groupby(["trade_date", "ts_bucket"], as_index=False)
+        .agg(spy_close=("spy_close", "last"), vwap_spy=("vwap_spy", "last"))
+    )
+    chart_spx = pd.merge(spx_aligned, spy_aligned, on=["trade_date", "ts_bucket"], how="left")
+    chart_spx[["spy_close", "vwap_spy"]] = chart_spx.groupby("trade_date")[["spy_close", "vwap_spy"]].ffill()
+    return chart_spx.drop(columns=["ts_bucket"])
 
 
 def first_valid_number(series: pd.Series):
@@ -3691,18 +3721,9 @@ def run_web_service(settings: dict) -> dict:
     spy_session = spy_regular.copy()
     spx_session = spx_regular.copy()
 
-    spy_session["vwap_spy"] = (
-        spy_session.groupby("trade_date", group_keys=False).apply(calculate_vwap).reset_index(level=0, drop=True)
-    )
+    spy_session["vwap_spy"] = calculate_session_vwap(spy_session)
 
-    chart_spx = pd.merge(
-        spx_session.sort_values("ts"),
-        spy_session[["ts", "trade_date", "close_price", "vwap_spy"]]
-        .rename(columns={"close_price": "spy_close"})
-        .sort_values("ts"),
-        on=["ts", "trade_date"],
-        how="inner",
-    )
+    chart_spx = build_chart_spx_frame(spx_session.sort_values("ts"), spy_session.sort_values("ts"))
     chart_spx["spx_spy_ratio"] = chart_spx["close_price"] / chart_spx["spy_close"].replace(0, pd.NA)
     chart_spx["spx_spy_ratio"] = pd.to_numeric(chart_spx["spx_spy_ratio"], errors="coerce")
     chart_spx["spx_spy_ratio_median"] = (
