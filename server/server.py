@@ -678,7 +678,7 @@ TERMINAL_HTML = """
         td,th{padding:9px 7px; border-bottom:1px solid rgba(142,170,179,.18); font-size:14px;}
         th{color:var(--muted); text-align:left; font-size:12px; text-transform:uppercase;}
         td:last-child,th:last-child{text-align:right;}
-        .option-grid{display:grid; grid-template-columns:minmax(250px,1.08fr) minmax(170px,.72fr); gap:16px; min-width:0; overflow:hidden;}
+        .option-grid{display:grid; grid-template-columns:minmax(250px,1.02fr) minmax(210px,.88fr); gap:16px; min-width:0; overflow:hidden;}
         .setup-table{table-layout:fixed;}
         .setup-table td:first-child{width:34%; color:#dffcff;}
         .setup-table td:last-child{width:66%; white-space:normal; overflow-wrap:anywhere;}
@@ -687,6 +687,14 @@ TERMINAL_HTML = """
         .panel-title .trade-state.no-trade{color:var(--red);}
         .option-grid table{min-width:0;}
         .ladder td{font-size:13px; padding:7px 6px;}
+        .strategy-ladder{height:100%; table-layout:fixed; border:1px solid rgba(0,229,240,.18); background:linear-gradient(180deg, rgba(2,18,22,.68), rgba(0,7,10,.72));}
+        .strategy-ladder th,.strategy-ladder td{font-size:12px; padding:8px 7px;}
+        .strategy-ladder th{color:#8eaab3; letter-spacing:.08em;}
+        .strategy-ladder td:first-child{width:24%; color:var(--cyan); font-weight:900; text-align:left;}
+        .strategy-ladder td:nth-child(2){width:36%; color:#dffcff; font-weight:900; text-align:left;}
+        .strategy-ladder td:last-child{width:40%; color:var(--muted); text-align:right;}
+        .strategy-ladder .active-step td{background:rgba(28,255,115,.08); color:var(--green);}
+        .strategy-ladder .wait-step td{background:rgba(255,196,0,.08);}
         .selected-short{outline:1px solid var(--red); color:var(--red); background:rgba(255,49,72,.08);}
         .selected-long{outline:1px solid var(--green); color:var(--green); background:rgba(28,255,115,.08);}
         .placeholder{color:var(--yellow); font-weight:900;}
@@ -817,7 +825,6 @@ TERMINAL_HTML = """
                 <div class="panel-title"><span>Trade Setup</span><span class="trade-state {{ 'no-trade' if data.trade == 'NO TRADE' else 'trade' }}">{{ data.trade }}</span></div>
                 <div class="option-grid">
                     <table class="setup-table">
-                        <tr><td>Type</td><td class="{{ 'green' if data.trade != 'NO TRADE' else 'yellow' }}">{{ data.trade_type }}</td></tr>
                         <tr><td>Short Strike</td><td>{{ data.short_strike }}</td></tr>
                         <tr><td>Long Strike</td><td>{{ data.long_strike }}</td></tr>
                         <tr><td>Credit</td><td class="placeholder">{{ data.credit }}</td></tr>
@@ -828,14 +835,13 @@ TERMINAL_HTML = """
                         <tr><td>Breakeven</td><td class="placeholder">Needs option pricing</td></tr>
                         <tr><td>Net GEX</td><td class="{{ data.net_gex_signal_class }}">{{ data.net_gex_billions }}</td></tr>
                     </table>
-                    <table class="ladder">
-                        <tr><th>Strike</th><th>Put</th><th>Call</th></tr>
-                        <tr><td>{{ data.price + 30 }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
-                        <tr><td>{{ data.price + 20 }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
-                        <tr><td>{{ data.price + 10 }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
-                        <tr class="selected-short"><td>{{ data.short_strike }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
-                        <tr class="selected-long"><td>{{ data.long_strike }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
-                        <tr><td>{{ data.price - 30 }}</td><td class="placeholder">N/A</td><td class="placeholder">N/A</td></tr>
+                    <table class="strategy-ladder" aria-label="Doug Strategy income loop">
+                        <tr><th>Phase</th><th>Doug Strategy</th><th>Rule</th></tr>
+                        <tr><td>01</td><td>Screen quality</td><td>Ownable through volatility</td></tr>
+                        <tr class="wait-step"><td>02</td><td>Sell OTM put</td><td>Only at target entry</td></tr>
+                        <tr><td>03</td><td>Accept assignment</td><td>Cash reserved first</td></tr>
+                        <tr><td>04</td><td>Covered call</td><td>Exit price is acceptable</td></tr>
+                        <tr class="active-step"><td>05</td><td>Reinvest income</td><td>Grow recurring cash flow</td></tr>
                     </table>
                 </div>
                 <div class="pl-profile">
