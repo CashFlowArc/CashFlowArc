@@ -613,6 +613,8 @@ TERMINAL_HTML = """
         .nav-link.active{color:#dffcff; border-color:rgba(0,229,240,.48); box-shadow:inset 0 0 0 1px rgba(0,229,240,.18);}
         .debug-form{display:flex; align-items:center; gap:8px; flex-wrap:wrap; color:var(--muted); font-size:11px; text-transform:uppercase;}
         .debug-form input,.debug-form select{height:28px; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 8px; font:inherit;}
+        .debug-form .refresh-input{width:68px;}
+        .debug-readout{height:28px; display:inline-flex; align-items:center; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.58); color:#dffcff; padding:0 9px; font-weight:900;}
         .debug-switch{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
         .debug-switch input{position:absolute; opacity:0; pointer-events:none;}
         .debug-slider{width:38px; height:20px; border:1px solid rgba(0,229,240,.3); background:rgba(142,170,179,.16); position:relative;}
@@ -731,8 +733,9 @@ TERMINAL_HTML = """
             <a class="nav-link" href="/simulator">Simulator</a>
         </nav>
         <form class="debug-form" method="post" action="/settings">
-            <input type="hidden" name="refresh_interval" value="{{ data.refresh_interval }}">
             <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+            <span>Refresh</span>
+            <input class="refresh-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
             <input type="hidden" name="debug_mode" value="0">
             <label class="debug-switch">
                 <span>Debug</span>
@@ -1898,12 +1901,14 @@ TERMINAL_PAGE_HTML = """
         .call-last,.call-bid,.call-ask,.call-vol,.call-oi,.call-iv{color:var(--green);}
         .put-last,.put-bid,.put-ask,.put-vol,.put-oi,.put-iv{color:var(--red);}
         .simulator-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
-        .simulator-controls .control-label{font-size:11px; color:var(--muted); font-weight:900; letter-spacing:.08em; text-transform:uppercase;}
+        .simulator-controls .control-label{font-size:11px; color:var(--muted); font-weight:900; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap;}
         .simulator-controls input{height:32px; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 9px; font:inherit;}
         .simulator-controls .ticker-input{width:112px;}
-        .simulator-controls .time-input{width:112px;}
+        .simulator-controls .time-input{width:138px; min-width:138px;}
         .terminal-button{height:32px; cursor:pointer; border:1px solid rgba(0,229,240,.34); background:linear-gradient(135deg, rgba(0,229,240,.92), rgba(223,252,255,.92)); color:#031014; font-size:11px; font-weight:900; text-transform:uppercase; padding:0 12px;}
         .terminal-button:hover{filter:brightness(1.08);}
+        .debug-form .refresh-input{width:68px;}
+        .debug-readout{height:28px; display:inline-flex; align-items:center; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.58); color:#dffcff; padding:0 9px; font-weight:900; white-space:nowrap;}
         .simulator-status{margin-bottom:16px;}
         .simulator-status .metric-value{font-size:20px; line-height:1.35; white-space:normal; overflow-wrap:anywhere;}
         .simulator-chart{height:640px;}
@@ -1936,8 +1941,9 @@ TERMINAL_PAGE_HTML = """
             <a class="{{ 'nav-link active' if data.active_tab == 'simulator' else 'nav-link' }}" href="/simulator">Simulator</a>
         </nav>
         <form class="debug-form" method="post" action="/settings">
-            <input type="hidden" name="refresh_interval" value="{{ data.refresh_interval }}">
             <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+            <span>Refresh</span>
+            <input class="refresh-input" type="number" min="15" max="3600" step="1" name="refresh_interval" value="{{ data.refresh_interval }}">
             <input type="hidden" name="debug_mode" value="0">
             <label class="debug-switch">
                 <span>Debug</span>
@@ -1946,6 +1952,8 @@ TERMINAL_PAGE_HTML = """
             </label>
             {% if data.active_tab != 'simulator' %}
             <input type="date" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+            {% else %}
+            <span class="debug-readout">Date {{ data.trade_date or data.debug_trade_date or data.last_update_date }}</span>
             {% endif %}
             <select name="debug_time">
                 <option value="">Time</option>
