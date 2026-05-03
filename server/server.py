@@ -619,7 +619,9 @@ TERMINAL_HTML = """
         .debug-form input:disabled{opacity:1; cursor:not-allowed; color:var(--muted);}
         .debug-picker{position:relative; display:inline-flex; align-items:center;}
         .debug-picker input{padding-right:26px;}
-        .debug-picker.active:after{content:"\\1F50D"; position:absolute; right:7px; top:50%; transform:translateY(-50%); color:var(--cyan); font-size:12px; line-height:1; pointer-events:none; opacity:.76; text-shadow:0 0 8px rgba(0,229,240,.36);}
+        .debug-picker-button{position:absolute; right:3px; top:50%; width:22px; height:22px; transform:translateY(-50%); display:grid; place-items:center; border:0; background:transparent; color:var(--cyan); padding:0; cursor:pointer;}
+        .debug-picker-button:before{content:"\\1F50D"; font-size:12px; line-height:1; opacity:.76; text-shadow:0 0 8px rgba(0,229,240,.36);}
+        .debug-picker-button:disabled{display:none;}
         .debug-switch{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
         .debug-switch input{position:absolute; opacity:0; pointer-events:none;}
         .debug-slider{width:38px; height:20px; border:1px solid rgba(0,229,240,.3); background:rgba(142,170,179,.16); position:relative;}
@@ -749,9 +751,11 @@ TERMINAL_HTML = """
             </label>
             <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
                 <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
+                <button class="debug-picker-button" type="button" aria-label="Open debug date picker" {% if not data.debug_mode %}disabled{% endif %}></button>
             </span>
             <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
                 <input type="time" name="debug_time" step="60" value="{{ data.debug_control_time }}" {% if not data.debug_mode %}disabled{% endif %}>
+                <button class="debug-picker-button" type="button" aria-label="Open debug time picker" {% if not data.debug_mode %}disabled{% endif %}></button>
             </span>
         </form>
     </section>
@@ -887,6 +891,22 @@ document.querySelectorAll('.debug-form').forEach(function(form) {
         fetch('/settings', { method: 'POST', body: new FormData(form) })
             .then(function() { window.location.reload(); })
             .catch(function() {});
+    });
+});
+document.querySelectorAll('.debug-picker-button').forEach(function(button) {
+    button.addEventListener('click', function(event) {
+        event.preventDefault();
+        var wrapper = button.closest('.debug-picker');
+        var input = wrapper ? wrapper.querySelector('input') : null;
+        if (!input || input.disabled) return;
+        input.focus();
+        if (typeof input.showPicker === 'function') {
+            try {
+                input.showPicker();
+                return;
+            } catch (err) {}
+        }
+        input.click();
     });
 });
 setTimeout(function(){ window.location.reload(); }, Math.max(15, Number({{ data.refresh_interval }})) * 1000);
@@ -1917,7 +1937,9 @@ TERMINAL_PAGE_HTML = """
         .debug-form input:disabled{opacity:1; cursor:not-allowed; color:var(--muted);}
         .debug-picker{position:relative; display:inline-flex; align-items:center;}
         .debug-picker input{padding-right:26px;}
-        .debug-picker.active:after{content:"\\1F50D"; position:absolute; right:7px; top:50%; transform:translateY(-50%); color:var(--cyan); font-size:12px; line-height:1; pointer-events:none; opacity:.76; text-shadow:0 0 8px rgba(0,229,240,.36);}
+        .debug-picker-button{position:absolute; right:3px; top:50%; width:22px; height:22px; transform:translateY(-50%); display:grid; place-items:center; border:0; background:transparent; color:var(--cyan); padding:0; cursor:pointer;}
+        .debug-picker-button:before{content:"\\1F50D"; font-size:12px; line-height:1; opacity:.76; text-shadow:0 0 8px rgba(0,229,240,.36);}
+        .debug-picker-button:disabled{display:none;}
         .simulator-status{margin-bottom:16px;}
         .simulator-status .metric-value{font-size:20px; line-height:1.35; white-space:normal; overflow-wrap:anywhere;}
         .simulator-chart{height:640px;}
@@ -1961,9 +1983,11 @@ TERMINAL_PAGE_HTML = """
             </label>
             <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
                 <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
+                <button class="debug-picker-button" type="button" aria-label="Open debug date picker" {% if not data.debug_mode %}disabled{% endif %}></button>
             </span>
             <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
                 <input type="time" name="debug_time" step="60" value="{{ data.debug_control_time }}" {% if not data.debug_mode %}disabled{% endif %}>
+                <button class="debug-picker-button" type="button" aria-label="Open debug time picker" {% if not data.debug_mode %}disabled{% endif %}></button>
             </span>
         </form>
     </section>
@@ -1987,6 +2011,22 @@ document.querySelectorAll('.debug-form').forEach(function(form) {
         fetch('/settings', { method: 'POST', body: new FormData(form) })
             .then(function() { window.location.reload(); })
             .catch(function() {});
+    });
+});
+document.querySelectorAll('.debug-picker-button').forEach(function(button) {
+    button.addEventListener('click', function(event) {
+        event.preventDefault();
+        var wrapper = button.closest('.debug-picker');
+        var input = wrapper ? wrapper.querySelector('input') : null;
+        if (!input || input.disabled) return;
+        input.focus();
+        if (typeof input.showPicker === 'function') {
+            try {
+                input.showPicker();
+                return;
+            } catch (err) {}
+        }
+        input.click();
     });
 });
 {% if data.active_tab != 'simulator' %}
@@ -2241,8 +2281,9 @@ def resolve_gex_expiration_date(now_et: pd.Timestamp, available_dates: list[dt.d
 
 def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, dict, dt.date]:
     spx_db_ticker = db_storage_ticker(SPX_TICKER)
+    snapshot_as_of_utc = now_et.tz_convert("UTC").tz_localize(None).to_pydatetime()
     with get_connection() as conn:
-        snapshot_ts = get_latest_option_snapshot_ts(conn, spx_db_ticker)
+        snapshot_ts = get_latest_option_snapshot_ts(conn, spx_db_ticker, snapshot_as_of_utc)
         if snapshot_ts is None:
             raise ValueError(f"No stored options snapshots found in {OPTION_SOURCE_TABLE} for {spx_db_ticker}.")
         options = query_option_snapshot(conn, spx_db_ticker, snapshot_ts)
@@ -2303,8 +2344,9 @@ def fetch_spx_options_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, d
 
 def fetch_spx_option_chain_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFrame, dict, dt.date, dt.datetime]:
     spx_db_ticker = db_storage_ticker(SPX_TICKER)
+    snapshot_as_of_utc = now_et.tz_convert("UTC").tz_localize(None).to_pydatetime()
     with get_connection() as conn:
-        snapshot_ts = get_latest_option_snapshot_ts(conn, spx_db_ticker)
+        snapshot_ts = get_latest_option_snapshot_ts(conn, spx_db_ticker, snapshot_as_of_utc)
         if snapshot_ts is None:
             raise ValueError(f"No stored options snapshots found in {OPTION_SOURCE_TABLE} for {spx_db_ticker}.")
         options = query_option_snapshot(conn, spx_db_ticker, snapshot_ts)
@@ -2332,15 +2374,23 @@ def fetch_spx_option_chain_for_session(now_et: pd.Timestamp) -> tuple[pd.DataFra
     return selected_options, underlying, selected_expiration_date, snapshot_ts
 
 
-def get_latest_option_snapshot_ts(conn, ticker: str) -> Optional[dt.datetime]:
+def get_latest_option_snapshot_ts(
+    conn,
+    ticker: str,
+    as_of_utc: Optional[dt.datetime] = None,
+) -> Optional[dt.datetime]:
     sql = f"""
         SELECT MAX(snapshot_ts_utc)
         FROM {OPTION_SOURCE_TABLE}
         WHERE ticker = :ticker
     """
+    params = {"ticker": ticker}
+    if as_of_utc is not None:
+        sql += "\n          AND snapshot_ts_utc <= :as_of_utc"
+        params["as_of_utc"] = as_of_utc
     cur = conn.cursor()
     try:
-        cur.execute(sql, {"ticker": ticker})
+        cur.execute(sql, params)
         row = cur.fetchone()
         return None if row is None else row[0]
     finally:
@@ -2658,8 +2708,8 @@ def make_gex_chart(gex_by_strike: pd.DataFrame, spot_price: float) -> str:
 
 
 def run_gex_service(settings: dict) -> dict:
-    now_et = pd.Timestamp.now(tz=TIMEZONE)
-    gex_snapshot = get_net_gex_snapshot()
+    now_et = debug_as_of_timestamp(settings) or pd.Timestamp.now(tz=TIMEZONE)
+    gex_snapshot = get_net_gex_snapshot(now_et)
     terminal_snapshot = run_web_service(settings)
     spot_price = gex_snapshot["spot_price"]
     gex_by_strike = gex_snapshot["gex_by_strike"]
@@ -2694,7 +2744,7 @@ def run_gex_service(settings: dict) -> dict:
 
 
 def run_option_chain_service(settings: dict) -> dict:
-    now_et = pd.Timestamp.now(tz=TIMEZONE)
+    now_et = debug_as_of_timestamp(settings) or pd.Timestamp.now(tz=TIMEZONE)
     options, underlying, expiration_date, snapshot_ts = fetch_spx_option_chain_for_session(now_et)
     terminal_snapshot = run_web_service(settings)
     rows = build_option_chain_rows(options)
@@ -2832,9 +2882,8 @@ def make_gex_notice(message: str) -> str:
     )
 
 
-def get_net_gex_snapshot() -> dict:
-    now_et = pd.Timestamp.now(tz=TIMEZONE)
-
+def get_net_gex_snapshot(now_et: Optional[pd.Timestamp] = None) -> dict:
+    now_et = now_et or pd.Timestamp.now(tz=TIMEZONE)
     options, underlying, expiration_date = fetch_spx_options_for_session(now_et)
     spot_price = float(
         underlying.get("regularMarketPrice")
@@ -3756,7 +3805,7 @@ def run_web_service(settings: dict) -> dict:
     trade_type = "Bull Put Credit Spread" if trade == "SELL PUT SPREAD" else ("Bear Call Credit Spread" if trade == "SELL CALL SPREAD" else "No trade")
 
     try:
-        gex_snapshot = get_net_gex_snapshot()
+        gex_snapshot = get_net_gex_snapshot(now_et)
         net_gex = gex_snapshot["net_gex"]
         net_gex_billions = format_billions(net_gex)
         expiration_date = gex_snapshot["expiration_date"]
@@ -4062,7 +4111,7 @@ def gex():
     try:
         data = run_gex_service(settings)
     except NoOpenInterestInFeedError as exc:
-        now_et = pd.Timestamp.now(tz=TIMEZONE)
+        now_et = debug_as_of_timestamp(settings) or pd.Timestamp.now(tz=TIMEZONE)
         terminal_snapshot = run_web_service(settings)
         underlying = exc.underlying or {}
         spot_price = float(
@@ -4093,7 +4142,7 @@ def gex():
             "error": None,
         }
     except Exception as exc:
-        now_et = pd.Timestamp.now(tz=TIMEZONE)
+        now_et = debug_as_of_timestamp(settings) or pd.Timestamp.now(tz=TIMEZONE)
         terminal_snapshot = run_web_service(settings)
         data = {
             "subtitle": (
@@ -4124,7 +4173,7 @@ def option_chain():
     try:
         data = run_option_chain_service(settings)
     except Exception as exc:
-        now_et = pd.Timestamp.now(tz=TIMEZONE)
+        now_et = debug_as_of_timestamp(settings) or pd.Timestamp.now(tz=TIMEZONE)
         terminal_snapshot = run_web_service(settings)
         data = {
             "subtitle": (
