@@ -617,6 +617,9 @@ TERMINAL_HTML = """
         .debug-form input[type="date"]{min-width:128px; text-transform:none;}
         .debug-form input[type="time"]{min-width:88px; text-transform:none;}
         .debug-form input:disabled{opacity:1; cursor:not-allowed; color:var(--muted);}
+        .debug-picker{position:relative; display:inline-flex; align-items:center;}
+        .debug-picker input{padding-right:26px;}
+        .debug-picker.active:after{content:"\\1F50D"; position:absolute; right:7px; top:50%; transform:translateY(-50%); color:var(--cyan); font-size:12px; line-height:1; pointer-events:none; opacity:.76; text-shadow:0 0 8px rgba(0,229,240,.36);}
         .debug-switch{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
         .debug-switch input{position:absolute; opacity:0; pointer-events:none;}
         .debug-slider{width:38px; height:20px; border:1px solid rgba(0,229,240,.3); background:rgba(142,170,179,.16); position:relative;}
@@ -744,8 +747,12 @@ TERMINAL_HTML = """
                 <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
                 <span class="debug-slider"></span>
             </label>
-            <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
-            <input type="time" name="debug_time" step="60" value="{{ data.debug_control_time }}" {% if not data.debug_mode %}disabled{% endif %}>
+            <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
+                <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
+            </span>
+            <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
+                <input type="time" name="debug_time" step="60" value="{{ data.debug_control_time }}" {% if not data.debug_mode %}disabled{% endif %}>
+            </span>
         </form>
     </section>
 
@@ -1908,6 +1915,9 @@ TERMINAL_PAGE_HTML = """
         .debug-form input[type="date"]{min-width:128px; text-transform:none;}
         .debug-form input[type="time"]{min-width:88px; text-transform:none;}
         .debug-form input:disabled{opacity:1; cursor:not-allowed; color:var(--muted);}
+        .debug-picker{position:relative; display:inline-flex; align-items:center;}
+        .debug-picker input{padding-right:26px;}
+        .debug-picker.active:after{content:"\\1F50D"; position:absolute; right:7px; top:50%; transform:translateY(-50%); color:var(--cyan); font-size:12px; line-height:1; pointer-events:none; opacity:.76; text-shadow:0 0 8px rgba(0,229,240,.36);}
         .simulator-status{margin-bottom:16px;}
         .simulator-status .metric-value{font-size:20px; line-height:1.35; white-space:normal; overflow-wrap:anywhere;}
         .simulator-chart{height:640px;}
@@ -1949,8 +1959,12 @@ TERMINAL_PAGE_HTML = """
                 <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
                 <span class="debug-slider"></span>
             </label>
-            <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
-            <input type="time" name="debug_time" step="60" value="{{ data.debug_control_time }}" {% if not data.debug_mode %}disabled{% endif %}>
+            <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
+                <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
+            </span>
+            <span class="debug-picker {{ 'active' if data.debug_mode else '' }}">
+                <input type="time" name="debug_time" step="60" value="{{ data.debug_control_time }}" {% if not data.debug_mode %}disabled{% endif %}>
+            </span>
         </form>
     </section>
 
@@ -3346,6 +3360,7 @@ def make_chart(
             itemclick="toggle",
             itemdoubleclick="toggleothers",
         ),
+        showlegend=False,
         hovermode="closest",
         hoverlabel=dict(bgcolor="#0f141b", bordercolor="#273244", font=dict(color="#e8eef7")),
         hoverdistance=20,
@@ -3376,13 +3391,13 @@ def make_chart(
     var tooltip = null;
     var crosshairV = null;
     var crosshairH = null;
-    var labelsVisible = true;
+    var labelsVisible = false;
 
     if (!gd.style.position) gd.style.position = 'relative';
 
     var legendButton = document.createElement('button');
     legendButton.type = 'button';
-    legendButton.textContent = 'Labels -';
+    legendButton.textContent = 'Labels +';
     legendButton.setAttribute('aria-label', 'Toggle chart labels');
     legendButton.style.position = 'absolute';
     legendButton.style.left = '8px';
