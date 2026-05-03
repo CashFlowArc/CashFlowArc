@@ -615,6 +615,8 @@ TERMINAL_HTML = """
         .debug-form input,.debug-form select{height:28px; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 8px; font:inherit;}
         .debug-form .refresh-input{width:68px;}
         .debug-form input[type="date"]{min-width:128px; text-transform:none;}
+        .debug-form input[type="time"]{min-width:88px; text-transform:none;}
+        .debug-form input:disabled{opacity:1; cursor:not-allowed; color:var(--muted);}
         .debug-switch{display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
         .debug-switch input{position:absolute; opacity:0; pointer-events:none;}
         .debug-slider{width:38px; height:20px; border:1px solid rgba(0,229,240,.3); background:rgba(142,170,179,.16); position:relative;}
@@ -742,13 +744,8 @@ TERMINAL_HTML = """
                 <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
                 <span class="debug-slider"></span>
             </label>
-            <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}">
-            <select name="debug_time">
-                <option value="">Time</option>
-                {% for option in data.debug_time_options %}
-                <option value="{{ option }}" {% if data.debug_time == option %}selected{% endif %}>{{ option }}</option>
-                {% endfor %}
-            </select>
+            <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
+            <input type="time" name="debug_time" step="60" value="{{ data.debug_control_time }}" {% if not data.debug_mode %}disabled{% endif %}>
         </form>
     </section>
 
@@ -1909,6 +1906,8 @@ TERMINAL_PAGE_HTML = """
         .terminal-button:hover{filter:brightness(1.08);}
         .debug-form .refresh-input{width:68px;}
         .debug-form input[type="date"]{min-width:128px; text-transform:none;}
+        .debug-form input[type="time"]{min-width:88px; text-transform:none;}
+        .debug-form input:disabled{opacity:1; cursor:not-allowed; color:var(--muted);}
         .simulator-status{margin-bottom:16px;}
         .simulator-status .metric-value{font-size:20px; line-height:1.35; white-space:normal; overflow-wrap:anywhere;}
         .simulator-chart{height:640px;}
@@ -1950,13 +1949,8 @@ TERMINAL_PAGE_HTML = """
                 <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
                 <span class="debug-slider"></span>
             </label>
-            <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}">
-            <select name="debug_time">
-                <option value="">Time</option>
-                {% for option in data.debug_time_options %}
-                <option value="{{ option }}" {% if data.debug_time == option %}selected{% endif %}>{{ option }}</option>
-                {% endfor %}
-            </select>
+            <input type="date" name="debug_trade_date" value="{{ data.debug_control_date }}" {% if not data.debug_mode %}disabled{% endif %}>
+            <input type="time" name="debug_time" step="60" value="{{ data.debug_control_time }}" {% if not data.debug_mode %}disabled{% endif %}>
         </form>
     </section>
 
@@ -2160,8 +2154,6 @@ def load_settings() -> dict:
             out["simulator_execution_end_time"] = normalize_execution_end_time(out.get("simulator_execution_end_time", "14:00"))
             if out["chart_interval"] not in {"5min", "15min", "1h"}:
                 out["chart_interval"] = "5min"
-            if out["debug_time"] and out["debug_time"] not in DEBUG_TIME_OPTIONS:
-                out["debug_time"] = ""
             return out
         except Exception:
             pass
@@ -3894,6 +3886,7 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "debug_trade_date": "",
         "debug_control_date": dt.date.today().isoformat(),
         "debug_time": "",
+        "debug_control_time": dt.datetime.now().strftime("%H:%M"),
         "debug_time_options": DEBUG_TIME_OPTIONS,
         "chart_html": "",
         "source_table": SOURCE_TABLE,
@@ -3903,9 +3896,13 @@ def ensure_terminal_display_data(data: dict) -> dict:
     }
     for key, value in defaults.items():
         data.setdefault(key, value)
-    today = pd.Timestamp.now(tz=TIMEZONE).date().isoformat()
+    now_et = pd.Timestamp.now(tz=TIMEZONE)
+    today = now_et.date().isoformat()
+    current_time = now_et.strftime("%H:%M")
     saved_debug_date = str(data.get("debug_trade_date", "") or "").strip()
+    saved_debug_time = normalize_simulator_time(data.get("debug_time", ""), "")
     data["debug_control_date"] = (saved_debug_date or today) if data.get("debug_mode", False) else today
+    data["debug_control_time"] = (saved_debug_time or current_time) if data.get("debug_mode", False) else current_time
     return data
 
 
@@ -3923,6 +3920,7 @@ def add_terminal_chrome_data(settings: dict, page_data: dict, active_tab: str) -
     merged["debug_mode"] = settings.get("debug_mode", False)
     merged["debug_trade_date"] = settings.get("debug_trade_date", "")
     merged["debug_time"] = settings.get("debug_time", "")
+    merged["debug_control_time"] = settings.get("debug_control_time", "")
     merged["debug_time_options"] = DEBUG_TIME_OPTIONS
     return ensure_terminal_display_data(merged)
 
@@ -3973,8 +3971,6 @@ def update_settings():
         debug_mode = bool(current.get("debug_mode", False))
     debug_trade_date = str(request.form.get("debug_trade_date", current.get("debug_trade_date", "")) or "")
     debug_time = normalize_simulator_time(request.form.get("debug_time", current.get("debug_time", "")), "")
-    if debug_time and debug_time not in DEBUG_TIME_OPTIONS:
-        debug_time = ""
 
     try:
         simulator_speed = float(request.form.get("simulator_speed", current.get("simulator_speed", 60.0)))
