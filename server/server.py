@@ -687,14 +687,17 @@ TERMINAL_HTML = """
         .panel-title .trade-state.no-trade{color:var(--red);}
         .option-grid table{min-width:0;}
         .ladder td{font-size:13px; padding:7px 6px;}
-        .strategy-ladder{height:100%; table-layout:fixed; border:1px solid rgba(0,229,240,.18); background:linear-gradient(180deg, rgba(2,18,22,.68), rgba(0,7,10,.72));}
-        .strategy-ladder th,.strategy-ladder td{font-size:12px; padding:8px 7px;}
-        .strategy-ladder th{color:#8eaab3; letter-spacing:.08em;}
-        .strategy-ladder td:first-child{width:24%; color:var(--cyan); font-weight:900; text-align:left;}
-        .strategy-ladder td:nth-child(2){width:36%; color:#dffcff; font-weight:900; text-align:left;}
-        .strategy-ladder td:last-child{width:40%; color:var(--muted); text-align:right;}
-        .strategy-ladder .active-step td{background:rgba(28,255,115,.08); color:var(--green);}
-        .strategy-ladder .wait-step td{background:rgba(255,196,0,.08);}
+        .condor-ladder{height:100%; table-layout:fixed; border:1px solid rgba(0,229,240,.18); background:linear-gradient(180deg, rgba(2,18,22,.68), rgba(0,7,10,.72));}
+        .condor-ladder th,.condor-ladder td{font-size:12px; padding:8px 7px;}
+        .condor-ladder th{color:#8eaab3; letter-spacing:.08em;}
+        .condor-ladder td:first-child{width:38%; color:#dffcff; font-weight:900; text-align:left;}
+        .condor-ladder td:nth-child(2){width:22%; color:var(--muted); font-weight:900; text-align:center;}
+        .condor-ladder td:last-child{width:40%; color:#dffcff; font-weight:900; text-align:right;}
+        .condor-ladder .short-leg td{background:rgba(255,196,0,.08);}
+        .condor-ladder .short-leg td:last-child{color:var(--yellow);}
+        .condor-ladder .long-leg td{background:rgba(0,229,240,.05);}
+        .condor-ladder .put-leg td:first-child{color:var(--cyan);}
+        .condor-ladder .call-leg td:first-child{color:var(--green);}
         .selected-short{outline:1px solid var(--red); color:var(--red); background:rgba(255,49,72,.08);}
         .selected-long{outline:1px solid var(--green); color:var(--green); background:rgba(28,255,115,.08);}
         .placeholder{color:var(--yellow); font-weight:900;}
@@ -835,13 +838,12 @@ TERMINAL_HTML = """
                         <tr><td>Breakeven</td><td class="placeholder">Needs option pricing</td></tr>
                         <tr><td>Net GEX</td><td class="{{ data.net_gex_signal_class }}">{{ data.net_gex_billions }}</td></tr>
                     </table>
-                    <table class="strategy-ladder" aria-label="Doug Strategy income loop">
-                        <tr><th>Phase</th><th>Doug Strategy</th><th>Rule</th></tr>
-                        <tr><td>01</td><td>Screen quality</td><td>Ownable through volatility</td></tr>
-                        <tr class="wait-step"><td>02</td><td>Sell OTM put</td><td>Only at target entry</td></tr>
-                        <tr><td>03</td><td>Accept assignment</td><td>Cash reserved first</td></tr>
-                        <tr><td>04</td><td>Covered call</td><td>Exit price is acceptable</td></tr>
-                        <tr class="active-step"><td>05</td><td>Reinvest income</td><td>Grow recurring cash flow</td></tr>
+                    <table class="condor-ladder" aria-label="Doug6 iron condor puts and calls">
+                        <tr><th>Doug6 Leg</th><th>Side</th><th>Strike</th></tr>
+                        <tr class="long-leg put-leg"><td>Long Put</td><td>PUT</td><td>{{ data.condor_long_put }}</td></tr>
+                        <tr class="short-leg put-leg"><td>Short Put</td><td>PUT</td><td>{{ data.condor_short_put }}</td></tr>
+                        <tr class="short-leg call-leg"><td>Short Call</td><td>CALL</td><td>{{ data.condor_short_call }}</td></tr>
+                        <tr class="long-leg call-leg"><td>Long Call</td><td>CALL</td><td>{{ data.condor_long_call }}</td></tr>
                     </table>
                 </div>
                 <div class="pl-profile">
@@ -3153,6 +3155,12 @@ def last_valid_number(series: pd.Series):
     return float(s.iloc[-1])
 
 
+def format_strike(value: Optional[float]) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"{value:,.0f}"
+
+
 def intraday_session_mask(ts_series: pd.Series) -> pd.Series:
     times = ts_series.dt.time
     weekdays = ts_series.dt.weekday < 5
@@ -3839,12 +3847,16 @@ def run_web_service(settings: dict) -> dict:
     spy_latest = last_valid_number(spy_current["close_price"]) if not spy_current.empty else None
     strike_points = float(settings.get("simulator_points", 70.0))
     spread_width = float(settings.get("simulator_wide", 20.0))
+    condor_short_put_value = latest_price - strike_points
+    condor_long_put_value = condor_short_put_value - spread_width
+    condor_short_call_value = latest_price + strike_points
+    condor_long_call_value = condor_short_call_value + spread_width
     if trade == "SELL PUT SPREAD":
-        short_strike_value = latest_price - strike_points
-        long_strike_value = short_strike_value - spread_width
+        short_strike_value = condor_short_put_value
+        long_strike_value = condor_long_put_value
     elif trade == "SELL CALL SPREAD":
-        short_strike_value = latest_price + strike_points
-        long_strike_value = short_strike_value + spread_width
+        short_strike_value = condor_short_call_value
+        long_strike_value = condor_long_call_value
     else:
         short_strike_value = None
         long_strike_value = None
@@ -3929,8 +3941,12 @@ def run_web_service(settings: dict) -> dict:
         "checklist": checklist,
         "trade": trade,
         "trade_type": trade_type,
-        "short_strike": "N/A" if short_strike_value is None else f"{short_strike_value:,.0f}",
-        "long_strike": "N/A" if long_strike_value is None else f"{long_strike_value:,.0f}",
+        "short_strike": format_strike(short_strike_value),
+        "long_strike": format_strike(long_strike_value),
+        "condor_long_put": format_strike(condor_long_put_value),
+        "condor_short_put": format_strike(condor_short_put_value),
+        "condor_short_call": format_strike(condor_short_call_value),
+        "condor_long_call": format_strike(condor_long_call_value),
         "credit": "Needs option Greeks/selection",
         "max_profit": "N/A",
         "max_risk": "N/A",
@@ -3983,6 +3999,10 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "trade_type": "No trade",
         "short_strike": "N/A",
         "long_strike": "N/A",
+        "condor_long_put": "N/A",
+        "condor_short_put": "N/A",
+        "condor_short_call": "N/A",
+        "condor_long_call": "N/A",
         "credit": "N/A",
         "max_profit": "N/A",
         "max_risk": "N/A",
