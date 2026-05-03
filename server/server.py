@@ -353,7 +353,7 @@ HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link active" href="/terminal">Modern Terminal</a>
+                <a class="nav-link active" href="/terminal">Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
                 <a class="nav-link" href="/option-chain">Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
@@ -632,12 +632,12 @@ TERMINAL_HTML = """
         .layout{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px; align-items:stretch;}
         .stack{display:grid; gap:18px; align-content:start;}
         .left-stack{grid-template-rows:auto auto;}
-        .center-stack{grid-template-rows:300px 206px 174px;}
+        .center-stack{grid-template-rows:270px 184px 154px;}
         .right-stack{grid-template-rows:auto auto; min-width:0; overflow:hidden;}
         .panel{padding:16px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:#c8f8ff; text-transform:uppercase; font-size:14px; font-weight:900; letter-spacing:.02em;}
         .panel-title span:last-child{color:var(--cyan)}
-        .chart-wrap{height:540px; overflow:hidden; background:radial-gradient(circle at 50% 10%, rgba(0,229,240,.06), rgba(0,8,11,.9) 56%); border:1px solid rgba(0,229,240,.22); box-shadow:inset 0 0 28px rgba(0,229,240,.045);}
+        .chart-wrap{height:456px; overflow:hidden; background:radial-gradient(circle at 50% 10%, rgba(0,229,240,.06), rgba(0,8,11,.9) 56%); border:1px solid rgba(0,229,240,.22); box-shadow:inset 0 0 28px rgba(0,229,240,.045);}
         .chart-wrap .plotly-graph-div{width:100% !important; height:100% !important;}
         .hero{display:grid; place-items:center; text-align:center;}
         .hero-inner{width:100%; display:grid; justify-items:center; gap:8px;}
@@ -657,7 +657,7 @@ TERMINAL_HTML = """
         .signal strong{display:block; color:var(--green); font-size:clamp(28px, 2.35vw, 38px); line-height:1; margin-top:8px; text-shadow:0 0 18px rgba(28,255,115,.32); white-space:nowrap;}
         .signal strong.red{color:var(--red); text-shadow:0 0 18px rgba(255,49,72,.30);}
         .signal strong.yellow{color:var(--yellow); text-shadow:0 0 18px rgba(255,196,0,.24);}
-        .bars{grid-column:1 / -1; grid-row:2; display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-top:0;}
+        .bars{grid-column:1 / -1; grid-row:2; display:grid; grid-template-columns:repeat(8,1fr); gap:7px; margin-top:0;}
         .bars i{height:8px; background:rgba(142,170,179,.24); border-radius:1px;}
         .bars i.on{background:var(--green); box-shadow:0 0 12px rgba(28,255,115,.45);}
         .confidence{display:grid; grid-template-columns:132px 1fr; gap:22px; align-items:center;}
@@ -673,7 +673,7 @@ TERMINAL_HTML = """
         .notes li.red{color:var(--red);}
         .notes li.red:before{box-shadow:0 0 10px rgba(255,49,72,.22);}
         .market-grid{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px;}
-        .market-grid .panel{min-height:170px;}
+        .market-grid .panel{min-height:160px;}
         .market-grid .panel:first-child{grid-column:1;}
         .market-grid .panel:nth-child(2){grid-column:3;}
         table{width:100%; border-collapse:collapse;}
@@ -682,8 +682,8 @@ TERMINAL_HTML = """
         td:last-child,th:last-child{text-align:right;}
         .option-grid{display:grid; grid-template-columns:minmax(250px,1.02fr) minmax(210px,.88fr); gap:16px; min-width:0; overflow:hidden;}
         .setup-table{table-layout:fixed;}
-        .setup-table td:first-child{width:34%; color:#dffcff;}
-        .setup-table td:last-child{width:66%; white-space:normal; overflow-wrap:anywhere;}
+        .setup-table td:first-child{width:44%; color:#dffcff;}
+        .setup-table td:last-child{width:56%; white-space:normal; overflow-wrap:anywhere;}
         .trade-state{font-weight:900; text-transform:uppercase;}
         .panel-title .trade-state.trade{color:var(--green);}
         .panel-title .trade-state.no-trade{color:var(--red);}
@@ -730,8 +730,8 @@ TERMINAL_HTML = """
         .tickerbar{display:flex; align-items:center; gap:34px; overflow:auto; white-space:nowrap; padding:12px 20px;}
         .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.market-grid .panel:first-child,.market-grid .panel:nth-child(2){grid-column:auto}.chart-wrap{height:520px}.topbar{grid-template-columns:1fr}.controlbar{display:grid; justify-items:center}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:260px 180px 156px}}
-        @media (max-width: 760px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}.chart-wrap{height:430px}}
+        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.market-grid .panel:first-child,.market-grid .panel:nth-child(2){grid-column:auto}.chart-wrap{height:470px}.topbar{grid-template-columns:1fr}.controlbar{display:grid; justify-items:center}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:250px 176px 150px}}
+        @media (max-width: 760px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}.chart-wrap{height:400px}}
     </style>
 </head>
 <body>
@@ -752,7 +752,7 @@ TERMINAL_HTML = """
     </header>
     <section class="controlbar">
         <nav class="nav-links">
-            <a class="nav-link active" href="/terminal">Modern Terminal</a>
+            <a class="nav-link active" href="/terminal">Terminal</a>
             <a class="nav-link" href="/gex">SPX GEX</a>
             <a class="nav-link" href="/option-chain">Option Chain</a>
             <a class="nav-link" href="/simulator">Simulator</a>
@@ -836,7 +836,8 @@ TERMINAL_HTML = """
                 <div class="option-grid">
                     <table class="setup-table">
                         <tr><td>Credit</td><td class="{{ data.credit_class }}">{{ data.credit }}</td></tr>
-                        <tr><td>Delta (Net)</td><td class="{{ data.delta_net_class }}">{{ data.delta_net }}</td></tr>
+                        <tr><td>Put Spread Delta</td><td class="{{ data.put_spread_delta_class }}">{{ data.put_spread_delta }}</td></tr>
+                        <tr><td>Call Spread Delta</td><td class="{{ data.call_spread_delta_class }}">{{ data.call_spread_delta }}</td></tr>
                         <tr><td>Max Profit</td><td class="{{ data.max_profit_class }}">{{ data.max_profit }}</td></tr>
                         <tr><td>Max Risk</td><td class="{{ data.max_risk_class }}">{{ data.max_risk }}</td></tr>
                         <tr><td>Breakeven</td><td class="{{ data.breakeven_class }}">{{ data.breakeven }}</td></tr>
@@ -957,7 +958,7 @@ HUD_HTML = """
         .chart-mini{height:220px; overflow:hidden; background:#03080a; border:1px solid rgba(0,229,240,.12);}
         .chart-mini .plotly-graph-div{width:100% !important; height:100% !important;}
         .signal{text-align:center}.signal strong{display:block; color:var(--green); font-size:34px; line-height:1; margin-top:6px; text-shadow:0 0 18px rgba(28,255,115,.35);}
-        .bars{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:12px}.bars i{height:6px; background:rgba(138,177,186,.2)}.bars i.on{background:var(--green); box-shadow:0 0 10px rgba(28,255,115,.45)}
+        .bars{display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-top:12px}.bars i{height:6px; background:rgba(138,177,186,.2)}.bars i.on{background:var(--green); box-shadow:0 0 10px rgba(28,255,115,.45)}
         .ring{height:82px; width:82px; border-radius:50%; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); display:grid; place-items:center; font-size:22px; font-weight:900; box-shadow:0 0 18px rgba(28,255,115,.2);}
         .ring span{height:58px; width:58px; border-radius:50%; display:grid; place-items:center; background:#041014;}
         .confidence{display:grid; grid-template-columns:86px 1fr; gap:10px; align-items:center;}
@@ -985,7 +986,7 @@ HUD_HTML = """
             <h1>CashFlowArc HUD</h1>
             <p>S&P 500 Index - SPX</p>
             <nav class="tabs">
-                <a class="active" href="/terminal">Modern Terminal</a>
+                <a class="active" href="/terminal">Terminal</a>
                 <a href="/gex">SPX GEX</a>
                 <a href="/option-chain">Option Chain</a>
                 <a href="/simulator">Simulator</a>
@@ -1169,7 +1170,7 @@ GEX_HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link" href="/terminal">Modern Terminal</a>
+                <a class="nav-link" href="/terminal">Terminal</a>
                 <a class="nav-link active" href="/gex">SPX GEX</a>
                 <a class="nav-link" href="/option-chain">Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
@@ -1303,7 +1304,7 @@ OPTION_CHAIN_HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link" href="/terminal">Modern Terminal</a>
+                <a class="nav-link" href="/terminal">Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
                 <a class="nav-link active" href="/option-chain">Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
@@ -1475,7 +1476,7 @@ SIMULATOR_HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link" href="/terminal">Modern Terminal</a>
+                <a class="nav-link" href="/terminal">Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
                 <a class="nav-link" href="/option-chain">Option Chain</a>
                 <a class="nav-link active" href="/simulator">Simulator</a>
@@ -1973,7 +1974,7 @@ TERMINAL_PAGE_HTML = """
     </header>
     <section class="controlbar">
         <nav class="nav-links">
-            <a class="{{ 'nav-link active' if data.active_tab == 'terminal' else 'nav-link' }}" href="/terminal">Modern Terminal</a>
+            <a class="{{ 'nav-link active' if data.active_tab == 'terminal' else 'nav-link' }}" href="/terminal">Terminal</a>
             <a class="{{ 'nav-link active' if data.active_tab == 'gex' else 'nav-link' }}" href="/gex">SPX GEX</a>
             <a class="{{ 'nav-link active' if data.active_tab == 'option-chain' else 'nav-link' }}" href="/option-chain">Option Chain</a>
             <a class="{{ 'nav-link active' if data.active_tab == 'simulator' else 'nav-link' }}" href="/simulator">Simulator</a>
@@ -3199,6 +3200,12 @@ def format_signed_delta(value: Optional[float]) -> str:
     return f"{float(value):+.2f}"
 
 
+def delta_class(value: str) -> str:
+    if value == "N/A":
+        return "placeholder"
+    return "red" if value.startswith("-") else "green"
+
+
 def format_breakeven_pair(lower: Optional[float], upper: Optional[float]) -> str:
     if lower is None or upper is None or pd.isna(lower) or pd.isna(upper):
         return "N/A"
@@ -3418,9 +3425,15 @@ def build_doug6_trade_setup(trade_date: dt.date, settings: dict) -> dict:
     short_put_delta = option_leg_delta(short_put, spot_price, now_et, expiration_date)
     short_call_delta = option_leg_delta(short_call, spot_price, now_et, expiration_date)
     long_call_delta = option_leg_delta(long_call, spot_price, now_et, expiration_date)
+    put_spread_delta: Optional[float] = None
+    call_spread_delta: Optional[float] = None
     net_delta: Optional[float] = None
-    if None not in {long_put_delta, short_put_delta, short_call_delta, long_call_delta}:
-        net_delta = float(long_put_delta - short_put_delta - short_call_delta + long_call_delta)
+    if None not in {long_put_delta, short_put_delta}:
+        put_spread_delta = float(long_put_delta - short_put_delta)
+    if None not in {short_call_delta, long_call_delta}:
+        call_spread_delta = float(long_call_delta - short_call_delta)
+    if put_spread_delta is not None and call_spread_delta is not None:
+        net_delta = put_spread_delta + call_spread_delta
 
     long_put_strike = option_leg_price(long_put, "strike")
     short_put_strike = option_leg_price(short_put, "strike")
@@ -3437,6 +3450,8 @@ def build_doug6_trade_setup(trade_date: dt.date, settings: dict) -> dict:
         "condor_spx_ref": format_price_reference(spot_price),
         "credit": format_trade_currency(credit),
         "delta_net": format_signed_delta(net_delta),
+        "put_spread_delta": format_signed_delta(put_spread_delta),
+        "call_spread_delta": format_signed_delta(call_spread_delta),
         "breakeven": format_breakeven_pair(lower_breakeven, upper_breakeven),
         "max_profit": format_trade_currency(credit),
         "max_risk": format_trade_currency(max_risk),
@@ -3583,8 +3598,8 @@ def make_chart(
         rows=2,
         cols=1,
         shared_xaxes=True,
-        row_heights=[0.82, 0.18],
-        vertical_spacing=0.02,
+        row_heights=[0.89, 0.11],
+        vertical_spacing=0.015,
     )
     candle_hover = [
         f"Time: {t}<br>Open: {o:.0f}<br>High: {h:.0f}<br>Low: {l:.0f}<br>Close: {c:.0f}"
@@ -3696,7 +3711,7 @@ def make_chart(
         ), row=1, col=1)
 
     fig.update_layout(
-        margin=dict(l=18, r=58, t=18, b=28),
+        margin=dict(l=18, r=58, t=14, b=14),
         paper_bgcolor="#17202b",
         plot_bgcolor="#17202b",
         font=dict(color="#e8eef7"),
@@ -4114,8 +4129,9 @@ def run_web_service(settings: dict) -> dict:
     ]
     confidence = int(round(sum(1 for item in checklist if item["status"] == "PASS") / len(checklist) * 100))
     pass_count = sum(1 for item in checklist if item["status"] == "PASS")
-    active_signal_bars = int(round(pass_count / len(checklist) * 6))
-    signal_bars = [i < active_signal_bars for i in range(6)]
+    signal_bar_count = 8
+    active_signal_bars = int(round(pass_count / len(checklist) * signal_bar_count))
+    signal_bars = [i < active_signal_bars for i in range(signal_bar_count)]
     setup_notes = [
         {
             "label": "Price above VWAP" if latest_price > latest_vwap else "Price below VWAP",
@@ -4146,6 +4162,8 @@ def run_web_service(settings: dict) -> dict:
         "condor_spx_ref": "N/A",
         "credit": "N/A",
         "delta_net": "N/A",
+        "put_spread_delta": "N/A",
+        "call_spread_delta": "N/A",
         "breakeven": "N/A",
         "max_profit": "N/A",
         "max_risk": "N/A",
@@ -4248,7 +4266,11 @@ def run_web_service(settings: dict) -> dict:
         "credit": doug6_setup["credit"],
         "credit_class": "placeholder" if doug6_setup["credit"] == "N/A" else "green",
         "delta_net": doug6_setup["delta_net"],
-        "delta_net_class": "placeholder" if doug6_setup["delta_net"] == "N/A" else "green",
+        "delta_net_class": delta_class(doug6_setup["delta_net"]),
+        "put_spread_delta": doug6_setup["put_spread_delta"],
+        "put_spread_delta_class": delta_class(doug6_setup["put_spread_delta"]),
+        "call_spread_delta": doug6_setup["call_spread_delta"],
+        "call_spread_delta_class": delta_class(doug6_setup["call_spread_delta"]),
         "max_profit": doug6_setup["max_profit"],
         "max_profit_class": "placeholder" if doug6_setup["max_profit"] == "N/A" else "green",
         "max_risk": doug6_setup["max_risk"],
@@ -4299,7 +4321,7 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "open_distance_pct": "N/A",
         "bias_label": "NEUTRAL",
         "confidence": 0,
-        "signal_bars": [False, False, False, False, False, False],
+        "signal_bars": [False, False, False, False, False, False, False, False],
         "setup_notes": [{"label": "Waiting for Oracle market data", "class": "red"}],
         "checklist": [{"label": "Oracle data available", "status": "WATCH", "class": "yellow"}],
         "trade": "NO TRADE",
@@ -4315,6 +4337,10 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "credit_class": "placeholder",
         "delta_net": "N/A",
         "delta_net_class": "placeholder",
+        "put_spread_delta": "N/A",
+        "put_spread_delta_class": "placeholder",
+        "call_spread_delta": "N/A",
+        "call_spread_delta_class": "placeholder",
         "max_profit": "N/A",
         "max_profit_class": "placeholder",
         "max_risk": "N/A",
