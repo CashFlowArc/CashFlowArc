@@ -353,11 +353,9 @@ HTML = """
         </div>
         <div class="top-right">
             <div class="nav-links">
-                <a class="nav-link" href="/terminal">Modern Terminal</a>
-                <a class="nav-link" href="/hud">AR HUD</a>
-                <a class="nav-link active" href="/">Classic Terminal</a>
+                <a class="nav-link active" href="/terminal">Modern Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
-                <a class="nav-link" href="/option-chain">SPX Option Chain</a>
+                <a class="nav-link" href="/option-chain">Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
             </div>
             <form id="settings-form" method="post" action="/settings" class="control-form">
@@ -728,8 +726,6 @@ TERMINAL_HTML = """
     <section class="controlbar">
         <nav class="nav-links">
             <a class="nav-link active" href="/terminal">Modern Terminal</a>
-            <a class="nav-link" href="/hud">AR HUD</a>
-            <a class="nav-link" href="/">Classic Terminal</a>
             <a class="nav-link" href="/gex">SPX GEX</a>
             <a class="nav-link" href="/option-chain">Option Chain</a>
             <a class="nav-link" href="/simulator">Simulator</a>
@@ -955,9 +951,7 @@ HUD_HTML = """
             <h1>CashFlowArc HUD</h1>
             <p>S&P 500 Index - SPX</p>
             <nav class="tabs">
-                <a href="/terminal">Modern Terminal</a>
-                <a class="active" href="/hud">AR HUD</a>
-                <a href="/">Classic Terminal</a>
+                <a class="active" href="/terminal">Modern Terminal</a>
                 <a href="/gex">SPX GEX</a>
                 <a href="/option-chain">Option Chain</a>
                 <a href="/simulator">Simulator</a>
@@ -1142,10 +1136,8 @@ GEX_HTML = """
         <div class="top-right">
             <div class="nav-links">
                 <a class="nav-link" href="/terminal">Modern Terminal</a>
-                <a class="nav-link" href="/hud">AR HUD</a>
-                <a class="nav-link" href="/">Classic Terminal</a>
                 <a class="nav-link active" href="/gex">SPX GEX</a>
-                <a class="nav-link" href="/option-chain">SPX Option Chain</a>
+                <a class="nav-link" href="/option-chain">Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
             </div>
             <form id="gex-settings-form" method="post" action="/settings" class="control-form">
@@ -1278,10 +1270,8 @@ OPTION_CHAIN_HTML = """
         <div class="top-right">
             <div class="nav-links">
                 <a class="nav-link" href="/terminal">Modern Terminal</a>
-                <a class="nav-link" href="/hud">AR HUD</a>
-                <a class="nav-link" href="/">Classic Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
-                <a class="nav-link active" href="/option-chain">SPX Option Chain</a>
+                <a class="nav-link active" href="/option-chain">Option Chain</a>
                 <a class="nav-link" href="/simulator">Simulator</a>
             </div>
             <form id="option-settings-form" method="post" action="/settings" class="control-form">
@@ -1452,10 +1442,8 @@ SIMULATOR_HTML = """
         <div class="top-right">
             <div class="nav-links">
                 <a class="nav-link" href="/terminal">Modern Terminal</a>
-                <a class="nav-link" href="/hud">AR HUD</a>
-                <a class="nav-link" href="/">Classic Terminal</a>
                 <a class="nav-link" href="/gex">SPX GEX</a>
-                <a class="nav-link" href="/option-chain">SPX Option Chain</a>
+                <a class="nav-link" href="/option-chain">Option Chain</a>
                 <a class="nav-link active" href="/simulator">Simulator</a>
             </div>
             <div class="status-pill {{ 'enter' if data.trade != 'NO TRADE' else 'no' }}">
@@ -1471,8 +1459,6 @@ SIMULATOR_HTML = """
         <form id="simulator-form" method="get" action="/simulator" class="control-form" style="margin-bottom:16px;">
             <span class="control-label">Ticker</span>
             <input id="simulator-ticker" class="text-input ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
-            <span class="control-label">Date</span>
-            <input id="simulator-trade-date" class="text-input date-input" type="date" name="trade_date" value="{{ data.trade_date }}">
             <span class="control-label">Speed</span>
             <input id="simulator-speed" class="text-input" type="number" name="speed" min="0.5" max="360" step="0.5" value="{{ data.speed }}">
             <span class="control-label">Points +/-</span>
@@ -1493,7 +1479,7 @@ SIMULATOR_HTML = """
         <div id="simulator-chart" class="chart-wrap"></div>
 
         <div class="notes">
-            Simulation uses Oracle data aggregated into 5-minute candles for the selected day. Each candle plays over 60 simulated seconds: 10 seconds at the open, 20 seconds to a random high/low, 20 seconds to the other extreme, and 10 seconds to the close. Rendering stops after the final intraday candle for the session.
+            Simulation uses the debug date from the terminal header and Oracle data aggregated into 5-minute candles. Each candle plays over 60 simulated seconds: 10 seconds at the open, 20 seconds to a random high/low, 20 seconds to the other extreme, and 10 seconds to the close. Rendering stops after the final intraday candle for the session.
         </div>
         {% endif %}
     </div>
@@ -1511,7 +1497,6 @@ SIMULATOR_HTML = """
     const executionEndTime = {{ data.execution_end_time|tojson }};
     const formEl = document.getElementById('simulator-form');
     const tickerInputEl = document.getElementById('simulator-ticker');
-    const dateInputEl = document.getElementById('simulator-trade-date');
     const speedInputEl = document.getElementById('simulator-speed');
     const pointsInputEl = document.getElementById('simulator-points');
     const wideInputEl = document.getElementById('simulator-wide');
@@ -1664,7 +1649,6 @@ SIMULATOR_HTML = """
     function currentSessionState() {
         return {
             ticker: normalizeTicker(tickerInputEl ? tickerInputEl.value : ''),
-            tradeDate: dateInputEl ? dateInputEl.value : '',
             speed: normalizeNumberString(speedInputEl ? speedInputEl.value : ''),
             points: normalizeNumberString(pointsInputEl ? pointsInputEl.value : ''),
             wide: normalizeNumberString(wideInputEl ? wideInputEl.value : ''),
@@ -1685,7 +1669,6 @@ SIMULATOR_HTML = """
     function persistSimulatorSettings() {
         if (!formEl) return Promise.resolve();
         const data = new FormData();
-        data.set('simulator_trade_date', dateInputEl ? dateInputEl.value : '');
         data.set('simulator_speed', speedInputEl ? speedInputEl.value : '');
         data.set('simulator_points', pointsInputEl ? pointsInputEl.value : '');
         data.set('simulator_wide', wideInputEl ? wideInputEl.value : '');
@@ -1701,7 +1684,7 @@ SIMULATOR_HTML = """
         }, 250);
     }
 
-    [dateInputEl, speedInputEl, pointsInputEl, wideInputEl, executeTimeInputEl, executionEndTimeInputEl].forEach((input) => {
+    [speedInputEl, pointsInputEl, wideInputEl, executeTimeInputEl, executionEndTimeInputEl].forEach((input) => {
         if (!input) return;
         input.addEventListener('input', debouncePersist);
         input.addEventListener('change', debouncePersist);
@@ -1869,6 +1852,275 @@ SIMULATOR_HTML = """
 {% endif %}
 </body>
 </html>
+"""
+
+
+_TERMINAL_STYLE_MATCH = re.search(r"<style>(.*?)</style>", TERMINAL_HTML, re.S)
+TERMINAL_STYLE = _TERMINAL_STYLE_MATCH.group(1) if _TERMINAL_STYLE_MATCH else ""
+
+_SIMULATOR_SCRIPT_MATCH = re.search(
+    r"({% if not data.error %}\s*<script>.*?</script>\s*{% endif %})",
+    SIMULATOR_HTML,
+    re.S,
+)
+SIMULATOR_TERMINAL_SCRIPT = _SIMULATOR_SCRIPT_MATCH.group(1) if _SIMULATOR_SCRIPT_MATCH else ""
+
+TERMINAL_PAGE_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>CashFlowArc Terminal</title>
+    <link rel="icon" href="{{ url_for('favicon_svg', v=favicon_version) }}" sizes="any" type="image/svg+xml">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+{{ terminal_style|safe }}
+        .shell{grid-template-rows:auto auto 1fr auto;}
+        .page-stack{display:grid; gap:18px; align-content:start; min-width:0;}
+        .page-grid{display:grid; grid-template-columns:minmax(0,1fr); gap:18px; align-items:start; min-width:0;}
+        .gex-grid{grid-template-columns:minmax(0,1fr) minmax(300px,420px);}
+        .metric-strip{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px;}
+        .terminal-metric{min-height:126px; display:grid; align-content:start; gap:8px;}
+        .metric-label{color:var(--muted); font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;}
+        .metric-value{font-size:clamp(24px,2.2vw,36px); line-height:1; color:#dffcff; font-weight:900;}
+        .metric-sub{color:var(--muted); font-size:12px; line-height:1.45;}
+        .terminal-note{margin:0; color:var(--muted); font-size:12px; line-height:1.65;}
+        .terminal-chart-tall{height:620px;}
+        .terminal-chart-tall .plotly-graph-div{height:100% !important;}
+        .terminal-table-wrap{overflow:auto; max-height:72vh; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.68); box-shadow:inset 0 0 28px rgba(0,229,240,.045);}
+        .terminal-table{min-width:1120px; border-collapse:separate; border-spacing:0;}
+        .terminal-table th,.terminal-table td{padding:10px 9px; border-bottom:1px solid rgba(142,170,179,.16); font-size:12px; white-space:nowrap; text-align:right;}
+        .terminal-table th{position:sticky; top:0; z-index:1; color:var(--muted); background:rgba(2,12,16,.96); text-transform:uppercase; letter-spacing:.06em;}
+        .terminal-table tbody tr:nth-child(even){background:rgba(255,255,255,.018);}
+        .terminal-table tbody tr:hover{background:rgba(0,229,240,.06);}
+        .terminal-table .strike{text-align:center; color:#f3fbff; background:rgba(255,255,255,.025); font-weight:900;}
+        .call-last,.call-bid,.call-ask,.call-vol,.call-oi,.call-iv{color:var(--green);}
+        .put-last,.put-bid,.put-ask,.put-vol,.put-oi,.put-iv{color:var(--red);}
+        .simulator-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
+        .simulator-controls .control-label{font-size:11px; color:var(--muted); font-weight:900; letter-spacing:.08em; text-transform:uppercase;}
+        .simulator-controls input{height:32px; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 9px; font:inherit;}
+        .simulator-controls .ticker-input{width:112px;}
+        .simulator-controls .time-input{width:112px;}
+        .terminal-button{height:32px; cursor:pointer; border:1px solid rgba(0,229,240,.34); background:linear-gradient(135deg, rgba(0,229,240,.92), rgba(223,252,255,.92)); color:#031014; font-size:11px; font-weight:900; text-transform:uppercase; padding:0 12px;}
+        .terminal-button:hover{filter:brightness(1.08);}
+        .simulator-status{margin-bottom:16px;}
+        .simulator-status .metric-value{font-size:20px; line-height:1.35; white-space:normal; overflow-wrap:anywhere;}
+        .simulator-chart{height:640px;}
+        .simulator-chart .plotly-graph-div{height:100% !important;}
+        @media (max-width: 980px){.gex-grid{grid-template-columns:1fr}.metric-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.terminal-chart-tall{height:540px}.simulator-chart{height:520px}}
+        @media (max-width: 680px){.metric-strip{grid-template-columns:1fr}.simulator-controls input,.simulator-controls .ticker-input,.simulator-controls .time-input{width:100%}.terminal-button{width:100%}.simulator-chart{height:440px}}
+    </style>
+</head>
+<body>
+<main class="shell">
+    <header class="topbar">
+        <div class="timeblock">
+            <span class="clockmark">TIME</span>
+            <span>{{ data.header_time }}</span>
+            <span>{{ data.header_date }}</span>
+            <span>{{ data.header_weekday }}</span>
+        </div>
+        <div class="brand">
+            <h1>CashFlowArc Terminal</h1>
+        </div>
+        <div class="nav-panel">
+            <div class="market-readout"><b class="{{ data.market_status_class }}">{{ data.market_status }}</b>{{ data.market_hours }}</div>
+        </div>
+    </header>
+    <section class="controlbar">
+        <nav class="nav-links">
+            <a class="{{ 'nav-link active' if data.active_tab == 'terminal' else 'nav-link' }}" href="/terminal">Modern Terminal</a>
+            <a class="{{ 'nav-link active' if data.active_tab == 'gex' else 'nav-link' }}" href="/gex">SPX GEX</a>
+            <a class="{{ 'nav-link active' if data.active_tab == 'option-chain' else 'nav-link' }}" href="/option-chain">Option Chain</a>
+            <a class="{{ 'nav-link active' if data.active_tab == 'simulator' else 'nav-link' }}" href="/simulator">Simulator</a>
+        </nav>
+        <form class="debug-form" method="post" action="/settings">
+            <input type="hidden" name="refresh_interval" value="{{ data.refresh_interval }}">
+            <input type="hidden" name="chart_interval" value="{{ data.chart_interval }}">
+            <input type="hidden" name="debug_mode" value="0">
+            <label class="debug-switch">
+                <span>Debug</span>
+                <input type="checkbox" name="debug_mode" value="1" {% if data.debug_mode %}checked{% endif %}>
+                <span class="debug-slider"></span>
+            </label>
+            <input type="date" name="debug_trade_date" value="{{ data.debug_trade_date }}">
+            <select name="debug_time">
+                <option value="">Time</option>
+                {% for option in data.debug_time_options %}
+                <option value="{{ option }}" {% if data.debug_time == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </section>
+
+    {% if data.error %}
+    <section class="panel"><div class="err">{{ data.error }}</div></section>
+    {% else %}
+    {{ data.page_content|safe }}
+    {% endif %}
+
+    <footer class="tickerbar">
+        <span><b>WATCHLIST</b></span>
+        <span>SPX <span class="green">{{ data.price }}</span></span>
+        <span>SPY <span class="green">{{ data.spy_price }}</span></span>
+        <span class="muted">Refresh {{ data.refresh_interval }}s</span>
+    </footer>
+</main>
+<script>
+document.querySelectorAll('.debug-form').forEach(function(form) {
+    form.addEventListener('change', function() {
+        fetch('/settings', { method: 'POST', body: new FormData(form) })
+            .then(function() { window.location.reload(); })
+            .catch(function() {});
+    });
+});
+{% if data.active_tab != 'simulator' %}
+setTimeout(function(){ window.location.reload(); }, Math.max(15, Number({{ data.refresh_interval }})) * 1000);
+{% endif %}
+</script>
+{{ data.page_script|safe }}
+</body>
+</html>
+"""
+
+GEX_TERMINAL_CONTENT = """
+<section class="page-grid gex-grid">
+    <section class="panel">
+        <div class="panel-title"><span>SPX Gamma Exposure</span><span>{{ data.expiration_date }}</span></div>
+        <div class="chart-wrap terminal-chart-tall">{{ data.chart_html|safe }}</div>
+    </section>
+    <section class="page-stack">
+        <section class="panel terminal-metric">
+            <div class="metric-label">Spot</div>
+            <div class="metric-value">{{ data.spot_price }}</div>
+            <div class="metric-sub">Latest SPX price from the stored option snapshot.</div>
+        </section>
+        <section class="panel terminal-metric">
+            <div class="metric-label">Net GEX</div>
+            <div class="metric-value {{ data.net_gex_signal_class }}">{{ data.net_gex_billions }}</div>
+            <div class="metric-sub">Per 1 percent move, shown in billions.</div>
+        </section>
+        <section class="panel terminal-metric">
+            <div class="metric-label">Call Wall</div>
+            <div class="metric-value">{{ data.call_wall }}</div>
+            <div class="metric-sub">Largest positive strike gamma exposure.</div>
+        </section>
+        <section class="panel terminal-metric">
+            <div class="metric-label">Put Wall</div>
+            <div class="metric-value">{{ data.put_wall }}</div>
+            <div class="metric-sub">Largest negative strike gamma exposure.</div>
+        </section>
+    </section>
+</section>
+<section class="panel">
+    <div class="panel-title"><span>Source Notes</span><span>Oracle Snapshot</span></div>
+    <p class="terminal-note">{{ data.subtitle }}</p>
+    <p class="terminal-note">Gamma exposure is estimated from stored option-chain open interest, implied volatility, and Black-Scholes gamma with time capped at a minimum of {{ data.min_time_minutes }} minute(s).</p>
+</section>
+"""
+
+OPTION_CHAIN_TERMINAL_CONTENT = """
+<section class="page-stack">
+    <section class="metric-strip">
+        <section class="panel terminal-metric">
+            <div class="metric-label">Spot</div>
+            <div class="metric-value">{{ data.spot_price }}</div>
+            <div class="metric-sub">Latest stored SPX underlying price.</div>
+        </section>
+        <section class="panel terminal-metric">
+            <div class="metric-label">Contracts</div>
+            <div class="metric-value">{{ data.contract_count }}</div>
+            <div class="metric-sub">Rows in the selected chain.</div>
+        </section>
+        <section class="panel terminal-metric">
+            <div class="metric-label">Call OI</div>
+            <div class="metric-value green">{{ data.call_open_interest }}</div>
+            <div class="metric-sub">Total call open interest.</div>
+        </section>
+        <section class="panel terminal-metric">
+            <div class="metric-label">Put OI</div>
+            <div class="metric-value red">{{ data.put_open_interest }}</div>
+            <div class="metric-sub">Total put open interest.</div>
+        </section>
+    </section>
+    <section class="panel">
+        <div class="panel-title"><span>SPX Option Chain</span><span>{{ data.expiration_date }}</span></div>
+        <div class="terminal-table-wrap">
+            <table class="terminal-table">
+                <thead>
+                    <tr>
+                        <th>Call Last</th>
+                        <th>Call Bid</th>
+                        <th>Call Ask</th>
+                        <th>Call Vol</th>
+                        <th>Call OI</th>
+                        <th>Call IV</th>
+                        <th class="strike">Strike</th>
+                        <th>Put IV</th>
+                        <th>Put OI</th>
+                        <th>Put Vol</th>
+                        <th>Put Bid</th>
+                        <th>Put Ask</th>
+                        <th>Put Last</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data.rows %}
+                    <tr>
+                        <td class="call-last">{{ row.call_last }}</td>
+                        <td class="call-bid">{{ row.call_bid }}</td>
+                        <td class="call-ask">{{ row.call_ask }}</td>
+                        <td class="call-vol">{{ row.call_volume }}</td>
+                        <td class="call-oi">{{ row.call_open_interest }}</td>
+                        <td class="call-iv">{{ row.call_iv }}</td>
+                        <td class="strike">{{ row.strike }}</td>
+                        <td class="put-iv">{{ row.put_iv }}</td>
+                        <td class="put-oi">{{ row.put_open_interest }}</td>
+                        <td class="put-vol">{{ row.put_volume }}</td>
+                        <td class="put-bid">{{ row.put_bid }}</td>
+                        <td class="put-ask">{{ row.put_ask }}</td>
+                        <td class="put-last">{{ row.put_last }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <section class="panel">
+        <div class="panel-title"><span>Source Notes</span><span>{{ data.source_table }}</span></div>
+        <p class="terminal-note">{{ data.subtitle }}</p>
+        <p class="terminal-note">This view uses the latest stored SPX option snapshot selected directly from Oracle.</p>
+    </section>
+</section>
+"""
+
+SIMULATOR_TERMINAL_CONTENT = """
+<section class="panel">
+    <div class="panel-title"><span>Simulator</span><span>Debug Date {{ data.trade_date or data.debug_trade_date or 'Not Selected' }}</span></div>
+    <form id="simulator-form" method="get" action="/simulator" class="simulator-controls">
+        <span class="control-label">Ticker</span>
+        <input id="simulator-ticker" class="ticker-input" type="text" name="ticker" value="{{ data.ticker }}" spellcheck="false">
+        <span class="control-label">Speed</span>
+        <input id="simulator-speed" type="number" name="speed" min="0.5" max="360" step="0.5" value="{{ data.speed }}">
+        <span class="control-label">Points +/-</span>
+        <input id="simulator-points" type="number" name="points" min="0" step="1" value="{{ data.points }}">
+        <span class="control-label">Wide</span>
+        <input id="simulator-wide" type="number" name="wide" min="0" step="1" value="{{ data.wide }}">
+        <span class="control-label">Execute Time</span>
+        <input id="simulator-execute-time" class="time-input" type="time" name="execute_time" step="300" value="{{ data.execute_time }}">
+        <span class="control-label">Execution End</span>
+        <input id="simulator-execution-end-time" class="time-input" type="time" name="execution_end_time" step="300" value="{{ data.execution_end_time }}">
+        <button id="simulator-toggle" class="terminal-button" type="button">Start Simulation</button>
+    </form>
+    <section class="panel terminal-metric simulator-status">
+        <div class="metric-label">Status</div>
+        <div id="simulator-status" class="metric-value">Ready</div>
+        <div class="metric-sub">Simulation clock. Date is controlled by the debug date in the header.</div>
+    </section>
+    <div id="simulator-chart" class="chart-wrap simulator-chart"></div>
+    <p class="terminal-note" style="margin-top:16px;">Simulation uses the terminal debug date and Oracle data aggregated into 5-minute candles. Rendering stops after the final intraday candle for the session.</p>
+</section>
 """
 
 
@@ -3073,7 +3325,7 @@ def make_chart(
             yanchor="top",
             y=0.98,
             xanchor="left",
-            x=0.02,
+            x=0.08,
             bgcolor="rgba(5,13,17,0.62)",
             bordercolor="rgba(0,229,240,0.16)",
             borderwidth=1,
@@ -3120,7 +3372,7 @@ def make_chart(
     legendButton.textContent = 'Labels -';
     legendButton.setAttribute('aria-label', 'Toggle chart labels');
     legendButton.style.position = 'absolute';
-    legendButton.style.right = '8px';
+    legendButton.style.left = '8px';
     legendButton.style.top = '8px';
     legendButton.style.zIndex = '30';
     legendButton.style.border = '1px solid rgba(0,229,240,.3)';
@@ -3615,16 +3867,59 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "market_status": "MARKET CLOSED",
         "market_status_class": "yellow",
         "market_hours": "TRADING HOURS - 09:30 AM - 04:00 PM ET",
+        "refresh_interval": DEFAULT_SETTINGS["refresh_interval"],
+        "chart_interval": DEFAULT_SETTINGS["chart_interval"],
         "debug_mode": False,
         "debug_trade_date": "",
         "debug_time": "",
         "debug_time_options": DEBUG_TIME_OPTIONS,
         "chart_html": "",
         "source_table": SOURCE_TABLE,
+        "active_tab": "terminal",
+        "page_content": "",
+        "page_script": "",
     }
     for key, value in defaults.items():
         data.setdefault(key, value)
     return data
+
+
+def add_terminal_chrome_data(settings: dict, page_data: dict, active_tab: str) -> dict:
+    try:
+        chrome_data = ensure_terminal_display_data(run_web_service(settings))
+    except Exception:
+        chrome_data = ensure_terminal_display_data({})
+
+    merged = chrome_data.copy()
+    merged.update(page_data)
+    merged["active_tab"] = active_tab
+    merged["refresh_interval"] = settings.get("refresh_interval", DEFAULT_SETTINGS["refresh_interval"])
+    merged["chart_interval"] = settings.get("chart_interval", DEFAULT_SETTINGS["chart_interval"])
+    merged["debug_mode"] = settings.get("debug_mode", False)
+    merged["debug_trade_date"] = settings.get("debug_trade_date", "")
+    merged["debug_time"] = settings.get("debug_time", "")
+    merged["debug_time_options"] = DEBUG_TIME_OPTIONS
+    return ensure_terminal_display_data(merged)
+
+
+def render_terminal_page(
+    content_template: str,
+    data: dict,
+    active_tab: str,
+    page_script_template: str = "",
+) -> str:
+    data = ensure_terminal_display_data(data)
+    data["active_tab"] = active_tab
+    data["page_content"] = "" if data.get("error") else render_template_string(content_template, data=data)
+    data["page_script"] = ""
+    if page_script_template and not data.get("error"):
+        data["page_script"] = render_template_string(page_script_template, data=data)
+    return render_template_string(
+        TERMINAL_PAGE_HTML,
+        data=data,
+        terminal_style=TERMINAL_STYLE,
+        favicon_version=FAVICON_VERSION,
+    )
 
 
 @app.route("/settings", methods=["POST"])
@@ -3700,8 +3995,8 @@ def favicon_ico():
 @app.route("/")
 def index():
     settings = load_settings()
-    data = run_web_service(settings)
-    return render_template_string(HTML, data=data, favicon_version=FAVICON_VERSION)
+    data = ensure_terminal_display_data(run_web_service(settings))
+    return render_template_string(TERMINAL_HTML, data=data, favicon_version=FAVICON_VERSION)
 
 
 @app.route("/terminal")
@@ -3715,7 +4010,7 @@ def modern_terminal():
 def hud():
     settings = load_settings()
     data = ensure_terminal_display_data(run_web_service(settings))
-    return render_template_string(HUD_HTML, data=data, favicon_version=FAVICON_VERSION)
+    return render_template_string(TERMINAL_HTML, data=data, favicon_version=FAVICON_VERSION)
 
 
 @app.route("/gex")
@@ -3776,7 +4071,8 @@ def gex():
             "trade": terminal_snapshot.get("trade", "NO TRADE"),
             "error": str(exc),
         }
-    return render_template_string(GEX_HTML, data=data, favicon_version=FAVICON_VERSION)
+    data = add_terminal_chrome_data(settings, data, "gex")
+    return render_terminal_page(GEX_TERMINAL_CONTENT, data, "gex")
 
 
 @app.route("/option-chain")
@@ -3807,19 +4103,19 @@ def option_chain():
             "trade": terminal_snapshot.get("trade", "NO TRADE"),
             "error": str(exc),
         }
-    return render_template_string(OPTION_CHAIN_HTML, data=data, favicon_version=FAVICON_VERSION)
+    data = add_terminal_chrome_data(settings, data, "option-chain")
+    return render_terminal_page(OPTION_CHAIN_TERMINAL_CONTENT, data, "option-chain")
 
 
 @app.route("/simulator")
 def simulator():
     settings = load_settings()
-    raw_trade_date = request.args.get("trade_date")
     raw_speed = request.args.get("speed")
     raw_points = request.args.get("points")
     raw_wide = request.args.get("wide")
     raw_execute_time = request.args.get("execute_time")
     raw_execution_end_time = request.args.get("execution_end_time")
-    effective_trade_date = raw_trade_date if raw_trade_date not in {None, ""} else (settings.get("simulator_trade_date") or None)
+    effective_trade_date = str(settings.get("debug_trade_date", "") or "").strip() or None
     try:
         data = run_simulator_service(
             settings,
@@ -3857,7 +4153,8 @@ def simulator():
             "trade": run_web_service(settings).get("trade", "NO TRADE"),
             "error": str(exc),
         }
-    return render_template_string(SIMULATOR_HTML, data=data, favicon_version=FAVICON_VERSION)
+    data = add_terminal_chrome_data(settings, data, "simulator")
+    return render_terminal_page(SIMULATOR_TERMINAL_CONTENT, data, "simulator", SIMULATOR_TERMINAL_SCRIPT)
 
 
 if __name__ == "__main__":
