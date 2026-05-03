@@ -665,11 +665,13 @@ TERMINAL_HTML = """
         .confidence-label{color:#c8f8ff; text-transform:uppercase; font-size:11px; font-weight:900; letter-spacing:.06em;}
         .ring{height:118px; width:118px; border-radius:50%; display:grid; place-items:center; color:var(--text); font-size:30px; font-weight:900; background:conic-gradient(var(--green) calc(var(--score) * 1%), rgba(28,255,115,.16) 0); box-shadow:0 0 20px rgba(28,255,115,.18);}
         .ring span{height:82px; width:82px; border-radius:50%; display:grid; place-items:center; background:#061016;}
-        .notes{margin:0; padding-left:24px; line-height:1.58; font-size:14px;}
-        .notes li{padding-left:4px;}
-        .notes li::marker{font-size:1.42em;}
-        .notes li.green{color:var(--green); font-weight:800;}
-        .notes li.red{color:var(--red); font-weight:800;}
+        .notes{margin:0; padding-left:0; list-style:none; line-height:1.58; font-size:14px;}
+        .notes li{display:flex; align-items:flex-start; gap:9px; font-weight:800;}
+        .notes li:before{content:"\\00D7"; flex:0 0 17px; height:17px; margin-top:3px; display:grid; place-items:center; border-radius:50%; border:1px solid currentColor; font-size:13px; line-height:1;}
+        .notes li.green{color:var(--green);}
+        .notes li.green:before{content:"\\2713"; box-shadow:0 0 10px rgba(28,255,115,.24);}
+        .notes li.red{color:var(--red);}
+        .notes li.red:before{box-shadow:0 0 10px rgba(255,49,72,.22);}
         .market-grid{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px;}
         .market-grid .panel{min-height:170px;}
         .market-grid .panel:first-child{grid-column:1;}
@@ -688,7 +690,7 @@ TERMINAL_HTML = """
         .option-grid table{min-width:0;}
         .ladder td{font-size:13px; padding:7px 6px;}
         .condor-ladder{height:100%; table-layout:fixed; border:1px solid rgba(0,229,240,.18); background:linear-gradient(180deg, rgba(2,18,22,.68), rgba(0,7,10,.72));}
-        .condor-ladder th,.condor-ladder td{font-size:12px; padding:8px 7px;}
+        .condor-ladder th,.condor-ladder td{font-size:12px; padding:7px 7px;}
         .condor-ladder th{color:#8eaab3; letter-spacing:.08em;}
         .condor-ladder td:first-child{width:38%; color:#dffcff; font-weight:900; text-align:left;}
         .condor-ladder td:nth-child(2){width:22%; color:var(--muted); font-weight:900; text-align:center;}
@@ -698,15 +700,19 @@ TERMINAL_HTML = """
         .condor-ladder .long-leg td{background:rgba(0,229,240,.05);}
         .condor-ladder .put-leg td:first-child{color:var(--cyan);}
         .condor-ladder .call-leg td:first-child{color:var(--green);}
+        .condor-ladder .spot-leg td{background:linear-gradient(90deg, rgba(0,229,240,.12), rgba(28,255,115,.07)); color:#dffcff;}
+        .condor-ladder .spot-leg td:first-child{color:#dffcff;}
+        .condor-ladder .spot-leg td:nth-child(2){color:var(--cyan);}
+        .condor-ladder .spot-leg td:last-child{color:var(--green);}
         .selected-short{outline:1px solid var(--red); color:var(--red); background:rgba(255,49,72,.08);}
         .selected-long{outline:1px solid var(--green); color:var(--green); background:rgba(28,255,115,.08);}
         .placeholder{color:var(--yellow); font-weight:900;}
         .pl-profile{height:136px; margin-top:14px; position:relative; border:1px solid rgba(0,229,240,.16); background:linear-gradient(180deg, rgba(2,11,14,.78), rgba(0,5,7,.7)); overflow:hidden;}
         .pl-profile:before{content:""; position:absolute; inset:12px; background:linear-gradient(rgba(142,170,179,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(142,170,179,.16) 1px, transparent 1px); background-size:100% 50%,25% 100%;}
-        .pl-line{position:absolute; left:28px; right:24px; top:22px; height:92px;}
-        .pl-line svg{width:100%; height:100%; overflow:visible;}
+        .pl-profile svg{position:absolute; inset:7px 9px; width:calc(100% - 18px); height:calc(100% - 14px); overflow:visible;}
         .radar-wrap{display:grid; justify-items:center; gap:6px;}
         .radar{height:112px; width:112px; border-radius:50%; margin:auto; position:relative; background:radial-gradient(circle, rgba(28,255,115,.95) 0 5px, transparent 6px), repeating-radial-gradient(circle, rgba(0,229,240,.28) 0 1px, transparent 1px 15px), conic-gradient(from 180deg, rgba(28,255,115,.38), transparent 35%, rgba(0,229,240,.15) 70%, transparent);}
+        .radar .sweep{position:absolute; inset:0; border-radius:50%; background:conic-gradient(from -24deg, rgba(28,255,115,.46) 0deg, rgba(0,229,240,.16) 38deg, transparent 76deg); mix-blend-mode:screen; animation:radarSweep 2.6s linear infinite;}
         .radar:before,.radar:after{content:""; position:absolute; left:50%; top:0; bottom:0; border-left:1px solid rgba(0,229,240,.35);}
         .radar:after{transform:rotate(90deg);}
         .radar b{position:absolute; color:#8eaab3; font-size:10px; font-weight:900;}
@@ -715,6 +721,7 @@ TERMINAL_HTML = """
         .radar .s{bottom:-2px; left:50%; transform:translateX(-50%);}
         .radar .w{left:5px; top:50%; transform:translateY(-50%);}
         .radar-caption{color:var(--cyan); font-size:10px; text-transform:uppercase; font-weight:900; letter-spacing:.08em;}
+        @keyframes radarSweep{to{transform:rotate(360deg);}}
         .snapshot-table{table-layout:fixed;}
         .snapshot-table td{white-space:nowrap;}
         .snapshot-table td:nth-child(2),.snapshot-table td:nth-child(4){text-align:right;}
@@ -828,32 +835,24 @@ TERMINAL_HTML = """
                 <div class="panel-title"><span>Trade Setup</span><span class="trade-state {{ 'no-trade' if data.trade == 'NO TRADE' else 'trade' }}">{{ data.trade }}</span></div>
                 <div class="option-grid">
                     <table class="setup-table">
-                        <tr><td>Short Strikes</td><td>{{ data.short_strike }}</td></tr>
-                        <tr><td>Long Strikes</td><td>{{ data.long_strike }}</td></tr>
                         <tr><td>Credit</td><td class="{{ data.credit_class }}">{{ data.credit }}</td></tr>
-                        <tr><td>Delta (Net)</td><td class="placeholder">Needs option Greeks</td></tr>
+                        <tr><td>Delta (Net)</td><td class="{{ data.delta_net_class }}">{{ data.delta_net }}</td></tr>
                         <tr><td>Max Profit</td><td class="{{ data.max_profit_class }}">{{ data.max_profit }}</td></tr>
                         <tr><td>Max Risk</td><td class="{{ data.max_risk_class }}">{{ data.max_risk }}</td></tr>
-                        <tr><td>POP</td><td class="placeholder">Needs probability model</td></tr>
-                        <tr><td>Breakeven</td><td class="placeholder">Needs option pricing</td></tr>
+                        <tr><td>Breakeven</td><td class="{{ data.breakeven_class }}">{{ data.breakeven }}</td></tr>
                         <tr><td>Net GEX</td><td class="{{ data.net_gex_signal_class }}">{{ data.net_gex_billions }}</td></tr>
                     </table>
                     <table class="condor-ladder" aria-label="Doug6 iron condor puts and calls">
                         <tr><th>Legs</th><th>Side</th><th>Strike</th></tr>
-                        <tr class="long-leg put-leg"><td>Long Put</td><td>PUT</td><td>{{ data.condor_long_put }}</td></tr>
-                        <tr class="short-leg put-leg"><td>Short Put</td><td>PUT</td><td>{{ data.condor_short_put }}</td></tr>
-                        <tr class="short-leg call-leg"><td>Short Call</td><td>CALL</td><td>{{ data.condor_short_call }}</td></tr>
                         <tr class="long-leg call-leg"><td>Long Call</td><td>CALL</td><td>{{ data.condor_long_call }}</td></tr>
+                        <tr class="short-leg call-leg"><td>Short Call</td><td>CALL</td><td>{{ data.condor_short_call }}</td></tr>
+                        <tr class="spot-leg"><td>SPX Ref</td><td>{{ data.doug6_snapshot_clock }}</td><td>{{ data.condor_spx_ref }}</td></tr>
+                        <tr class="short-leg put-leg"><td>Short Put</td><td>PUT</td><td>{{ data.condor_short_put }}</td></tr>
+                        <tr class="long-leg put-leg"><td>Long Put</td><td>PUT</td><td>{{ data.condor_long_put }}</td></tr>
                     </table>
                 </div>
                 <div class="pl-profile">
-                    <div class="pl-line">
-                        <svg viewBox="0 0 500 100" preserveAspectRatio="none" aria-hidden="true">
-                            <polyline points="0,82 80,82 170,12 320,12 420,76 500,76" fill="none" stroke="#1cff73" stroke-width="4"/>
-                            <polyline points="0,82 80,82 170,12" fill="none" stroke="#ff3148" stroke-width="4"/>
-                            <polyline points="420,76 500,76" fill="none" stroke="#ff3148" stroke-width="4"/>
-                        </svg>
-                    </div>
+                    {{ data.condor_profit_svg|safe }}
                 </div>
             </section>
         </div>
@@ -878,7 +877,7 @@ TERMINAL_HTML = """
                     {% endfor %}
                 </table>
                 <div class="radar-wrap" aria-hidden="true">
-                    <div class="radar"><b class="n">N</b><b class="e">E</b><b class="s">S</b><b class="w">W</b></div>
+                    <div class="radar"><span class="sweep"></span><b class="n">N</b><b class="e">E</b><b class="s">S</b><b class="w">W</b></div>
                     <div class="radar-caption">Range Scan</div>
                 </div>
             </div>
@@ -2276,6 +2275,10 @@ def normal_pdf(value: float) -> float:
     return math.exp(-0.5 * value * value) / math.sqrt(2.0 * math.pi)
 
 
+def normal_cdf(value: float) -> float:
+    return 0.5 * (1.0 + math.erf(value / math.sqrt(2.0)))
+
+
 def black_scholes_gamma(spot: float, strike: float, volatility: float, time_to_expiry: float) -> float:
     if spot <= 0 or strike <= 0 or volatility <= 0 or time_to_expiry <= 0:
         return 0.0
@@ -2286,6 +2289,23 @@ def black_scholes_gamma(spot: float, strike: float, volatility: float, time_to_e
 
     d1 = (math.log(spot / strike) + 0.5 * volatility * volatility * time_to_expiry) / vol_term
     return normal_pdf(d1) / (spot * vol_term)
+
+
+def black_scholes_delta(spot: float, strike: float, volatility: float, time_to_expiry: float, option_type: str) -> Optional[float]:
+    if spot <= 0 or strike <= 0 or volatility <= 0 or time_to_expiry <= 0:
+        return None
+
+    vol_term = volatility * math.sqrt(time_to_expiry)
+    if vol_term <= 0:
+        return None
+
+    d1 = (math.log(spot / strike) + 0.5 * volatility * volatility * time_to_expiry) / vol_term
+    option_type = (option_type or "").lower()
+    if option_type == "call":
+        return normal_cdf(d1)
+    if option_type == "put":
+        return normal_cdf(d1) - 1.0
+    return None
 
 
 def resolve_gex_expiration_date(now_et: pd.Timestamp, available_dates: list[dt.date]) -> dt.date:
@@ -3167,6 +3187,24 @@ def format_trade_currency(value: Optional[float]) -> str:
     return f"${float(value):,.2f}"
 
 
+def format_price_reference(value: Optional[float]) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"{float(value):,.2f}"
+
+
+def format_signed_delta(value: Optional[float]) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"{float(value):+.2f}"
+
+
+def format_breakeven_pair(lower: Optional[float], upper: Optional[float]) -> str:
+    if lower is None or upper is None or pd.isna(lower) or pd.isna(upper):
+        return "N/A"
+    return f"{float(lower):,.2f} / {float(upper):,.2f}"
+
+
 def option_leg_row(options: pd.DataFrame, option_type: str, target_strike: float) -> Optional[pd.Series]:
     if options is None or options.empty:
         return None
@@ -3190,6 +3228,141 @@ def option_leg_price(row: Optional[pd.Series], column: str) -> Optional[float]:
     return float(value.iloc[0])
 
 
+def option_leg_delta(row: Optional[pd.Series], spot_price: float, now_et: pd.Timestamp, expiration_date: dt.date) -> Optional[float]:
+    strike = option_leg_price(row, "strike")
+    volatility = option_leg_price(row, "implied_volatility")
+    if row is None or strike is None or volatility is None:
+        return None
+
+    expiry_close = pd.Timestamp.combine(expiration_date, dt.time(16, 0)).tz_localize(TIMEZONE)
+    time_to_expiry_years = max(
+        (expiry_close - now_et).total_seconds(),
+        GEX_MIN_TIME_SECONDS,
+    ) / (365.0 * 24.0 * 60.0 * 60.0)
+    return black_scholes_delta(
+        spot=spot_price,
+        strike=strike,
+        volatility=volatility,
+        time_to_expiry=time_to_expiry_years,
+        option_type=str(row.get("option_type", "")).lower(),
+    )
+
+
+def make_condor_profit_svg(
+    long_put: Optional[float],
+    short_put: Optional[float],
+    short_call: Optional[float],
+    long_call: Optional[float],
+    credit: Optional[float],
+) -> str:
+    title = "Doug6 Iron Condor Profit Graph"
+    if None in {long_put, short_put, short_call, long_call, credit}:
+        return (
+            '<svg viewBox="0 0 560 150" preserveAspectRatio="none" role="img" '
+            f'aria-label="{title}">'
+            '<text x="280" y="70" text-anchor="middle" fill="#ffc400" font-size="14" '
+            'font-weight="900">Profit graph needs priced Doug6 legs</text>'
+            '<text x="280" y="140" text-anchor="middle" fill="#8eaab3" font-size="10" '
+            'font-weight="900">SPX Price at Expiration</text>'
+            '<text x="18" y="82" transform="rotate(-90 18 82)" text-anchor="middle" '
+            'fill="#8eaab3" font-size="10" font-weight="900">Profit / Loss</text>'
+            '</svg>'
+        )
+
+    lp = float(long_put)
+    sp = float(short_put)
+    sc = float(short_call)
+    lc = float(long_call)
+    net_credit = float(credit)
+    if not (lp < sp < sc < lc):
+        return (
+            '<svg viewBox="0 0 560 150" preserveAspectRatio="none" role="img" '
+            f'aria-label="{title}">'
+            '<text x="280" y="70" text-anchor="middle" fill="#ffc400" font-size="14" '
+            'font-weight="900">Profit graph needs ordered strikes</text>'
+            '<text x="280" y="140" text-anchor="middle" fill="#8eaab3" font-size="10" '
+            'font-weight="900">SPX Price at Expiration</text>'
+            '<text x="18" y="82" transform="rotate(-90 18 82)" text-anchor="middle" '
+            'fill="#8eaab3" font-size="10" font-weight="900">Profit / Loss</text>'
+            '</svg>'
+        )
+
+    max_width = max(sp - lp, lc - sc, 1.0)
+    lower_be = sp - net_credit
+    upper_be = sc + net_credit
+    x_min = lp - max_width * 0.55
+    x_max = lc + max_width * 0.55
+
+    def payoff(price: float) -> float:
+        return (
+            net_credit
+            + max(lp - price, 0.0)
+            - max(sp - price, 0.0)
+            - max(price - sc, 0.0)
+            + max(price - lc, 0.0)
+        )
+
+    raw_xs = [x_min, lp, lower_be, sp, sc, upper_be, lc, x_max]
+    xs = sorted({round(x, 6) for x in raw_xs if x_min <= x <= x_max})
+    payoffs = [(x, payoff(x)) for x in xs]
+    y_values = [y for _, y in payoffs] + [0.0]
+    y_min = min(y_values)
+    y_max = max(y_values)
+    y_pad = max((y_max - y_min) * 0.16, 0.5)
+    y_min -= y_pad
+    y_max += y_pad
+
+    plot_x = 62.0
+    plot_y = 15.0
+    plot_w = 462.0
+    plot_h = 96.0
+
+    def sx(price: float) -> float:
+        return plot_x + ((price - x_min) / (x_max - x_min)) * plot_w
+
+    def sy(profit: float) -> float:
+        return plot_y + ((y_max - profit) / (y_max - y_min)) * plot_h
+
+    zero_y = sy(0.0)
+    segment_parts: list[str] = []
+    for (x1, y1), (x2, y2) in zip(payoffs, payoffs[1:]):
+        color = "#1cff73" if max(y1, y2) >= 0 and min(y1, y2) >= -0.00001 else "#ff3148"
+        if y1 < 0 and y2 <= 0:
+            color = "#ff3148"
+        segment_parts.append(
+            f'<line x1="{sx(x1):.1f}" y1="{sy(y1):.1f}" x2="{sx(x2):.1f}" y2="{sy(y2):.1f}" '
+            f'stroke="{color}" stroke-width="4" stroke-linecap="round"/>'
+        )
+
+    strike_labels = [
+        (lp, "LP"),
+        (sp, "SP"),
+        (sc, "SC"),
+        (lc, "LC"),
+    ]
+    strike_parts = [
+        f'<line x1="{sx(strike):.1f}" y1="{plot_y:.1f}" x2="{sx(strike):.1f}" y2="{plot_y + plot_h:.1f}" '
+        'stroke="rgba(142,170,179,.18)" stroke-width="1"/>'
+        f'<text x="{sx(strike):.1f}" y="123" text-anchor="middle" fill="#8eaab3" font-size="8" '
+        f'font-weight="900">{label} {strike:,.0f}</text>'
+        for strike, label in strike_labels
+    ]
+    svg_parts = [
+        f'<svg viewBox="0 0 560 150" preserveAspectRatio="none" role="img" aria-label="{title}">',
+        f'<line x1="{plot_x:.1f}" y1="{plot_y:.1f}" x2="{plot_x:.1f}" y2="{plot_y + plot_h:.1f}" stroke="rgba(142,170,179,.46)" stroke-width="1"/>',
+        f'<line x1="{plot_x:.1f}" y1="{zero_y:.1f}" x2="{plot_x + plot_w:.1f}" y2="{zero_y:.1f}" stroke="rgba(255,49,72,.48)" stroke-width="1.2" stroke-dasharray="5 5"/>',
+        f'<line x1="{plot_x:.1f}" y1="{plot_y + plot_h:.1f}" x2="{plot_x + plot_w:.1f}" y2="{plot_y + plot_h:.1f}" stroke="rgba(142,170,179,.34)" stroke-width="1"/>',
+        *strike_parts,
+        *segment_parts,
+        f'<text x="{plot_x + plot_w - 6:.1f}" y="{sy(net_credit) - 5:.1f}" text-anchor="end" fill="#1cff73" font-size="10" font-weight="900">Max Profit {format_trade_currency(net_credit)}</text>',
+        f'<text x="{plot_x + 4:.1f}" y="{sy(net_credit - max_width) - 5:.1f}" text-anchor="start" fill="#ff3148" font-size="10" font-weight="900">Max Loss {format_trade_currency(max_width - net_credit)}</text>',
+        '<text x="293" y="143" text-anchor="middle" fill="#8eaab3" font-size="10" font-weight="900">SPX Price at Expiration</text>',
+        '<text x="18" y="80" transform="rotate(-90 18 80)" text-anchor="middle" fill="#8eaab3" font-size="10" font-weight="900">Profit / Loss</text>',
+        "</svg>",
+    ]
+    return "".join(svg_parts)
+
+
 def doug6_as_of_timestamp(trade_date: dt.date, settings: dict) -> pd.Timestamp:
     execute_time = normalize_execute_time(settings.get("simulator_execute_time", "10:30"))
     return pd.Timestamp(f"{trade_date.isoformat()} {execute_time}", tz=TIMEZONE)
@@ -3199,7 +3372,7 @@ def build_doug6_trade_setup(trade_date: dt.date, settings: dict) -> dict:
     strike_points = float(settings.get("simulator_points", 70.0))
     spread_width = float(settings.get("simulator_wide", 20.0))
     now_et = doug6_as_of_timestamp(trade_date, settings)
-    options, underlying, _, snapshot_ts = fetch_spx_option_chain_for_session(now_et)
+    options, underlying, expiration_date, snapshot_ts = fetch_spx_option_chain_for_session(now_et)
     snapshot_et = pd.Timestamp(snapshot_ts, tz="UTC").tz_convert(TIMEZONE)
     if snapshot_et.date() != trade_date:
         raise ValueError("No Doug6 option snapshot was available for the selected trade date at 10:30.")
@@ -3230,23 +3403,52 @@ def build_doug6_trade_setup(trade_date: dt.date, settings: dict) -> dict:
 
     credit: Optional[float] = None
     max_risk: Optional[float] = None
+    lower_breakeven: Optional[float] = None
+    upper_breakeven: Optional[float] = None
     if None not in {short_put_bid, short_call_bid, long_put_ask, long_call_ask}:
         credit = max(0.0, float(short_put_bid + short_call_bid - long_put_ask - long_call_ask))
         put_width = abs(float(short_put["strike"]) - float(long_put["strike"])) if short_put is not None and long_put is not None else spread_width
         call_width = abs(float(long_call["strike"]) - float(short_call["strike"])) if short_call is not None and long_call is not None else spread_width
         max_risk = max(0.0, max(put_width, call_width) - credit)
+        if short_put is not None and short_call is not None:
+            lower_breakeven = float(short_put["strike"]) - credit
+            upper_breakeven = float(short_call["strike"]) + credit
+
+    long_put_delta = option_leg_delta(long_put, spot_price, now_et, expiration_date)
+    short_put_delta = option_leg_delta(short_put, spot_price, now_et, expiration_date)
+    short_call_delta = option_leg_delta(short_call, spot_price, now_et, expiration_date)
+    long_call_delta = option_leg_delta(long_call, spot_price, now_et, expiration_date)
+    net_delta: Optional[float] = None
+    if None not in {long_put_delta, short_put_delta, short_call_delta, long_call_delta}:
+        net_delta = float(long_put_delta - short_put_delta - short_call_delta + long_call_delta)
+
+    long_put_strike = option_leg_price(long_put, "strike")
+    short_put_strike = option_leg_price(short_put, "strike")
+    short_call_strike = option_leg_price(short_call, "strike")
+    long_call_strike = option_leg_price(long_call, "strike")
 
     return {
-        "short_strike": f"{format_strike(option_leg_price(short_put, 'strike'))}P / {format_strike(option_leg_price(short_call, 'strike'))}C",
-        "long_strike": f"{format_strike(option_leg_price(long_put, 'strike'))}P / {format_strike(option_leg_price(long_call, 'strike'))}C",
-        "condor_long_put": format_strike(option_leg_price(long_put, "strike")),
-        "condor_short_put": format_strike(option_leg_price(short_put, "strike")),
-        "condor_short_call": format_strike(option_leg_price(short_call, "strike")),
-        "condor_long_call": format_strike(option_leg_price(long_call, "strike")),
+        "short_strike": f"{format_strike(short_put_strike)}P / {format_strike(short_call_strike)}C",
+        "long_strike": f"{format_strike(long_put_strike)}P / {format_strike(long_call_strike)}C",
+        "condor_long_put": format_strike(long_put_strike),
+        "condor_short_put": format_strike(short_put_strike),
+        "condor_short_call": format_strike(short_call_strike),
+        "condor_long_call": format_strike(long_call_strike),
+        "condor_spx_ref": format_price_reference(spot_price),
         "credit": format_trade_currency(credit),
+        "delta_net": format_signed_delta(net_delta),
+        "breakeven": format_breakeven_pair(lower_breakeven, upper_breakeven),
         "max_profit": format_trade_currency(credit),
         "max_risk": format_trade_currency(max_risk),
         "doug6_snapshot_time": snapshot_et.strftime("%H:%M %Z"),
+        "doug6_snapshot_clock": snapshot_et.strftime("%H:%M"),
+        "condor_profit_svg": make_condor_profit_svg(
+            long_put=long_put_strike,
+            short_put=short_put_strike,
+            short_call=short_call_strike,
+            long_call=long_call_strike,
+            credit=credit,
+        ),
     }
 
 
@@ -3941,10 +4143,15 @@ def run_web_service(settings: dict) -> dict:
         "condor_short_put": "N/A",
         "condor_short_call": "N/A",
         "condor_long_call": "N/A",
+        "condor_spx_ref": "N/A",
         "credit": "N/A",
+        "delta_net": "N/A",
+        "breakeven": "N/A",
         "max_profit": "N/A",
         "max_risk": "N/A",
         "doug6_snapshot_time": "10:30 ET",
+        "doug6_snapshot_clock": "10:30",
+        "condor_profit_svg": make_condor_profit_svg(None, None, None, None, None),
     }
     try:
         doug6_setup.update(build_doug6_trade_setup(current_et_date, settings))
@@ -4037,12 +4244,19 @@ def run_web_service(settings: dict) -> dict:
         "condor_short_put": doug6_setup["condor_short_put"],
         "condor_short_call": doug6_setup["condor_short_call"],
         "condor_long_call": doug6_setup["condor_long_call"],
+        "condor_spx_ref": doug6_setup["condor_spx_ref"],
         "credit": doug6_setup["credit"],
         "credit_class": "placeholder" if doug6_setup["credit"] == "N/A" else "green",
+        "delta_net": doug6_setup["delta_net"],
+        "delta_net_class": "placeholder" if doug6_setup["delta_net"] == "N/A" else "green",
         "max_profit": doug6_setup["max_profit"],
         "max_profit_class": "placeholder" if doug6_setup["max_profit"] == "N/A" else "green",
         "max_risk": doug6_setup["max_risk"],
         "max_risk_class": "placeholder" if doug6_setup["max_risk"] == "N/A" else "red",
+        "breakeven": doug6_setup["breakeven"],
+        "breakeven_class": "placeholder" if doug6_setup["breakeven"] == "N/A" else "green",
+        "doug6_snapshot_clock": doug6_setup["doug6_snapshot_clock"],
+        "condor_profit_svg": doug6_setup["condor_profit_svg"],
         "structure": structure,
         "chart_html": chart_html,
         "refresh_interval": settings["refresh_interval"],
@@ -4096,12 +4310,20 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "condor_short_put": "N/A",
         "condor_short_call": "N/A",
         "condor_long_call": "N/A",
+        "condor_spx_ref": "N/A",
         "credit": "N/A",
         "credit_class": "placeholder",
+        "delta_net": "N/A",
+        "delta_net_class": "placeholder",
         "max_profit": "N/A",
         "max_profit_class": "placeholder",
         "max_risk": "N/A",
         "max_risk_class": "placeholder",
+        "breakeven": "N/A",
+        "breakeven_class": "placeholder",
+        "doug6_snapshot_time": "10:30 ET",
+        "doug6_snapshot_clock": "10:30",
+        "condor_profit_svg": make_condor_profit_svg(None, None, None, None, None),
         "net_gex_billions": "N/A",
         "net_gex_signal_class": "yellow",
         "market_status": "MARKET CLOSED",
