@@ -1913,7 +1913,8 @@ TERMINAL_PAGE_HTML = """
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <style>
 {{ terminal_style|safe }}
-        .shell{grid-template-rows:auto auto 1fr auto;}
+        .shell{grid-template-rows:auto max-content minmax(0,1fr) auto;}
+        .shell > .controlbar{align-self:start; min-height:44px; padding-block:6px;}
         .page-stack{display:grid; gap:18px; align-content:start; min-width:0;}
         .page-grid{display:grid; grid-template-columns:minmax(0,1fr); gap:18px; align-items:start; min-width:0;}
         .gex-grid{grid-template-columns:minmax(0,1fr) minmax(300px,420px);}
