@@ -1933,6 +1933,12 @@ TERMINAL_PAGE_HTML = """
         .terminal-table tbody tr:nth-child(even){background:rgba(255,255,255,.018);}
         .terminal-table tbody tr:hover{background:rgba(0,229,240,.06);}
         .terminal-table .strike{text-align:center; color:#f3fbff; background:rgba(255,255,255,.025); font-weight:900;}
+        .option-chain-table-wrap{max-height:78vh;}
+        .option-chain-table th,.option-chain-table td{padding:4px 6px; font-size:9px; line-height:1;}
+        .option-chain-table th{font-size:8px;}
+        .option-chain-table .strike{font-size:9px;}
+        .option-chain-table .spx-reference-row td{height:14px; padding:2px 7px; border-top:2px solid rgba(255,196,0,.82); border-bottom:2px solid rgba(255,196,0,.82); background:rgba(255,196,0,.07);}
+        .option-chain-table .spx-reference-row .strike{color:var(--yellow); background:rgba(255,196,0,.16); font-size:10px; text-shadow:0 0 9px rgba(255,196,0,.28);}
         .call-last,.call-bid,.call-ask,.call-vol,.call-oi,.call-iv{color:var(--green);}
         .put-last,.put-bid,.put-ask,.put-vol,.put-oi,.put-iv{color:var(--red);}
         .simulator-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
@@ -2111,8 +2117,8 @@ OPTION_CHAIN_TERMINAL_CONTENT = """
     </section>
     <section class="panel">
         <div class="panel-title"><span>SPX Option Chain</span><span>{{ data.expiration_date }}</span></div>
-        <div class="terminal-table-wrap">
-            <table class="terminal-table">
+        <div class="terminal-table-wrap option-chain-table-wrap">
+            <table class="terminal-table option-chain-table">
                 <thead>
                     <tr>
                         <th>Call Last</th>
@@ -2132,6 +2138,23 @@ OPTION_CHAIN_TERMINAL_CONTENT = """
                 </thead>
                 <tbody>
                     {% for row in data.rows %}
+                    {% if row.is_spot_reference %}
+                    <tr class="spx-reference-row">
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td class="strike">{{ row.strike }}</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    {% else %}
                     <tr>
                         <td class="call-last">{{ row.call_last }}</td>
                         <td class="call-bid">{{ row.call_bid }}</td>
@@ -2147,6 +2170,7 @@ OPTION_CHAIN_TERMINAL_CONTENT = """
                         <td class="put-ask">{{ row.put_ask }}</td>
                         <td class="put-last">{{ row.put_last }}</td>
                     </tr>
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -2528,7 +2552,7 @@ def format_option_iv(value) -> str:
     return f"{float(value) * 100:.1f}%"
 
 
-def build_option_chain_rows(options: pd.DataFrame) -> list[dict]:
+def build_option_chain_rows(options: pd.DataFrame, spot_price: Optional[float] = None) -> list[dict]:
     if options is None or options.empty:
         return []
 
@@ -2565,14 +2589,18 @@ def build_option_chain_rows(options: pd.DataFrame) -> list[dict]:
     merged = pd.merge(calls, puts, on="strike", how="outer").sort_values("strike").reset_index(drop=True)
     rows: list[dict] = []
     for row in merged.itertuples(index=False):
+        raw_strike = getattr(row, "strike", None)
+        numeric_strike = None if raw_strike is None or pd.isna(raw_strike) else float(raw_strike)
         rows.append({
+            "is_spot_reference": False,
+            "raw_strike": numeric_strike,
             "call_last": format_option_price(getattr(row, "call_last", None)),
             "call_bid": format_option_price(getattr(row, "call_bid", None)),
             "call_ask": format_option_price(getattr(row, "call_ask", None)),
             "call_volume": format_option_integer(getattr(row, "call_volume", None)),
             "call_open_interest": format_option_integer(getattr(row, "call_open_interest", None)),
             "call_iv": format_option_iv(getattr(row, "call_iv", None)),
-            "strike": format_option_price(getattr(row, "strike", None)),
+            "strike": format_option_price(raw_strike),
             "put_iv": format_option_iv(getattr(row, "put_iv", None)),
             "put_open_interest": format_option_integer(getattr(row, "put_open_interest", None)),
             "put_volume": format_option_integer(getattr(row, "put_volume", None)),
@@ -2580,6 +2608,20 @@ def build_option_chain_rows(options: pd.DataFrame) -> list[dict]:
             "put_ask": format_option_price(getattr(row, "put_ask", None)),
             "put_last": format_option_price(getattr(row, "put_last", None)),
         })
+    if spot_price is not None and spot_price > 0:
+        spot_row = {
+            "is_spot_reference": True,
+            "raw_strike": spot_price,
+            "strike": f"{spot_price:,.2f}",
+        }
+        insert_index = next(
+            (
+                index for index, row in enumerate(rows)
+                if row.get("raw_strike") is not None and float(row["raw_strike"]) > spot_price
+            ),
+            len(rows),
+        )
+        rows.insert(insert_index, spot_row)
     return rows
 
 
@@ -2799,10 +2841,6 @@ def run_option_chain_service(settings: dict) -> dict:
     now_et = debug_as_of_timestamp(settings) or pd.Timestamp.now(tz=TIMEZONE)
     options, underlying, expiration_date, snapshot_ts = fetch_spx_option_chain_for_session(now_et)
     terminal_snapshot = run_web_service(settings)
-    rows = build_option_chain_rows(options)
-    if not rows:
-        raise ValueError("No option-chain rows were available in the latest stored SPX snapshot.")
-
     spot_price = float(
         underlying.get("regularMarketPrice")
         or underlying.get("postMarketPrice")
@@ -2810,6 +2848,10 @@ def run_option_chain_service(settings: dict) -> dict:
         or underlying.get("previousClose")
         or 0.0
     )
+    rows = build_option_chain_rows(options, spot_price)
+    if not rows:
+        raise ValueError("No option-chain rows were available in the latest stored SPX snapshot.")
+
     call_open_interest = pd.to_numeric(
         options.loc[options["option_type"] == "call", "open_interest"],
         errors="coerce",
