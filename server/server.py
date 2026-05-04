@@ -637,7 +637,7 @@ TERMINAL_HTML = """
         .panel{padding:16px; min-width:0;}
         .panel-title{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:#c8f8ff; text-transform:uppercase; font-size:14px; font-weight:900; letter-spacing:.02em;}
         .panel-title span:last-child{color:var(--cyan)}
-        .chart-wrap{height:456px; overflow:hidden; background:radial-gradient(circle at 50% 10%, rgba(0,229,240,.06), rgba(0,8,11,.9) 56%); border:1px solid rgba(0,229,240,.22); box-shadow:inset 0 0 28px rgba(0,229,240,.045);}
+        .chart-wrap{height:432px; overflow:hidden; background:radial-gradient(circle at 50% 10%, rgba(0,229,240,.06), rgba(0,8,11,.9) 56%); border:1px solid rgba(0,229,240,.22); box-shadow:inset 0 0 28px rgba(0,229,240,.045);}
         .chart-wrap .plotly-graph-div{width:100% !important; height:100% !important;}
         .hero{display:grid; place-items:center; text-align:center;}
         .hero-inner{width:100%; display:grid; justify-items:center; gap:8px;}
@@ -672,7 +672,7 @@ TERMINAL_HTML = """
         .notes li.green:before{content:"\\2713"; box-shadow:0 0 10px rgba(28,255,115,.24);}
         .notes li.red{color:var(--red);}
         .notes li.red:before{box-shadow:0 0 10px rgba(255,49,72,.22);}
-        .market-grid{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px;}
+        .market-grid{display:grid; grid-template-columns:minmax(0,1.16fr) minmax(320px,.74fr) minmax(0,1.04fr); gap:18px; margin-top:-136px;}
         .market-grid .panel{min-height:160px;}
         .market-grid .panel:first-child{grid-column:1;}
         .market-grid .panel:nth-child(2){grid-column:3;}
@@ -684,6 +684,8 @@ TERMINAL_HTML = """
         .setup-table{table-layout:fixed;}
         .setup-table td:first-child{width:44%; color:#dffcff;}
         .setup-table td:last-child{width:56%; white-space:normal; overflow-wrap:anywhere;}
+        .stacked-value{display:grid; justify-items:end; gap:2px; line-height:1.05;}
+        .stacked-value small{color:var(--muted); font-size:10px; font-weight:900; letter-spacing:.02em;}
         .trade-state{font-weight:900; text-transform:uppercase;}
         .panel-title .trade-state.trade{color:var(--green);}
         .panel-title .trade-state.no-trade{color:var(--red);}
@@ -730,7 +732,7 @@ TERMINAL_HTML = """
         .tickerbar{display:flex; align-items:center; gap:34px; overflow:auto; white-space:nowrap; padding:12px 20px;}
         .tickerbar b{color:var(--cyan); margin-right:8px;}
         .err{color:var(--red); font-weight:900; font-size:18px;}
-        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr}.market-grid .panel:first-child,.market-grid .panel:nth-child(2){grid-column:auto}.chart-wrap{height:470px}.topbar{grid-template-columns:1fr}.controlbar{display:grid; justify-items:center}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:250px 176px 150px}}
+        @media (max-width: 980px){.layout{grid-template-columns:1fr 1fr}.layout>.left-stack{grid-column:1 / -1}.market-grid{grid-template-columns:1fr; margin-top:0}.market-grid .panel:first-child,.market-grid .panel:nth-child(2){grid-column:auto}.chart-wrap{height:470px}.topbar{grid-template-columns:1fr}.controlbar{display:grid; justify-items:center}.market,.brand{text-align:center}.nav-panel{justify-self:center;justify-items:center}.market-readout{text-align:center}.nav-links{justify-content:center}.debug-form{justify-self:center;justify-content:center}.timeblock{justify-self:center;justify-content:center}.center-stack{grid-template-rows:250px 176px 150px}}
         @media (max-width: 760px){.shell{padding:10px}.layout{grid-template-columns:1fr}.option-grid,.market-grid{grid-template-columns:1fr}.price,.symbol{font-size:48px}.confidence{grid-template-columns:1fr}.ring{margin:auto}.chart-wrap{height:400px}}
     </style>
 </head>
@@ -839,7 +841,7 @@ TERMINAL_HTML = """
                         <tr><td>Put Spread Delta</td><td class="{{ data.put_spread_delta_class }}">{{ data.put_spread_delta }}</td></tr>
                         <tr><td>Call Spread Delta</td><td class="{{ data.call_spread_delta_class }}">{{ data.call_spread_delta }}</td></tr>
                         <tr><td>Max Profit</td><td class="{{ data.max_profit_class }}">{{ data.max_profit }}</td></tr>
-                        <tr><td>Max Risk</td><td class="{{ data.max_risk_class }}">{{ data.max_risk }}</td></tr>
+                        <tr><td>Max Risk</td><td class="{{ data.max_risk_class }}"><span class="stacked-value">{{ data.max_risk }}{% if data.max_risk_contract != 'N/A' %}<small>{{ data.max_risk_contract }} / ct</small>{% endif %}</span></td></tr>
                         <tr><td>Breakeven</td><td class="{{ data.breakeven_class }}">{{ data.breakeven }}</td></tr>
                         <tr><td>Net GEX</td><td class="{{ data.net_gex_signal_class }}">{{ data.net_gex_billions }}</td></tr>
                     </table>
@@ -3188,6 +3190,18 @@ def format_trade_currency(value: Optional[float]) -> str:
     return f"${float(value):,.2f}"
 
 
+def format_trade_points(value: Optional[float]) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"{float(value):,.2f} pts"
+
+
+def format_contract_currency(value: Optional[float]) -> str:
+    if value is None or pd.isna(value):
+        return "N/A"
+    return f"${float(value) * GEX_CONTRACT_SIZE:,.0f}"
+
+
 def format_price_reference(value: Optional[float]) -> str:
     if value is None or pd.isna(value):
         return "N/A"
@@ -3361,8 +3375,8 @@ def make_condor_profit_svg(
         f'<line x1="{plot_x:.1f}" y1="{plot_y + plot_h:.1f}" x2="{plot_x + plot_w:.1f}" y2="{plot_y + plot_h:.1f}" stroke="rgba(142,170,179,.34)" stroke-width="1"/>',
         *strike_parts,
         *segment_parts,
-        f'<text x="{plot_x + plot_w - 6:.1f}" y="{sy(net_credit) - 5:.1f}" text-anchor="end" fill="#1cff73" font-size="10" font-weight="900">Max Profit {format_trade_currency(net_credit)}</text>',
-        f'<text x="{plot_x + 4:.1f}" y="{sy(net_credit - max_width) - 5:.1f}" text-anchor="start" fill="#ff3148" font-size="10" font-weight="900">Max Loss {format_trade_currency(max_width - net_credit)}</text>',
+        f'<text x="{plot_x + plot_w - 6:.1f}" y="{sy(net_credit) - 5:.1f}" text-anchor="end" fill="#1cff73" font-size="10" font-weight="900">Max Profit {format_trade_points(net_credit)}</text>',
+        f'<text x="{plot_x + 4:.1f}" y="{sy(net_credit - max_width) - 5:.1f}" text-anchor="start" fill="#ff3148" font-size="10" font-weight="900">Max Loss {format_trade_points(max_width - net_credit)}</text>',
         '<text x="293" y="143" text-anchor="middle" fill="#8eaab3" font-size="10" font-weight="900">SPX Price at Expiration</text>',
         '<text x="18" y="80" transform="rotate(-90 18 80)" text-anchor="middle" fill="#8eaab3" font-size="10" font-weight="900">Profit / Loss</text>',
         "</svg>",
@@ -3455,6 +3469,7 @@ def build_doug6_trade_setup(trade_date: dt.date, settings: dict) -> dict:
         "breakeven": format_breakeven_pair(lower_breakeven, upper_breakeven),
         "max_profit": format_trade_currency(credit),
         "max_risk": format_trade_currency(max_risk),
+        "max_risk_contract": format_contract_currency(max_risk),
         "doug6_snapshot_time": snapshot_et.strftime("%H:%M %Z"),
         "doug6_snapshot_clock": snapshot_et.strftime("%H:%M"),
         "condor_profit_svg": make_condor_profit_svg(
@@ -4167,6 +4182,7 @@ def run_web_service(settings: dict) -> dict:
         "breakeven": "N/A",
         "max_profit": "N/A",
         "max_risk": "N/A",
+        "max_risk_contract": "N/A",
         "doug6_snapshot_time": "10:30 ET",
         "doug6_snapshot_clock": "10:30",
         "condor_profit_svg": make_condor_profit_svg(None, None, None, None, None),
@@ -4275,6 +4291,7 @@ def run_web_service(settings: dict) -> dict:
         "max_profit_class": "placeholder" if doug6_setup["max_profit"] == "N/A" else "green",
         "max_risk": doug6_setup["max_risk"],
         "max_risk_class": "placeholder" if doug6_setup["max_risk"] == "N/A" else "red",
+        "max_risk_contract": doug6_setup["max_risk_contract"],
         "breakeven": doug6_setup["breakeven"],
         "breakeven_class": "placeholder" if doug6_setup["breakeven"] == "N/A" else "green",
         "doug6_snapshot_clock": doug6_setup["doug6_snapshot_clock"],
@@ -4345,6 +4362,7 @@ def ensure_terminal_display_data(data: dict) -> dict:
         "max_profit_class": "placeholder",
         "max_risk": "N/A",
         "max_risk_class": "placeholder",
+        "max_risk_contract": "N/A",
         "breakeven": "N/A",
         "breakeven_class": "placeholder",
         "doug6_snapshot_time": "10:30 ET",
