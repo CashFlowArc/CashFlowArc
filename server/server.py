@@ -607,7 +607,7 @@ TERMINAL_HTML = """
         .market-readout{text-align:right; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.02em;}
         .market-readout b{display:inline-block; margin-right:10px; font-size:18px;}
         .market-readout b:before{content:""; display:inline-block; width:8px; height:8px; margin-right:7px; border-radius:50%; background:currentColor; box-shadow:0 0 12px currentColor;}
-        .controlbar{display:flex; justify-content:space-between; align-items:center; gap:18px; padding:9px 16px; min-height:48px;}
+        .controlbar{display:flex; justify-content:center; align-items:center; gap:18px; padding:9px 16px; min-height:48px; width:fit-content; max-width:100%; justify-self:center;}
         .nav-links{display:flex; justify-content:flex-start; gap:8px; flex-wrap:wrap; opacity:.68;}
         .nav-link{color:var(--muted); text-decoration:none; font-size:11px; font-weight:900; padding:8px 11px; border:1px solid rgba(0,229,240,.18); background:rgba(0,10,14,.38); text-transform:uppercase;}
         .nav-link.active{color:#dffcff; border-color:rgba(0,229,240,.48); box-shadow:inset 0 0 0 1px rgba(0,229,240,.18);}
