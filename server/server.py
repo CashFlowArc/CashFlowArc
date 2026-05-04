@@ -579,7 +579,7 @@ TERMINAL_HTML = """
             mix-blend-mode:screen;
         }
         @keyframes circuit-pulse{0%{background-position:-40px 38px,130px -30px,0 0,0 0,0 0}50%{opacity:.34}100%{background-position:320px 38px,130px 250px,0 0,0 0,0 0}}
-        .shell{min-height:100vh; padding:18px; display:grid; grid-template-rows:auto 1fr auto; gap:18px;}
+        .shell{min-height:100vh; padding:18px; display:grid; grid-template-rows:auto max-content auto auto auto; gap:18px;}
         .topbar,.controlbar,.tickerbar,.panel{
             position:relative;
             border:1px solid var(--cyan-soft);
