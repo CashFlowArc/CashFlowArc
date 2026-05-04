@@ -545,11 +545,11 @@ TERMINAL_HTML = """
             font-family:Segoe UI, Arial, sans-serif;
             color:var(--text);
             background:
-                linear-gradient(180deg, rgba(1,7,10,.12), rgba(1,3,5,.72)),
-                radial-gradient(circle at 50% 115%, rgba(38,103,119,.55) 0 7%, transparent 34%),
-                repeating-linear-gradient(90deg, rgba(0,229,240,.026) 0 1px, transparent 1px 118px),
-                repeating-linear-gradient(0deg, rgba(0,229,240,.02) 0 1px, transparent 1px 92px),
-                radial-gradient(circle at 50% 20%, rgba(9,44,54,.72) 0%, rgba(2,7,9,.92) 38%, #010303 74%);
+                radial-gradient(circle at 50% 118%, rgba(19,84,98,.34) 0 8%, transparent 35%),
+                linear-gradient(115deg, transparent 0 31%, rgba(0,229,240,.035) 31.1% 31.32%, transparent 31.42% 63%, rgba(82,165,255,.024) 63.08% 63.28%, transparent 63.38%),
+                repeating-linear-gradient(90deg, rgba(0,229,240,.018) 0 1px, transparent 1px 128px),
+                repeating-linear-gradient(0deg, rgba(0,229,240,.014) 0 1px, transparent 1px 96px),
+                radial-gradient(circle at 50% 18%, rgba(6,33,41,.58) 0%, rgba(2,8,10,.95) 42%, #010303 78%);
         }
         body:before{
             content:"";
@@ -567,18 +567,17 @@ TERMINAL_HTML = """
             inset:0;
             pointer-events:none;
             background:
-                radial-gradient(circle, rgba(82,165,255,.75) 0 2px, transparent 3px),
-                radial-gradient(circle, rgba(0,229,240,.65) 0 2px, transparent 3px),
-                linear-gradient(90deg, transparent 0 9%, rgba(0,229,240,.13) 9% 9.25%, transparent 9.25% 28%, rgba(0,229,240,.10) 28% 28.25%, transparent 28.25%),
-                linear-gradient(0deg, transparent 0 18%, rgba(0,229,240,.10) 18% 18.25%, transparent 18.25% 58%, rgba(82,165,255,.09) 58% 58.25%, transparent 58.25%),
-                linear-gradient(135deg, transparent 0 48%, rgba(0,229,240,.08) 48% 48.3%, transparent 48.3%);
-            background-size:360px 220px,420px 280px,360px 220px,360px 220px,280px 280px;
-            background-position:0 0,130px 80px,0 0,0 0,0 0;
-            animation:circuit-pulse 6.5s linear infinite;
-            opacity:.26;
+                radial-gradient(circle at 8% 12%, rgba(82,165,255,.26) 0 1px, transparent 2px),
+                radial-gradient(circle at 24% 74%, rgba(0,229,240,.22) 0 1px, transparent 2px),
+                radial-gradient(circle at 74% 34%, rgba(0,229,240,.18) 0 1px, transparent 2px),
+                linear-gradient(90deg, transparent 0 8%, rgba(0,229,240,.055) 8% 8.15%, transparent 8.15% 29%, rgba(0,229,240,.042) 29% 29.14%, transparent 29.14%),
+                linear-gradient(0deg, transparent 0 20%, rgba(0,229,240,.045) 20% 20.14%, transparent 20.14% 62%, rgba(82,165,255,.035) 62% 62.14%, transparent 62.14%),
+                linear-gradient(135deg, transparent 0 49%, rgba(0,229,240,.04) 49% 49.18%, transparent 49.18%);
+            background-size:340px 220px,420px 280px,520px 300px,420px 260px,420px 260px,300px 300px;
+            background-position:20px 12px,110px 74px,60px 28px,0 0,0 0,0 0;
+            opacity:.20;
             mix-blend-mode:screen;
         }
-        @keyframes circuit-pulse{0%{background-position:-40px 38px,130px -30px,0 0,0 0,0 0}50%{opacity:.34}100%{background-position:320px 38px,130px 250px,0 0,0 0,0 0}}
         .shell{min-height:100vh; padding:18px; display:grid; grid-template-rows:auto max-content auto auto auto; gap:18px;}
         .topbar,.controlbar,.tickerbar,.panel{
             position:relative;
@@ -608,8 +607,8 @@ TERMINAL_HTML = """
         .market-readout b{display:inline-block; margin-right:10px; font-size:18px;}
         .market-readout b:before{content:""; display:inline-block; width:8px; height:8px; margin-right:7px; border-radius:50%; background:currentColor; box-shadow:0 0 12px currentColor;}
         .controlbar{display:flex; justify-content:center; align-items:center; gap:12px; padding:4px 10px; min-height:34px; width:fit-content; max-width:100%; justify-self:center;}
-        .nav-links{display:flex; justify-content:flex-start; gap:6px; flex-wrap:wrap; opacity:.68;}
-        .nav-link{color:var(--muted); text-decoration:none; font-size:10px; font-weight:900; padding:5px 9px; border:1px solid rgba(0,229,240,.18); background:rgba(0,10,14,.38); text-transform:uppercase;}
+        .nav-links{display:flex; justify-content:flex-start; align-items:center; gap:6px; flex-wrap:wrap; opacity:.68;}
+        .nav-link{height:24px; display:inline-flex; align-items:center; color:var(--muted); text-decoration:none; font-size:10px; font-weight:900; line-height:1; padding:0 9px; border:1px solid rgba(0,229,240,.18); background:rgba(0,10,14,.38); text-transform:uppercase;}
         .nav-link.active{color:#dffcff; border-color:rgba(0,229,240,.48); box-shadow:inset 0 0 0 1px rgba(0,229,240,.18);}
         .debug-form{display:flex; align-items:center; gap:6px; flex-wrap:wrap; color:var(--muted); font-size:10px; text-transform:uppercase;}
         .debug-form input,.debug-form select{height:24px; border:1px solid rgba(0,229,240,.22); background:rgba(0,8,11,.72); color:var(--text); padding:0 7px; font:inherit;}
@@ -1934,6 +1933,7 @@ TERMINAL_PAGE_HTML = """
         .terminal-table tbody tr:hover{background:rgba(0,229,240,.06);}
         .terminal-table .strike{text-align:center; color:#f3fbff; background:rgba(255,255,255,.025); font-weight:900;}
         .option-chain-table-wrap{max-height:78vh;}
+        .option-chain-table{min-width:930px; width:930px; table-layout:fixed;}
         .option-chain-table th,.option-chain-table td{padding:4px 6px; font-size:9px; line-height:1;}
         .option-chain-table th{font-size:8px;}
         .option-chain-table .strike{font-size:9px;}
