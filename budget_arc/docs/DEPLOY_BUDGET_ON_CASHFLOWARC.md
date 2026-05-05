@@ -9,19 +9,19 @@ It does not modify CashFlowArc's existing `server/server.py`.
 Recommended paths:
 
 ```text
-/opt/CashFlowArc                 # existing CashFlowArc git checkout
-/opt/CashFlowArc/budget_arc      # BudgetArc app directory in that checkout
+/home/opc/CashFlowArc            # existing CashFlowArc git checkout used by pull-on-push
+/home/opc/CashFlowArc/budget_arc # BudgetArc app directory in that checkout
 /etc/budget-arc/budget.env       # server secrets
 /etc/budget-arc/teller/          # Teller certificate and private key
-/opt/CashFlowArc/budget_arc/wallet/ # Oracle wallet, readable by service user only
+/home/opc/CashFlowArc/budget_arc/wallet/ # Oracle wallet, readable by service user only
 ```
 
 ## One-Time Setup
 
 ```bash
-cd /opt
+cd /home/opc
 git clone <CashFlowArc-repo-url> CashFlowArc
-cd /opt/CashFlowArc/budget_arc
+cd /home/opc/CashFlowArc/budget_arc
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
@@ -38,7 +38,7 @@ sudo chmod 600 /etc/budget-arc/budget.env
 Generate a web admin password hash locally on the server:
 
 ```bash
-/opt/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle hash-password
+/home/opc/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle hash-password
 ```
 
 Put the resulting hash in:
@@ -50,7 +50,7 @@ BUDGET_ADMIN_PASSWORD_HASH=
 Generate `BUDGET_MASTER_KEY` on the server if you are not sourcing it from a secrets manager:
 
 ```bash
-/opt/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle generate-key
+/home/opc/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle generate-key
 ```
 
 ## Required Server Environment
@@ -61,7 +61,7 @@ Set these in `/etc/budget-arc/budget.env`:
 DB_USER=
 DB_PASSWORD=
 DB_DSN=cfadb1_low
-WALLET_DIR=/opt/CashFlowArc/budget_arc/wallet
+WALLET_DIR=/home/opc/CashFlowArc/budget_arc/wallet
 WALLET_PASSWORD=
 BUDGET_MASTER_KEY=
 BUDGET_KEY_ID=server-v1
@@ -84,7 +84,7 @@ BUDGET_COOKIE_SECURE=true
 Initialize the isolated budget tables:
 
 ```bash
-/opt/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle init-db
+/home/opc/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle init-db
 ```
 
 The app uses `BUDGET_` tables and does not write to CashFlowArc market-data tables.
@@ -129,9 +129,9 @@ https://CashFlowArc.com/budget
 ## Updating
 
 ```bash
-cd /opt/CashFlowArc
+cd /home/opc/CashFlowArc
 git pull
-cd /opt/CashFlowArc/budget_arc
+cd /home/opc/CashFlowArc/budget_arc
 . .venv/bin/activate
 pip install -r requirements.txt
 sudo systemctl restart budget-arc

@@ -14,3 +14,21 @@ jobs:
           cd /home/opc/CashFlowArc
           git fetch origin
           git reset --hard origin/main
+
+      - name: Update BudgetArc app dependencies
+        run: |
+          if [ -d /home/opc/CashFlowArc/budget_arc ]; then
+            cd /home/opc/CashFlowArc/budget_arc
+            python3 -m venv .venv
+            . .venv/bin/activate
+            pip install -r requirements.txt
+          fi
+
+      - name: Restart BudgetArc service if installed
+        run: |
+          if systemctl list-unit-files budget-arc.service >/dev/null 2>&1; then
+            sudo systemctl restart budget-arc
+            sudo systemctl --no-pager --full status budget-arc
+          else
+            echo "budget-arc.service is not installed yet; skipping restart."
+          fi
