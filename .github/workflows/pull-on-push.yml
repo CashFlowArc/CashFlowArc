@@ -32,3 +32,22 @@ jobs:
           else
             echo "budget-arc.service is not installed yet; skipping restart."
           fi
+
+      - name: BudgetArc server routing diagnostics
+        run: |
+          echo "=== hostname ==="
+          hostname
+          echo "=== listening ports ==="
+          sudo ss -ltnp | sed -E 's/users:\(\(\"[^\"]+\",pid=[0-9]+,fd=[0-9]+\)\)/users:REDACTED/g' || true
+          echo "=== relevant processes ==="
+          ps -ef | grep -E 'server.py|gunicorn|nginx|httpd|budget_teller_oracle' | grep -v grep || true
+          echo "=== relevant services ==="
+          systemctl list-unit-files | grep -Ei 'cash|budget|nginx|httpd|gunicorn' || true
+          echo "=== nginx layout ==="
+          if command -v nginx >/dev/null 2>&1; then
+            nginx -V 2>&1 | head -5 || true
+            sudo find /etc/nginx -maxdepth 3 -type f | sort || true
+            sudo grep -R "server_name\|proxy_pass\|include .*default.d\|location /" /etc/nginx 2>/dev/null || true
+          else
+            echo "nginx not installed"
+          fi
