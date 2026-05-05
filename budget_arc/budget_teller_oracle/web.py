@@ -27,6 +27,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .config import AppConfig, load_config, load_env_file
 from .crypto import TokenCipher
 from .db import BudgetStore, connect
+from .emailer import load_email_config, send_password_reset_email, send_verification_email
 from .signature import verify_teller_enrollment_signature
 from .sync import sync_connection
 from .teller import TellerAPIError, TellerClient
@@ -241,6 +242,17 @@ def create_app() -> Flask:
         static_url_path="/static",
     )
 
+    def absolute_budget_url(endpoint: str, **values: Any) -> str:
+        path = url_for(endpoint, **values)
+        origin = web_config.external_origin or request.host_url.rstrip("/")
+        return origin + path
+
+    def send_or_log_email(send_func: Callable[[], None]) -> None:
+        try:
+            send_func()
+        except Exception as exc:
+            app.logger.warning("BudgetArc email delivery failed: %s", type(exc).__name__)
+
     def current_user() -> dict[str, Any] | None:
         role = session.get("auth_role")
         if role == "admin":
@@ -392,6 +404,150 @@ def create_app() -> Flask:
                     conn.close()
             flash("Invalid username or password.", "error")
         return render_template("login.html", setup_missing=setup_missing, web_config=web_config)
+
+    @budget.route("/register", methods=["GET", "POST"])
+    def register() -> Any:
+        setup_missing = web_config.require_auth and not web_config.admin_password_hash
+        if request.method == "POST" and not setup_missing:
+            require_csrf()
+            email = _normalize_email(request.form.get("email", ""))
+            display_name = request.form.get("display_name", "").strip() or None
+            if not _valid_email(email):
+                flash("Enter a valid email address.", "error")
+                return render_template("register.html", setup_missing=setup_missing)
+
+            token: str | None = None
+            cfg = load_config(require_teller=False)
+            conn = connect(cfg.oracle)
+            try:
+                store = BudgetStore(conn)
+                user = store.get_user_by_email(email)
+                if not user:
+                    user_id = store.create_pending_user(email=email, display_name=display_name)
+                    token = store.create_email_token(
+                        user_id=user_id,
+                        email=email,
+                        purpose="verify_email",
+                        expires_minutes=24 * 60,
+                    )
+                elif user["status"] == "PENDING":
+                    token = store.create_email_token(
+                        user_id=user["user_id"],
+                        email=user["email"],
+                        purpose="verify_email",
+                        expires_minutes=24 * 60,
+                    )
+                conn.commit()
+            finally:
+                conn.close()
+
+            if token:
+                verify_url = absolute_budget_url("budget.verify_email", token=token)
+                send_or_log_email(lambda: send_verification_email(to_email=email, verify_url=verify_url))
+            flash("If this email can be registered, check your inbox for a verification link.", "success")
+            return redirect(url_for("budget.login"))
+        return render_template("register.html", setup_missing=setup_missing)
+
+    @budget.route("/verify/<token>", methods=["GET", "POST"])
+    def verify_email(token: str) -> Any:
+        setup_missing = web_config.require_auth and not web_config.admin_password_hash
+        if setup_missing:
+            return redirect(url_for("budget.login"))
+
+        cfg = load_config(require_teller=False)
+        conn = connect(cfg.oracle)
+        try:
+            store = BudgetStore(conn)
+            token_record = store.get_valid_email_token(token=token, purpose="verify_email")
+            if not token_record or token_record["status"] == "DISABLED":
+                return render_template("set_password.html", token_valid=False, mode="verify")
+
+            if request.method == "POST":
+                require_csrf()
+                password = request.form.get("password", "")
+                confirm = request.form.get("confirm_password", "")
+                if password != confirm:
+                    flash("Passwords did not match.", "error")
+                elif not _valid_password(password):
+                    flash("Use at least 12 characters for your password.", "error")
+                else:
+                    store.activate_user_with_password(
+                        user_id=token_record["user_id"],
+                        password_hash=hash_password(password),
+                    )
+                    store.consume_email_token(token_hash=token_record["token_hash"])
+                    conn.commit()
+                    flash("Your email is verified. Sign in with your new password.", "success")
+                    return redirect(url_for("budget.login"))
+        finally:
+            conn.close()
+        return render_template("set_password.html", token_valid=True, mode="verify", email=token_record["user_email"])
+
+    @budget.route("/forgot-password", methods=["GET", "POST"])
+    def forgot_password() -> Any:
+        setup_missing = web_config.require_auth and not web_config.admin_password_hash
+        if request.method == "POST" and not setup_missing:
+            require_csrf()
+            email = _normalize_email(request.form.get("email", ""))
+            token: str | None = None
+            if _valid_email(email):
+                cfg = load_config(require_teller=False)
+                conn = connect(cfg.oracle)
+                try:
+                    store = BudgetStore(conn)
+                    user = store.get_user_by_email(email)
+                    if user and user["status"] == "ACTIVE":
+                        token = store.create_email_token(
+                            user_id=user["user_id"],
+                            email=user["email"],
+                            purpose="reset_password",
+                            expires_minutes=60,
+                        )
+                    conn.commit()
+                finally:
+                    conn.close()
+
+            if token:
+                reset_url = absolute_budget_url("budget.reset_password", token=token)
+                send_or_log_email(lambda: send_password_reset_email(to_email=email, reset_url=reset_url))
+            flash("If an active account exists for that email, a reset link has been sent.", "success")
+            return redirect(url_for("budget.login"))
+        return render_template("forgot_password.html", setup_missing=setup_missing)
+
+    @budget.route("/reset-password/<token>", methods=["GET", "POST"])
+    def reset_password(token: str) -> Any:
+        setup_missing = web_config.require_auth and not web_config.admin_password_hash
+        if setup_missing:
+            return redirect(url_for("budget.login"))
+
+        cfg = load_config(require_teller=False)
+        conn = connect(cfg.oracle)
+        try:
+            store = BudgetStore(conn)
+            token_record = store.get_valid_email_token(token=token, purpose="reset_password")
+            if not token_record or token_record["status"] != "ACTIVE":
+                return render_template("set_password.html", token_valid=False, mode="reset")
+
+            if request.method == "POST":
+                require_csrf()
+                password = request.form.get("password", "")
+                confirm = request.form.get("confirm_password", "")
+                if password != confirm:
+                    flash("Passwords did not match.", "error")
+                elif not _valid_password(password):
+                    flash("Use at least 12 characters for your password.", "error")
+                else:
+                    store.set_user_password(
+                        user_id=token_record["user_id"],
+                        password_hash=hash_password(password),
+                    )
+                    store.consume_email_token(token_hash=token_record["token_hash"])
+                    conn.commit()
+                    flash("Your password has been reset. Sign in with the new password.", "success")
+                    return redirect(url_for("budget.login"))
+        finally:
+            conn.close()
+        return render_template("set_password.html", token_valid=True, mode="reset", email=token_record["user_email"])
 
     @budget.route("/logout", methods=["POST"])
     @login_required
@@ -651,7 +807,12 @@ def create_app() -> Flask:
     @budget.route("/settings")
     @admin_required
     def settings() -> Any:
-        return render_template("settings.html", web_config=web_config, app_config=app_config)
+        return render_template(
+            "settings.html",
+            web_config=web_config,
+            app_config=app_config,
+            email_config=load_email_config(),
+        )
 
     @budget.route("/actions/sync/<connection_id>", methods=["POST"])
     @user_required
@@ -868,6 +1029,15 @@ def create_app() -> Flask:
                     status = request.form.get("status", "")
                     if status not in {"ACTIVE", "DISABLED"}:
                         flash("Invalid user status.", "error")
+                    elif status == "ACTIVE":
+                        user = store.get_user_by_id(user_id)
+                        if not user or not user["email_verified_at"] or not user["password_set_at"]:
+                            flash("Email verification and password setup are required before activating a user.", "error")
+                        else:
+                            store.set_user_status(user_id=user_id, status=status)
+                            conn.commit()
+                            flash("User status was updated.", "success")
+                            return redirect(url_for("budget.admin_users"))
                     else:
                         store.set_user_status(user_id=user_id, status=status)
                         conn.commit()

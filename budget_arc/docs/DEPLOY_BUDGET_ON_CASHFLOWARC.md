@@ -86,6 +86,12 @@ BUDGET_WEB_PORT=8788
 BUDGET_EXTERNAL_ORIGIN=https://CashFlowArc.com
 BUDGET_REQUIRE_AUTH=true
 BUDGET_COOKIE_SECURE=true
+BUDGET_EMAIL_FROM=
+BUDGET_SMTP_HOST=
+BUDGET_SMTP_PORT=587
+BUDGET_SMTP_USERNAME=
+BUDGET_SMTP_PASSWORD=
+BUDGET_SMTP_USE_TLS=true
 ```
 
 ## Oracle Tables
@@ -98,9 +104,26 @@ Initialize the isolated budget tables:
 
 The app uses `BUDGET_` tables and does not write to CashFlowArc market-data tables.
 
-The deployment installer runs `init-db` on each deploy. Existing installs are migrated in place by adding `BUDGET_USERS`, `USER_ID` columns to Teller connection/account/transaction/sync-event tables, and institution fields on transaction rows.
+The deployment installer runs `init-db` on each deploy. Existing installs are migrated in place by adding `BUDGET_USERS`, `BUDGET_EMAIL_TOKENS`, `USER_ID` columns to Teller connection/account/transaction/sync-event tables, and institution fields on transaction rows.
 
-After signing in as `admin`, create regular users from `Users`. If older Teller rows were loaded before user ownership existed, use `Assign unowned data` on the intended user once.
+After signing in as `admin`, create regular users from `Users`, or enable self-registration by configuring SMTP. If older Teller rows were loaded before user ownership existed, use `Assign unowned data` on the intended user once.
+
+## Email Registration
+
+For GitHub Actions deployment, add these repository secrets if you want verification and password-reset emails to send:
+
+```text
+BUDGET_EMAIL_FROM
+BUDGET_SMTP_HOST
+BUDGET_SMTP_PORT
+BUDGET_SMTP_USERNAME
+BUDGET_SMTP_PASSWORD
+BUDGET_SMTP_USE_TLS
+BUDGET_SMTP_USE_SSL
+BUDGET_SMTP_TIMEOUT
+```
+
+The installer writes non-empty secret values to `/etc/budget-arc/budget.env` without printing them. Verification links expire after 24 hours; password-reset links expire after 60 minutes. Raw link tokens are never stored in Oracle, only SHA-256 token hashes.
 
 ## systemd
 

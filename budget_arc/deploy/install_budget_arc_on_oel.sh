@@ -62,6 +62,15 @@ BUDGET_REQUIRE_AUTH=true
 BUDGET_ADMIN_USERNAME=admin
 BUDGET_ADMIN_PASSWORD_HASH=
 BUDGET_COOKIE_SECURE=true
+
+BUDGET_EMAIL_FROM=
+BUDGET_SMTP_HOST=
+BUDGET_SMTP_PORT=587
+BUDGET_SMTP_USERNAME=
+BUDGET_SMTP_PASSWORD=
+BUDGET_SMTP_USE_TLS=true
+BUDGET_SMTP_USE_SSL=false
+BUDGET_SMTP_TIMEOUT=20
 EOF
   sudo install -m 600 "$TMP_ENV" "$ENV_FILE"
   rm -f "$TMP_ENV"
@@ -99,14 +108,94 @@ else
   echo "BUDGET_ADMIN_PASSWORD secret not provided; preserving existing admin password hash."
 fi
 
-sudo APP_DIR="$APP_DIR" VENV_DIR="$VENV_DIR" ENV_FILE="$ENV_FILE" bash -c '
-  set -a
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
-  set +a
-  cd "$APP_DIR"
-  "$VENV_DIR/bin/python" -m budget_teller_oracle init-db
-'
+EMAIL_ENV_KEYS=(
+  BUDGET_EMAIL_FROM
+  BUDGET_SMTP_HOST
+  BUDGET_SMTP_PORT
+  BUDGET_SMTP_USERNAME
+  BUDGET_SMTP_PASSWORD
+  BUDGET_SMTP_USE_TLS
+  BUDGET_SMTP_USE_SSL
+  BUDGET_SMTP_TIMEOUT
+)
+EMAIL_ENV_PROVIDED=false
+for key in "${EMAIL_ENV_KEYS[@]}"; do
+  if [[ -n "${!key:-}" ]]; then
+    EMAIL_ENV_PROVIDED=true
+    break
+  fi
+done
+
+if [[ "$EMAIL_ENV_PROVIDED" == true ]]; then
+  TMP_EMAIL_SECRETS="$(mktemp)"
+  trap 'rm -f "${TMP_EMAIL_SECRETS:-}"' EXIT
+  chmod 600 "$TMP_EMAIL_SECRETS"
+  for key in "${EMAIL_ENV_KEYS[@]}"; do
+    if [[ -n "${!key:-}" ]]; then
+      printf '%s=%s\n' "$key" "${!key}" >> "$TMP_EMAIL_SECRETS"
+    fi
+  done
+  TMP_ENV_UPDATE="$(sudo mktemp)"
+  sudo python3 - "$ENV_FILE" "$TMP_ENV_UPDATE" "$TMP_EMAIL_SECRETS" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+secret_file = Path(sys.argv[3])
+updates = {}
+for line in secret_file.read_text().splitlines():
+    if "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    if value:
+        updates[key] = value
+
+lines = source.read_text().splitlines()
+for key, value in updates.items():
+    prefix = f"{key}="
+    for index, line in enumerate(lines):
+        if line.startswith(prefix):
+            lines[index] = f"{key}={value}"
+            break
+    else:
+        lines.append(f"{key}={value}")
+
+target.write_text("\n".join(lines) + "\n")
+PY
+  sudo install -m 600 "$TMP_ENV_UPDATE" "$ENV_FILE"
+  sudo rm -f "$TMP_ENV_UPDATE"
+  rm -f "$TMP_EMAIL_SECRETS"
+  echo "Updated BudgetArc email delivery settings from GitHub Actions secrets."
+else
+  echo "BudgetArc email delivery secrets not provided; preserving existing SMTP settings."
+fi
+
+sudo python3 - "$APP_DIR" "$VENV_DIR" "$ENV_FILE" <<'PY'
+from pathlib import Path
+import os
+import subprocess
+import sys
+
+app_dir = Path(sys.argv[1])
+venv_dir = Path(sys.argv[2])
+env_file = Path(sys.argv[3])
+env = os.environ.copy()
+
+for raw_line in env_file.read_text().splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    env[key.strip()] = value.strip().strip('"').strip("'")
+
+subprocess.run(
+    [str(venv_dir / "bin" / "python"), "-m", "budget_teller_oracle", "init-db"],
+    cwd=app_dir,
+    env=env,
+    check=True,
+)
+PY
 
 sudo install -m 644 "$APP_DIR/deploy/budget-arc.service" "$SERVICE_FILE"
 sudo systemctl daemon-reload

@@ -15,6 +15,9 @@
       <dt>Teller institution</dt><dd>{{ app_config.teller.institution_id or "picker" }}</dd>
       <dt>Oracle DSN</dt><dd>{{ app_config.oracle.dsn }}</dd>
       <dt>User storage</dt><dd>BUDGET_USERS plus USER_ID-scoped Teller rows</dd>
+      <dt>Email delivery</dt><dd>{{ "configured" if email_config.configured else "not configured" }}</dd>
+      <dt>SMTP host</dt><dd>{{ email_config.host or "not configured" }}</dd>
+      <dt>Email sender</dt><dd>{{ email_config.sender or "not configured" }}</dd>
     </dl>
   </article>
   <article class="panel">
@@ -26,6 +29,8 @@
       <li>Teller enrollment signatures are verified with ED25519 key material.</li>
       <li>Budget tables are isolated with the `BUDGET_` prefix.</li>
       <li>Budget users are separated by `USER_ID` on Teller connections, accounts, transactions, and sync events.</li>
+      <li>Email verification and password reset tokens are stored as one-way hashes and expire automatically.</li>
+      <li>Registration and password reset responses avoid revealing whether an email exists.</li>
       <li>Deploy behind HTTPS before exposing beyond localhost.</li>
     </ul>
   </article>

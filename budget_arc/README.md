@@ -96,6 +96,19 @@ http://127.0.0.1:8788/budget
 
 Sign in as `admin` to create budget users. Regular users sign in with their email address, connect their own Teller institutions, and only see rows tied to their `USER_ID`.
 
+Users can also self-register with an email verification link and reset passwords by email. Configure SMTP with:
+
+```text
+BUDGET_EMAIL_FROM=
+BUDGET_SMTP_HOST=
+BUDGET_SMTP_PORT=587
+BUDGET_SMTP_USERNAME=
+BUDGET_SMTP_PASSWORD=
+BUDGET_SMTP_USE_TLS=true
+```
+
+On the server, store those values as GitHub Actions secrets or in `/etc/budget-arc/budget.env`; never commit them.
+
 For CashFlowArc.com deployment, use:
 
 - [Deploy BudgetArc Beside CashFlowArc](docs/DEPLOY_BUDGET_ON_CASHFLOWARC.md)

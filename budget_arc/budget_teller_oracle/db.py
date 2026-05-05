@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import hashlib
-from datetime import date
+import secrets
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
 import uuid
@@ -51,6 +52,10 @@ def _connection_id(user_id: str, provider_enrollment_id: str) -> str:
     return hashlib.sha256(f"{user_id}:teller:{provider_enrollment_id}".encode("utf-8")).hexdigest()
 
 
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def initialize_schema(conn: oracledb.Connection) -> list[str]:
     statements: list[tuple[str, str]] = [
         (
@@ -64,6 +69,8 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
                 STATUS VARCHAR2(32) DEFAULT 'ACTIVE' NOT NULL,
                 CREATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
                 UPDATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                EMAIL_VERIFIED_AT TIMESTAMP WITH TIME ZONE,
+                PASSWORD_SET_AT TIMESTAMP WITH TIME ZONE,
                 LAST_LOGIN_AT TIMESTAMP WITH TIME ZONE,
                 CONSTRAINT BUDGET_USERS_EMAIL_UK UNIQUE (EMAIL)
             )
@@ -191,6 +198,22 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
             )
             """,
         ),
+        (
+            "BUDGET_EMAIL_TOKENS",
+            """
+            CREATE TABLE BUDGET_EMAIL_TOKENS (
+                TOKEN_HASH VARCHAR2(64) PRIMARY KEY,
+                USER_ID VARCHAR2(64) NOT NULL,
+                EMAIL VARCHAR2(320) NOT NULL,
+                PURPOSE VARCHAR2(32) NOT NULL,
+                CREATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                EXPIRES_AT TIMESTAMP WITH TIME ZONE NOT NULL,
+                USED_AT TIMESTAMP WITH TIME ZONE,
+                CONSTRAINT BUDGET_EMAIL_TOKENS_USER_FK FOREIGN KEY (USER_ID)
+                    REFERENCES BUDGET_USERS (USER_ID)
+            )
+            """,
+        ),
     ]
 
     created: list[str] = []
@@ -220,8 +243,28 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
             ):
                 cur.execute(f"ALTER TABLE BUDGET_TRANSACTIONS ADD ({column_name} {column_type})")
 
+        user_extra_columns = [
+            ("EMAIL_VERIFIED_AT", "TIMESTAMP WITH TIME ZONE"),
+            ("PASSWORD_SET_AT", "TIMESTAMP WITH TIME ZONE"),
+        ]
+        for column_name, column_type in user_extra_columns:
+            if _table_exists(conn, "BUDGET_USERS") and not _column_exists(conn, "BUDGET_USERS", column_name):
+                cur.execute(f"ALTER TABLE BUDGET_USERS ADD ({column_name} {column_type})")
+
+        if _table_exists(conn, "BUDGET_USERS"):
+            cur.execute(
+                """
+                UPDATE BUDGET_USERS
+                SET EMAIL_VERIFIED_AT = NVL(EMAIL_VERIFIED_AT, CREATED_AT),
+                    PASSWORD_SET_AT = NVL(PASSWORD_SET_AT, CREATED_AT)
+                WHERE STATUS = 'ACTIVE'
+                  AND (EMAIL_VERIFIED_AT IS NULL OR PASSWORD_SET_AT IS NULL)
+                """
+            )
+
         indexes = [
             "CREATE INDEX BUDGET_USERS_STATUS_IDX ON BUDGET_USERS (STATUS, EMAIL)",
+            "CREATE INDEX BUDGET_EMAIL_TOKENS_USER_IDX ON BUDGET_EMAIL_TOKENS (USER_ID, PURPOSE, EXPIRES_AT)",
             "CREATE INDEX BUDGET_CONN_USER_IDX ON BUDGET_CONNECTIONS (USER_ID, UPDATED_AT)",
             "CREATE INDEX BUDGET_ACCTS_USER_INST_IDX ON BUDGET_ACCOUNTS (USER_ID, INSTITUTION_NAME)",
             "CREATE INDEX BUDGET_TXNS_USER_DATE_IDX ON BUDGET_TRANSACTIONS (USER_ID, TRANSACTION_DATE)",
@@ -270,15 +313,36 @@ class BudgetStore:
             cur.execute(
                 """
                 INSERT INTO BUDGET_USERS (
-                    USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS
+                    USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS,
+                    EMAIL_VERIFIED_AT, PASSWORD_SET_AT
                 ) VALUES (
-                    :user_id, :email, :display_name, :password_hash, 'ACTIVE'
+                    :user_id, :email, :display_name, :password_hash, 'ACTIVE',
+                    SYSTIMESTAMP, SYSTIMESTAMP
                 )
                 """,
                 user_id=user_id,
                 email=email.strip().lower(),
                 display_name=display_name,
                 password_hash=password_hash,
+            )
+        return user_id
+
+    def create_pending_user(self, *, email: str, display_name: str | None = None) -> str:
+        random_password_hash = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+        user_id = uuid.uuid4().hex
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO BUDGET_USERS (
+                    USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS
+                ) VALUES (
+                    :user_id, :email, :display_name, :password_hash, 'PENDING'
+                )
+                """,
+                user_id=user_id,
+                email=email.strip().lower(),
+                display_name=display_name,
+                password_hash=random_password_hash,
             )
         return user_id
 
@@ -299,6 +363,8 @@ class BudgetStore:
                     u.STATUS,
                     u.CREATED_AT,
                     u.UPDATED_AT,
+                    u.EMAIL_VERIFIED_AT,
+                    u.PASSWORD_SET_AT,
                     u.LAST_LOGIN_AT,
                     COUNT(DISTINCT c.CONNECTION_ID) AS CONNECTION_COUNT,
                     COUNT(DISTINCT a.PROVIDER_ACCOUNT_ID) AS ACCOUNT_COUNT
@@ -311,7 +377,8 @@ class BudgetStore:
                  AND a.PROVIDER = 'teller'
                 GROUP BY
                     u.USER_ID, u.EMAIL, u.DISPLAY_NAME, u.STATUS,
-                    u.CREATED_AT, u.UPDATED_AT, u.LAST_LOGIN_AT
+                    u.CREATED_AT, u.UPDATED_AT, u.EMAIL_VERIFIED_AT,
+                    u.PASSWORD_SET_AT, u.LAST_LOGIN_AT
                 ORDER BY u.EMAIL
                 """
             )
@@ -323,9 +390,11 @@ class BudgetStore:
                     "status": row[3],
                     "created_at": row[4],
                     "updated_at": row[5],
-                    "last_login_at": row[6],
-                    "connection_count": row[7],
-                    "account_count": row[8],
+                    "email_verified_at": row[6],
+                    "password_set_at": row[7],
+                    "last_login_at": row[8],
+                    "connection_count": row[9],
+                    "account_count": row[10],
                 }
                 for row in cur.fetchall()
             ]
@@ -334,7 +403,7 @@ class BudgetStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS
+                SELECT USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS, EMAIL_VERIFIED_AT
                 FROM BUDGET_USERS
                 WHERE EMAIL = :email
                 """,
@@ -349,6 +418,30 @@ class BudgetStore:
                 "display_name": row[2],
                 "password_hash": row[3],
                 "status": row[4],
+                "email_verified_at": row[5],
+            }
+
+    def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS, EMAIL_VERIFIED_AT, PASSWORD_SET_AT
+                FROM BUDGET_USERS
+                WHERE USER_ID = :user_id
+                """,
+                user_id=user_id,
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {
+                "user_id": row[0],
+                "email": row[1],
+                "display_name": row[2],
+                "password_hash": row[3],
+                "status": row[4],
+                "email_verified_at": row[5],
+                "password_set_at": row[6],
             }
 
     def set_user_password(self, *, user_id: str, password_hash: str) -> None:
@@ -357,11 +450,111 @@ class BudgetStore:
                 """
                 UPDATE BUDGET_USERS
                 SET PASSWORD_HASH = :password_hash,
+                    PASSWORD_SET_AT = SYSTIMESTAMP,
                     UPDATED_AT = SYSTIMESTAMP
                 WHERE USER_ID = :user_id
                 """,
                 user_id=user_id,
                 password_hash=password_hash,
+            )
+
+    def activate_user_with_password(self, *, user_id: str, password_hash: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE BUDGET_USERS
+                SET PASSWORD_HASH = :password_hash,
+                    STATUS = 'ACTIVE',
+                    EMAIL_VERIFIED_AT = NVL(EMAIL_VERIFIED_AT, SYSTIMESTAMP),
+                    PASSWORD_SET_AT = SYSTIMESTAMP,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                """,
+                user_id=user_id,
+                password_hash=password_hash,
+            )
+
+    def create_email_token(self, *, user_id: str, email: str, purpose: str, expires_minutes: int) -> str:
+        token = secrets.token_urlsafe(32)
+        token_hash = _token_hash(token)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE BUDGET_EMAIL_TOKENS
+                SET USED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND PURPOSE = :purpose
+                  AND USED_AT IS NULL
+                """,
+                user_id=user_id,
+                purpose=purpose,
+            )
+            cur.execute(
+                """
+                INSERT INTO BUDGET_EMAIL_TOKENS (
+                    TOKEN_HASH, USER_ID, EMAIL, PURPOSE, EXPIRES_AT
+                ) VALUES (
+                    :token_hash, :user_id, :email, :purpose, :expires_at
+                )
+                """,
+                token_hash=token_hash,
+                user_id=user_id,
+                email=email.strip().lower(),
+                purpose=purpose,
+                expires_at=expires_at,
+            )
+        return token
+
+    def get_valid_email_token(self, *, token: str, purpose: str) -> dict[str, Any] | None:
+        token_hash = _token_hash(token)
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    t.TOKEN_HASH,
+                    t.USER_ID,
+                    t.EMAIL,
+                    t.PURPOSE,
+                    t.EXPIRES_AT,
+                    u.EMAIL,
+                    u.DISPLAY_NAME,
+                    u.STATUS
+                FROM BUDGET_EMAIL_TOKENS t
+                JOIN BUDGET_USERS u
+                  ON u.USER_ID = t.USER_ID
+                WHERE t.TOKEN_HASH = :token_hash
+                  AND t.PURPOSE = :purpose
+                  AND t.USED_AT IS NULL
+                  AND t.EXPIRES_AT > SYSTIMESTAMP
+                """,
+                token_hash=token_hash,
+                purpose=purpose,
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {
+                "token_hash": row[0],
+                "user_id": row[1],
+                "email": row[2],
+                "purpose": row[3],
+                "expires_at": row[4],
+                "user_email": row[5],
+                "display_name": row[6],
+                "status": row[7],
+            }
+
+    def consume_email_token(self, *, token_hash: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE BUDGET_EMAIL_TOKENS
+                SET USED_AT = SYSTIMESTAMP
+                WHERE TOKEN_HASH = :token_hash
+                  AND USED_AT IS NULL
+                """,
+                token_hash=token_hash,
             )
 
     def set_user_status(self, *, user_id: str, status: str) -> None:
