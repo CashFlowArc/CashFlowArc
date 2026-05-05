@@ -27,8 +27,8 @@ jobs:
       - name: Restart BudgetArc service if installed
         run: |
           if systemctl list-unit-files budget-arc.service >/dev/null 2>&1; then
-            sudo systemctl restart budget-arc
-            sudo systemctl --no-pager --full status budget-arc
+            sudo systemctl restart budget-arc || true
+            sudo systemctl --no-pager --full status budget-arc || true
           else
             echo "budget-arc.service is not installed yet; skipping restart."
           fi

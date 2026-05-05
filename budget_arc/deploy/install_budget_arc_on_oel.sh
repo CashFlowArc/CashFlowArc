@@ -78,7 +78,7 @@ if [[ -f "$NGINX_CONF" ]]; then
     sudo cp "$NGINX_CONF" "$BACKUP"
     echo "Backed up nginx config to $BACKUP"
 
-    TMP_NGINX="$(mktemp)"
+    TMP_NGINX="$(sudo mktemp)"
     sudo python3 - "$NGINX_CONF" "$TMP_NGINX" <<'PY'
 from pathlib import Path
 import sys
@@ -107,15 +107,16 @@ budget_block = """    location = /budget {
 """
 
 marker = "    location / {"
-idx = text.find(marker)
-if idx == -1:
+count = text.count(marker)
+if count == 0:
     raise SystemExit("Could not find nginx 'location / {' marker")
 
-text = text[:idx] + budget_block + text[idx:]
+text = text.replace(marker, budget_block + marker)
 target.write_text(text)
+print(f"Inserted BudgetArc nginx route before {count} location / block(s).")
 PY
     sudo install -m 644 "$TMP_NGINX" "$NGINX_CONF"
-    rm -f "$TMP_NGINX"
+    sudo rm -f "$TMP_NGINX"
   else
     echo "nginx /budget proxy already configured."
   fi
@@ -130,4 +131,3 @@ echo "=== local checks ==="
 curl -sS -I http://127.0.0.1:8788/budget/login | head -5 || true
 curl -sS -I http://127.0.0.1/budget/ | head -5 || true
 echo "BudgetArc install complete."
-
