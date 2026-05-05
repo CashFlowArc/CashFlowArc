@@ -33,6 +33,11 @@ jobs:
             echo "budget-arc.service is not installed yet; skipping restart."
           fi
 
+      - name: Install or update BudgetArc on OEL
+        run: |
+          cd /home/opc/CashFlowArc/budget_arc
+          bash deploy/install_budget_arc_on_oel.sh
+
       - name: BudgetArc server routing diagnostics
         run: |
           echo "=== hostname ==="
