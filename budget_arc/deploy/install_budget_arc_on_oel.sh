@@ -77,13 +77,12 @@ sudo systemctl restart budget-arc
 sudo systemctl --no-pager --full status budget-arc || true
 
 if [[ -f "$NGINX_CONF" ]]; then
-  if ! sudo grep -q "127.0.0.1:8788" "$NGINX_CONF"; then
-    BACKUP="$NGINX_CONF.budget-arc.$(date +%Y%m%d%H%M%S).bak"
-    sudo cp "$NGINX_CONF" "$BACKUP"
-    echo "Backed up nginx config to $BACKUP"
+  BACKUP="$NGINX_CONF.budget-arc.$(date +%Y%m%d%H%M%S).bak"
+  sudo cp "$NGINX_CONF" "$BACKUP"
+  echo "Backed up nginx config to $BACKUP"
 
-    TMP_NGINX="$(sudo mktemp)"
-    sudo python3 - "$NGINX_CONF" "$TMP_NGINX" <<'PY'
+  TMP_NGINX="$(sudo mktemp)"
+  sudo python3 - "$NGINX_CONF" "$TMP_NGINX" <<'PY'
 from pathlib import Path
 import sys
 
@@ -103,27 +102,28 @@ budget_block = """    location = /budget {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Prefix /budget;
         proxy_read_timeout 180s;
         proxy_send_timeout 180s;
     }
 
 """
 
-marker = "    location / {"
-count = text.count(marker)
-if count == 0:
-    raise SystemExit("Could not find nginx 'location / {' marker")
+legacy_prefix = "        proxy_set_header X-Forwarded-Prefix /budget;\n"
+if "127.0.0.1:8788" in text:
+    text = text.replace(legacy_prefix, "")
+    print("Updated existing BudgetArc nginx route.")
+else:
+    marker = "    location / {"
+    count = text.count(marker)
+    if count == 0:
+        raise SystemExit("Could not find nginx 'location / {' marker")
+    text = text.replace(marker, budget_block + marker)
+    print(f"Inserted BudgetArc nginx route before {count} location / block(s).")
 
-text = text.replace(marker, budget_block + marker)
 target.write_text(text)
-print(f"Inserted BudgetArc nginx route before {count} location / block(s).")
 PY
-    sudo install -m 644 "$TMP_NGINX" "$NGINX_CONF"
-    sudo rm -f "$TMP_NGINX"
-  else
-    echo "nginx /budget proxy already configured."
-  fi
+  sudo install -m 644 "$TMP_NGINX" "$NGINX_CONF"
+  sudo rm -f "$TMP_NGINX"
 
   sudo nginx -t
   sudo systemctl reload nginx
