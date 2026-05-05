@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}BudgetArc{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('budget.static', filename='budget.css') }}">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <a class="brand" href="{{ url_for('budget.dashboard') }}">
+          <span class="brand-mark">$</span>
+          <span>
+            <strong>BudgetArc</strong>
+            <em>Mint-style planner</em>
+          </span>
+        </a>
+        <nav class="nav">
+          <a href="{{ url_for('budget.dashboard') }}" class="{{ 'active' if request.endpoint == 'budget.dashboard' else '' }}">Overview</a>
+          <a href="{{ url_for('budget.transactions') }}" class="{{ 'active' if request.endpoint == 'budget.transactions' else '' }}">Transactions</a>
+          <a href="{{ url_for('budget.budgets') }}" class="{{ 'active' if request.endpoint == 'budget.budgets' else '' }}">Budgets</a>
+          <a href="{{ url_for('budget.accounts') }}" class="{{ 'active' if request.endpoint == 'budget.accounts' else '' }}">Accounts</a>
+          <a href="{{ url_for('budget.connect_page') }}" class="{{ 'active' if request.endpoint == 'budget.connect_page' else '' }}">Connect</a>
+          <a href="{{ url_for('budget.settings') }}" class="{{ 'active' if request.endpoint == 'budget.settings' else '' }}">Settings</a>
+        </nav>
+        <div class="sidebar-note">
+          <strong>Read-only by design.</strong>
+          Teller handles bank login; this app stores encrypted access tokens only.
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">{% block eyebrow %}Personal finance dashboard{% endblock %}</p>
+            <h1>{% block heading %}Overview{% endblock %}</h1>
+          </div>
+          {% if is_authenticated %}
+          <form method="post" action="{{ url_for('budget.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="ghost-button" type="submit">Sign out</button>
+          </form>
+          {% endif %}
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-stack">
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>
+

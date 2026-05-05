@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block title %}Connect Account{% endblock %}
+{% block heading %}Connect Accounts{% endblock %}
+{% block eyebrow %}Teller Connect for supported institutions{% endblock %}
+{% block content %}
+<section class="panel connect-panel">
+  <div>
+    <p class="eyebrow">Secure account linking</p>
+    <h2>Add another account</h2>
+    <p>Teller handles credentials and MFA. BudgetArc receives a signed enrollment, verifies it, encrypts the access token, stores it in Oracle, and starts a transaction sync.</p>
+    <button id="connect" class="primary-button" type="button">Connect with Teller</button>
+  </div>
+  <pre id="connect-status">Loading Teller configuration...</pre>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.teller.io/connect/connect.js"></script>
+<script src="{{ url_for('budget.static', filename='connect.js') }}"></script>
+{% endblock %}
+

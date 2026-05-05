@@ -1,0 +1,78 @@
+{% extends "layout.html" %}
+{% block title %}BudgetArc Overview{% endblock %}
+{% block heading %}Overview{% endblock %}
+{% block eyebrow %}{{ month_start.strftime('%B %Y') }} spending snapshot{% endblock %}
+{% block content %}
+<section class="hero-grid">
+  <article class="hero-card mint-glow">
+    <p class="card-label">This Month Spending</p>
+    <strong>{{ format_money(summary.spend_total) }}</strong>
+    <span>{{ summary.transaction_count or 0 }} transactions synced</span>
+  </article>
+  <article class="hero-card">
+    <p class="card-label">Payments & Credits</p>
+    <strong>{{ format_money(summary.payment_total) }}</strong>
+    <span>Credit card payments and refunds</span>
+  </article>
+  <article class="hero-card">
+    <p class="card-label">Connected Accounts</p>
+    <strong>{{ accounts.account_count or 0 }}</strong>
+    <span>Tracked through Teller + Oracle</span>
+  </article>
+  <article class="hero-card">
+    <p class="card-label">Previous Month Spend</p>
+    <strong>{{ format_money(previous.spend_total) }}</strong>
+    <span>For quick trend comparison</span>
+  </article>
+</section>
+
+<section class="two-column">
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">Budget bars</p>
+        <h2>Spending by category</h2>
+      </div>
+      <a class="text-link" href="{{ url_for('budget.budgets') }}">View budgets</a>
+    </div>
+    <div class="budget-list">
+      {% for row in categories %}
+        {% set spend = row.spend_total or 0 %}
+        <div class="budget-row">
+          <div class="budget-meta">
+            <strong>{{ row.category|title }}</strong>
+            <span>{{ row.transaction_count }} txns</span>
+          </div>
+          <div class="progress"><span style="width: {{ row.bar_pct }}%"></span></div>
+          <div class="budget-amount">{{ format_money(spend) }}</div>
+        </div>
+      {% else %}
+        <p class="empty">No spending has been synced for this month yet.</p>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">Recent activity</p>
+        <h2>Latest transactions</h2>
+      </div>
+      <a class="text-link" href="{{ url_for('budget.transactions') }}">See all</a>
+    </div>
+    <div class="mini-transactions">
+      {% for txn in recent_transactions %}
+        <a class="mini-transaction" href="{{ url_for('budget.transactions', q=txn.description) }}">
+          <span>
+            <strong>{{ txn.counterparty_name or txn.description }}</strong>
+            <em>{{ format_date(txn.transaction_date) }} · {{ txn.status }}</em>
+          </span>
+          <b class="{{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</b>
+        </a>
+      {% else %}
+        <p class="empty">No transactions found.</p>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+{% block title %}BudgetArc Settings{% endblock %}
+{% block heading %}Settings{% endblock %}
+{% block eyebrow %}Deployment posture and security checklist{% endblock %}
+{% block content %}
+<section class="two-column">
+  <article class="panel">
+    <p class="eyebrow">Runtime</p>
+    <h2>Server configuration</h2>
+    <dl class="settings-list">
+      <dt>Base path</dt><dd>{{ web_config.base_path }}</dd>
+      <dt>Auth required</dt><dd>{{ web_config.require_auth }}</dd>
+      <dt>Cookie secure</dt><dd>{{ web_config.cookie_secure }}</dd>
+      <dt>Teller environment</dt><dd>{{ app_config.teller.environment }}</dd>
+      <dt>Teller institution</dt><dd>{{ app_config.teller.institution_id or "picker" }}</dd>
+      <dt>Oracle DSN</dt><dd>{{ app_config.oracle.dsn }}</dd>
+    </dl>
+  </article>
+  <article class="panel">
+    <p class="eyebrow">Security posture</p>
+    <h2>Guardrails</h2>
+    <ul class="checklist">
+      <li>Teller token encryption is application-layer before Oracle writes.</li>
+      <li>Amex credentials are entered only inside Teller Connect.</li>
+      <li>Teller enrollment signatures are verified with ED25519 key material.</li>
+      <li>Budget tables are isolated with the `BUDGET_` prefix.</li>
+      <li>Deploy behind HTTPS before exposing beyond localhost.</li>
+    </ul>
+  </article>
+</section>
+{% endblock %}
+

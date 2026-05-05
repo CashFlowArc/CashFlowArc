@@ -1,0 +1,21 @@
+[Unit]
+Description=BudgetArc Teller/Oracle budget web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+WorkingDirectory=/opt/CashFlowArc/budget_arc
+EnvironmentFile=/etc/budget-arc/budget.env
+ExecStart=/opt/CashFlowArc/budget_arc/.venv/bin/gunicorn --workers 2 --threads 4 --bind 127.0.0.1:8788 budget_teller_oracle.wsgi:app
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target

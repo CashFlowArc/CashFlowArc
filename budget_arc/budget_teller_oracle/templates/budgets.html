@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block title %}BudgetArc Budgets{% endblock %}
+{% block heading %}Budgets{% endblock %}
+{% block eyebrow %}Mint-inspired category progress for {{ month_start.strftime('%B %Y') }}{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Auto-built from transactions</p>
+      <h2>Monthly category tracker</h2>
+    </div>
+  </div>
+  <div class="budget-list large">
+    {% for row in categories %}
+      {% set spend = row.spend_total or 0 %}
+      <div class="budget-row">
+        <div class="budget-meta">
+          <strong>{{ row.category|title }}</strong>
+          <span>{{ row.transaction_count }} transactions</span>
+        </div>
+        <div class="progress"><span style="width: {{ row.bar_pct }}%"></span></div>
+        <div class="budget-amount">{{ format_money(spend) }}</div>
+      </div>
+    {% else %}
+      <p class="empty">No categories yet. Sync accounts first.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,4 @@
+cryptography>=42
+Flask>=3
+gunicorn>=22; platform_system != "Windows"
+oracledb>=2

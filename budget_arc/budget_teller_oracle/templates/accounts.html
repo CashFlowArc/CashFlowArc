@@ -1,0 +1,60 @@
+{% extends "layout.html" %}
+{% block title %}BudgetArc Accounts{% endblock %}
+{% block heading %}Manage Accounts{% endblock %}
+{% block eyebrow %}Connections, account inventory, and safe manual sync controls{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Teller enrollments</p>
+      <h2>Connections</h2>
+    </div>
+    <a class="primary-button" href="{{ url_for('budget.connect_page') }}">Connect account</a>
+  </div>
+  <div class="connection-grid">
+    {% for connection in connections %}
+      <article class="connection-card">
+        <div>
+          <strong>{{ connection.institution_name or "Financial institution" }}</strong>
+          <span>{{ connection.environment }} · {{ connection.status }}</span>
+          <em>Last sync: {{ format_date(connection.last_sync_at) if connection.last_sync_at else "Not synced yet" }}</em>
+        </div>
+        <form method="post" action="{{ url_for('budget.sync_action', connection_id=connection.connection_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input name="start_date" type="date" value="{{ (connection.last_sync_at or '').strftime('%Y-%m-%d') if connection.last_sync_at else '' }}">
+          <button class="ghost-button" type="submit">Sync</button>
+        </form>
+      </article>
+    {% else %}
+      <p class="empty">No Teller connections yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Account manager</p>
+      <h2>{{ accounts|length }} linked accounts</h2>
+    </div>
+  </div>
+  <div class="account-grid">
+    {% for account in accounts %}
+      <article class="account-card">
+        <p>{{ account.institution_name }}</p>
+        <h3>{{ account.account_name }}</h3>
+        <div class="account-meta">
+          <span>{{ account.account_type }} · {{ account.account_subtype }}</span>
+          <span>Last four: {{ account.last_four or "n/a" }}</span>
+          <span>Status: {{ account.status }}</span>
+          <span>{{ account.transaction_count }} transactions</span>
+          <span>Latest: {{ iso_date(account.last_transaction_date) or "n/a" }}</span>
+        </div>
+      </article>
+    {% else %}
+      <p class="empty">No accounts have been imported.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+

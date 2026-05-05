@@ -1,0 +1,75 @@
+{% extends "layout.html" %}
+{% block title %}BudgetArc Transactions{% endblock %}
+{% block heading %}Transactions{% endblock %}
+{% block eyebrow %}Search, filter, and review imported Oracle transactions{% endblock %}
+{% block content %}
+<section class="panel">
+  <form class="filters" method="get">
+    <label>
+      Search
+      <input name="q" value="{{ filters.q }}" placeholder="merchant, description, category">
+    </label>
+    <label>
+      Account
+      <select name="account">
+        <option value="">All accounts</option>
+        {% for account in accounts %}
+          <option value="{{ account.provider_account_id }}" {{ 'selected' if filters.account == account.provider_account_id else '' }}>
+            {{ account.account_name }}{% if account.last_four %} · {{ account.last_four }}{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Status
+      <select name="status">
+        <option value="">All</option>
+        <option value="posted" {{ 'selected' if filters.status == 'posted' else '' }}>Posted</option>
+        <option value="pending" {{ 'selected' if filters.status == 'pending' else '' }}>Pending</option>
+      </select>
+    </label>
+    <button class="primary-button" type="submit">Filter</button>
+  </form>
+</section>
+
+<section class="panel table-panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Oracle ledger</p>
+      <h2>{{ transactions|length }} transactions shown</h2>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Account</th>
+          <th>Category</th>
+          <th>Status</th>
+          <th class="right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for txn in transactions %}
+          <tr>
+            <td>{{ iso_date(txn.transaction_date) }}</td>
+            <td>
+              <strong>{{ txn.counterparty_name or txn.description }}</strong>
+              <span>{{ txn.description }}</span>
+            </td>
+            <td>{{ txn.account_name or "Account" }}</td>
+            <td><span class="pill">{{ txn.category or "Uncategorized" }}</span></td>
+            <td><span class="status {{ txn.status }}">{{ txn.status }}</span></td>
+            <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="empty">No transactions match this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+

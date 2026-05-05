@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.log
+*.pem
+*.key
+teller.zip
+wallet/
+.logs/
