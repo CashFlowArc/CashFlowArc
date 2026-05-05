@@ -3,6 +3,7 @@
 This is a security-first test harness for connecting a Teller enrollment, encrypting the Teller access token at the application layer, and storing normalized account/transaction data in isolated Oracle tables.
 
 The Oracle tables are intentionally prefixed with `BUDGET_` so they remain separate from existing CashFlowArc tables.
+Budget users are stored in `BUDGET_USERS`; Teller connections, accounts, transactions, and sync events carry a `USER_ID` so data remains separated by user.
 
 This directory is designed to live inside the CashFlowArc git repository at `budget_arc/`. It runs as a separate service mounted at `/budget`, so it does not import or modify CashFlowArc's existing `server/server.py`.
 
@@ -75,7 +76,7 @@ python -m budget_teller_oracle hash-password
 
 For server deployment through GitHub Actions, set a repository secret named `BUDGET_ADMIN_PASSWORD` instead. The server installer hashes it and writes only the hash into `/etc/budget-arc/budget.env`.
 
-Put the result into `.env`:
+Put the result into `.env` for local-only admin access:
 
 ```text
 BUDGET_ADMIN_PASSWORD_HASH=
@@ -92,6 +93,8 @@ Open:
 ```text
 http://127.0.0.1:8788/budget
 ```
+
+Sign in as `admin` to create budget users. Regular users sign in with their email address, connect their own Teller institutions, and only see rows tied to their `USER_ID`.
 
 For CashFlowArc.com deployment, use:
 

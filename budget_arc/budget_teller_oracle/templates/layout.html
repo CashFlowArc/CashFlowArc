@@ -17,16 +17,25 @@
           </span>
         </a>
         <nav class="nav">
-          <a href="{{ url_for('budget.dashboard') }}" class="{{ 'active' if request.endpoint == 'budget.dashboard' else '' }}">Overview</a>
-          <a href="{{ url_for('budget.transactions') }}" class="{{ 'active' if request.endpoint == 'budget.transactions' else '' }}">Transactions</a>
-          <a href="{{ url_for('budget.budgets') }}" class="{{ 'active' if request.endpoint == 'budget.budgets' else '' }}">Budgets</a>
-          <a href="{{ url_for('budget.accounts') }}" class="{{ 'active' if request.endpoint == 'budget.accounts' else '' }}">Accounts</a>
-          <a href="{{ url_for('budget.connect_page') }}" class="{{ 'active' if request.endpoint == 'budget.connect_page' else '' }}">Connect</a>
-          <a href="{{ url_for('budget.settings') }}" class="{{ 'active' if request.endpoint == 'budget.settings' else '' }}">Settings</a>
+          {% if is_admin %}
+            <a href="{{ url_for('budget.admin_users') }}" class="{{ 'active' if request.endpoint == 'budget.admin_users' else '' }}">Users</a>
+            <a href="{{ url_for('budget.settings') }}" class="{{ 'active' if request.endpoint == 'budget.settings' else '' }}">Settings</a>
+          {% else %}
+            <a href="{{ url_for('budget.dashboard') }}" class="{{ 'active' if request.endpoint == 'budget.dashboard' else '' }}">Overview</a>
+            <a href="{{ url_for('budget.transactions') }}" class="{{ 'active' if request.endpoint == 'budget.transactions' else '' }}">Transactions</a>
+            <a href="{{ url_for('budget.budgets') }}" class="{{ 'active' if request.endpoint == 'budget.budgets' else '' }}">Budgets</a>
+            <a href="{{ url_for('budget.accounts') }}" class="{{ 'active' if request.endpoint == 'budget.accounts' else '' }}">Accounts</a>
+            <a href="{{ url_for('budget.connect_page') }}" class="{{ 'active' if request.endpoint == 'budget.connect_page' else '' }}">Connect</a>
+          {% endif %}
         </nav>
         <div class="sidebar-note">
-          <strong>Read-only by design.</strong>
-          Teller handles bank login; this app stores encrypted access tokens only.
+          {% if current_user %}
+            <strong>{{ current_user.display_name }}</strong>
+            {{ "Global administrator" if is_admin else current_user.email }}
+          {% else %}
+            <strong>Read-only by design.</strong>
+            Teller handles bank login; this app stores encrypted access tokens only.
+          {% endif %}
         </div>
       </aside>
       <main class="main">
@@ -59,4 +68,3 @@
     {% block scripts %}{% endblock %}
   </body>
 </html>
-

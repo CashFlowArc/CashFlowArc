@@ -14,6 +14,7 @@
       <dt>Teller environment</dt><dd>{{ app_config.teller.environment }}</dd>
       <dt>Teller institution</dt><dd>{{ app_config.teller.institution_id or "picker" }}</dd>
       <dt>Oracle DSN</dt><dd>{{ app_config.oracle.dsn }}</dd>
+      <dt>User storage</dt><dd>BUDGET_USERS plus USER_ID-scoped Teller rows</dd>
     </dl>
   </article>
   <article class="panel">
@@ -24,9 +25,9 @@
       <li>Amex credentials are entered only inside Teller Connect.</li>
       <li>Teller enrollment signatures are verified with ED25519 key material.</li>
       <li>Budget tables are isolated with the `BUDGET_` prefix.</li>
+      <li>Budget users are separated by `USER_ID` on Teller connections, accounts, transactions, and sync events.</li>
       <li>Deploy behind HTTPS before exposing beyond localhost.</li>
     </ul>
   </article>
 </section>
 {% endblock %}
-

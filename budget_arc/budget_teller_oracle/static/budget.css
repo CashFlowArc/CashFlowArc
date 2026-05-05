@@ -126,7 +126,7 @@ h2 { font-size: 1.45rem; margin-bottom: 0; }
 .mini-transaction strong { display: block; max-width: 370px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .credit { color: var(--mint-dark); }
 
-.filters { display: grid; grid-template-columns: 2fr 1.4fr 1fr auto; gap: 12px; align-items: end; }
+.filters { display: grid; grid-template-columns: 1.6fr 1.2fr 1.2fr 1fr auto; gap: 12px; align-items: end; }
 label { display: grid; gap: 6px; font-family: "Trebuchet MS", Verdana, sans-serif; font-size: .85rem; font-weight: 800; color: var(--muted); }
 input, select {
   width: 100%;
@@ -177,6 +177,8 @@ td span { color: var(--muted); font-size: .9rem; }
 .pill { background: var(--mint-soft); color: var(--mint-dark); }
 .status { background: #eef2ef; color: var(--muted); }
 .status.pending { background: #fff2d4; color: #8b5f00; }
+.status.active { background: var(--mint-soft); color: var(--mint-dark); }
+.status.disabled { background: #fff1ef; color: var(--red); }
 
 .connection-grid, .account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .connection-card, .account-card {
@@ -191,6 +193,9 @@ td span { color: var(--muted); font-size: .9rem; }
 .account-meta { display: grid; gap: 4px; }
 
 .connect-panel { display: grid; grid-template-columns: .8fr 1fr; gap: 22px; align-items: start; }
+.connect-panel > div, .admin-form, .inline-admin-form { display: grid; gap: 12px; }
+.admin-form { grid-template-columns: 1.2fr 1fr 1fr auto; align-items: end; }
+.inline-admin-form { grid-template-columns: minmax(150px, 1fr) auto; margin-bottom: 8px; }
 pre {
   background: #10261d;
   color: #dff6eb;
@@ -229,8 +234,7 @@ pre {
   .sidebar { position: static; height: auto; }
   .nav { grid-template-columns: repeat(3, 1fr); }
   .hero-grid, .two-column, .connection-grid, .account-grid, .connect-panel { grid-template-columns: 1fr; }
-  .filters { grid-template-columns: 1fr; }
+  .filters, .admin-form, .inline-admin-form { grid-template-columns: 1fr; }
   .budget-row { grid-template-columns: 1fr; }
   .budget-amount { text-align: left; }
 }
-

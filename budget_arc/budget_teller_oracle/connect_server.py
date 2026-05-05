@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -274,10 +275,17 @@ def make_handler(state: ConnectState) -> type[BaseHTTPRequestHandler]:
                 conn = connect(cfg.oracle)
                 try:
                     store = BudgetStore(conn)
+                    owner_id = store.ensure_user(
+                        email=os.getenv("BUDGET_LOCAL_USER_EMAIL", "local@budgetarc.test"),
+                        display_name="Local Teller test user",
+                        password_hash="local-connect-only",
+                    )
                     connection_id = store.upsert_connection(
+                        user_id=owner_id,
                         environment=cfg.teller.environment,
                         provider_user_id=user_id,
                         provider_enrollment_id=enrollment_id,
+                        institution_id=institution.get("id"),
                         institution_name=institution_name,
                         access_token_cipher=encrypted_token,
                         token_key_id=cfg.key_id,
@@ -288,6 +296,7 @@ def make_handler(state: ConnectState) -> type[BaseHTTPRequestHandler]:
                         store=store,
                         teller=teller,
                         cipher=cipher,
+                        user_id=owner_id,
                         connection_id=connection_id,
                     )
                     conn.commit()

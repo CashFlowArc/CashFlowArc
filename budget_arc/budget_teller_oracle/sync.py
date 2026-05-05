@@ -19,18 +19,19 @@ def sync_connection(
     store: BudgetStore,
     teller: TellerClient,
     cipher: TokenCipher,
+    user_id: str,
     connection_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> SyncSummary:
-    token_cipher = store.get_connection_token_cipher(connection_id)
+    token_cipher = store.get_connection_token_cipher(connection_id, user_id=user_id)
     access_token = cipher.decrypt(token_cipher)
 
     accounts = teller.list_accounts(access_token)
     total_transactions = 0
 
     for account in accounts:
-        store.upsert_account(connection_id, account)
+        store.upsert_account(user_id=user_id, connection_id=connection_id, account=account)
     store.conn.commit()
 
     for account in accounts:
@@ -47,12 +48,14 @@ def sync_connection(
             )
             for transaction in transactions:
                 store.upsert_transaction(
+                    user_id=user_id,
                     connection_id=connection_id,
                     account=account,
                     transaction=transaction,
                 )
             total_transactions += len(transactions)
             store.record_sync_event(
+                user_id=user_id,
                 connection_id=connection_id,
                 account_id=account.get("id"),
                 event_type="transactions_sync",
@@ -61,6 +64,7 @@ def sync_connection(
             )
         except Exception as exc:
             store.record_sync_event(
+                user_id=user_id,
                 connection_id=connection_id,
                 account_id=account.get("id"),
                 event_type="transactions_sync",
@@ -70,7 +74,7 @@ def sync_connection(
             )
             raise
 
-    store.mark_connection_synced(connection_id)
+    store.mark_connection_synced(connection_id, user_id=user_id)
     return SyncSummary(
         connection_id=connection_id,
         accounts=len(accounts),

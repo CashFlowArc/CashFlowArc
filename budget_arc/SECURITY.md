@@ -13,10 +13,11 @@ This project handles financial account metadata and transaction data. Treat ever
 - Require Teller enrollment signature verification for development/production data.
 - Use least-privilege Oracle users when this moves beyond local testing.
 - Prefer a server deployment for real financial data; local PC setup is only for short-lived development.
+- Keep admin and user responsibilities separate: `admin` is for global management, while email-based users own Teller data.
 
 ## Data Separation
 
-All budgeting tables use the `BUDGET_` prefix and must remain separate from CashFlowArc market-data tables.
+All budgeting tables use the `BUDGET_` prefix and must remain separate from CashFlowArc market-data tables. User-owned Teller rows must include `USER_ID` so one user's connections, accounts, transactions, and sync events cannot be queried by another user.
 
 ## Review Checklist
 
@@ -30,6 +31,7 @@ Before merging future changes, check whether the change:
 - Touches Oracle writes or schema migrations.
 - Exposes the web app beyond localhost without HTTPS and `BUDGET_REQUIRE_AUTH=true`.
 - Changes `/budget/api/teller/enrollment`, because that path receives signed Teller enrollment callbacks.
+- Changes user scoping on account, transaction, connection, or sync-event queries.
 
 ## Web App
 

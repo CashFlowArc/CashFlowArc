@@ -21,6 +21,17 @@
       </select>
     </label>
     <label>
+      Institution
+      <select name="institution">
+        <option value="">All institutions</option>
+        {% for institution in institutions %}
+          <option value="{{ institution.institution_id }}" {{ 'selected' if filters.institution == institution.institution_id else '' }}>
+            {{ institution.institution_name or institution.institution_id }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
       Status
       <select name="status">
         <option value="">All</option>
@@ -45,6 +56,7 @@
         <tr>
           <th>Date</th>
           <th>Description</th>
+          <th>Institution</th>
           <th>Account</th>
           <th>Category</th>
           <th>Status</th>
@@ -59,17 +71,17 @@
               <strong>{{ txn.counterparty_name or txn.description }}</strong>
               <span>{{ txn.description }}</span>
             </td>
+            <td>{{ txn.institution_name or "Institution" }}</td>
             <td>{{ txn.account_name or "Account" }}</td>
             <td><span class="pill">{{ txn.category or "Uncategorized" }}</span></td>
             <td><span class="status {{ txn.status }}">{{ txn.status }}</span></td>
             <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
           </tr>
         {% else %}
-          <tr><td colspan="6" class="empty">No transactions match this filter.</td></tr>
+          <tr><td colspan="7" class="empty">No transactions match this filter.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
 {% endblock %}
-

@@ -8,6 +8,21 @@
     <p class="eyebrow">Secure account linking</p>
     <h2>Add another account</h2>
     <p>Teller handles credentials and MFA. BudgetArc receives a signed enrollment, verifies it, encrypts the access token, stores it in Oracle, and starts a transaction sync.</p>
+    <label>
+      Institution
+      <select id="institution-select">
+        {% for option in institution_options %}
+          <option value="{{ option.id }}">{{ option.name }}</option>
+        {% endfor %}
+        {% if default_institution_id and default_institution_id != "amex" %}
+          <option value="__default__">Configured default: {{ default_institution_id }}</option>
+        {% endif %}
+      </select>
+    </label>
+    <label>
+      Optional Teller institution id
+      <input id="institution-custom" placeholder="Leave blank for the Teller picker">
+    </label>
     <button id="connect" class="primary-button" type="button">Connect with Teller</button>
   </div>
   <pre id="connect-status">Loading Teller configuration...</pre>
@@ -17,4 +32,3 @@
 <script src="https://cdn.teller.io/connect/connect.js"></script>
 <script src="{{ url_for('budget.static', filename='connect.js') }}"></script>
 {% endblock %}
-

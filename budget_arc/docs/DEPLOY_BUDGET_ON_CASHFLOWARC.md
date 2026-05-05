@@ -98,6 +98,10 @@ Initialize the isolated budget tables:
 
 The app uses `BUDGET_` tables and does not write to CashFlowArc market-data tables.
 
+The deployment installer runs `init-db` on each deploy. Existing installs are migrated in place by adding `BUDGET_USERS`, `USER_ID` columns to Teller connection/account/transaction/sync-event tables, and institution fields on transaction rows.
+
+After signing in as `admin`, create regular users from `Users`. If older Teller rows were loaded before user ownership existed, use `Assign unowned data` on the intended user once.
+
 ## systemd
 
 ```bash

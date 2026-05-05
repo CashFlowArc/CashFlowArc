@@ -234,6 +234,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
             store=store,
             teller=TellerClient(cfg.teller),
             cipher=TokenCipher(cfg.master_key),
+            user_id=args.user_id,
             connection_id=args.connection_id,
             start_date=args.start_date,
             end_date=args.end_date,
@@ -295,6 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync = subparsers.add_parser("sync", help="Sync an existing encrypted Teller connection")
     sync.add_argument("connection_id")
+    sync.add_argument("--user-id", required=True, help="Budget user id that owns the connection")
     sync.add_argument("--start-date")
     sync.add_argument("--end-date")
     sync.set_defaults(func=_cmd_sync)

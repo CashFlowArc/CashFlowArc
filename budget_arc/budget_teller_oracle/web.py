@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import re
 import secrets
 from dataclasses import dataclass
 from decimal import Decimal
@@ -29,7 +30,11 @@ from .db import BudgetStore, connect
 from .signature import verify_teller_enrollment_signature
 from .sync import sync_connection
 from .teller import TellerAPIError, TellerClient
-from .web_security import verify_password
+from .web_security import hash_password, verify_password
+
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+INSTITUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 
 @dataclass(frozen=True)
@@ -130,6 +135,29 @@ def _iso_date(value: Any) -> str:
     return str(value)[:10]
 
 
+def _normalize_email(value: str) -> str:
+    return value.strip().lower()
+
+
+def _valid_email(value: str) -> bool:
+    return bool(EMAIL_RE.fullmatch(value))
+
+
+def _valid_password(value: str) -> bool:
+    return len(value) >= 12
+
+
+def _selected_institution_id(default_id: str | None) -> str | None:
+    raw = (request.args.get("institution_id") or "").strip()
+    if raw == "__default__":
+        raw = default_id or ""
+    if not raw:
+        return None
+    if not INSTITUTION_ID_RE.fullmatch(raw):
+        raise ValueError("Invalid institution id")
+    return raw
+
+
 def _month_bounds() -> tuple[dt.date, dt.date]:
     today = dt.date.today()
     start = today.replace(day=1)
@@ -164,7 +192,13 @@ def _query_one(sql: str, **params: Any) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
-def _execute_sync(connection_id: str, *, start_date: str | None = None, end_date: str | None = None) -> dict[str, Any]:
+def _execute_sync(
+    connection_id: str,
+    *,
+    user_id: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> dict[str, Any]:
     cfg = load_config()
     conn = connect(cfg.oracle)
     try:
@@ -173,6 +207,7 @@ def _execute_sync(connection_id: str, *, start_date: str | None = None, end_date
             store=store,
             teller=TellerClient(cfg.teller),
             cipher=TokenCipher(cfg.master_key),
+            user_id=user_id,
             connection_id=connection_id,
             start_date=start_date,
             end_date=end_date,
@@ -206,10 +241,37 @@ def create_app() -> Flask:
         static_url_path="/static",
     )
 
+    def current_user() -> dict[str, Any] | None:
+        role = session.get("auth_role")
+        if role == "admin":
+            return {
+                "role": "admin",
+                "email": web_config.admin_username,
+                "display_name": "Budget administrator",
+                "user_id": None,
+            }
+        if role == "user" and session.get("user_id"):
+            return {
+                "role": "user",
+                "email": session.get("user_email"),
+                "display_name": session.get("display_name") or session.get("user_email"),
+                "user_id": session.get("user_id"),
+            }
+        return None
+
     def is_authenticated() -> bool:
         if not web_config.require_auth:
             return True
-        return bool(session.get("budget_auth"))
+        return current_user() is not None
+
+    def is_admin() -> bool:
+        return bool(current_user() and current_user()["role"] == "admin")
+
+    def current_user_id() -> str:
+        user = current_user()
+        if not user or user["role"] != "user" or not user["user_id"]:
+            raise PermissionError("A budget user login is required")
+        return str(user["user_id"])
 
     def csrf_token() -> str:
         token = session.get("csrf_token")
@@ -224,6 +286,30 @@ def create_app() -> Flask:
             if is_authenticated():
                 return view(*args, **kwargs)
             return redirect(url_for("budget.login", next=request.full_path))
+
+        return wrapper
+
+    def user_required(view: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(view)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            user = current_user()
+            if not user:
+                return redirect(url_for("budget.login", next=request.full_path))
+            if user["role"] != "user":
+                return redirect(url_for("budget.admin_users"))
+            return view(*args, **kwargs)
+
+        return wrapper
+
+    def admin_required(view: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(view)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            user = current_user()
+            if not user:
+                return redirect(url_for("budget.login", next=request.full_path))
+            if user["role"] != "admin":
+                return redirect(url_for("budget.dashboard"))
+            return view(*args, **kwargs)
 
         return wrapper
 
@@ -260,13 +346,15 @@ def create_app() -> Flask:
             "format_date": _date,
             "iso_date": _iso_date,
             "is_authenticated": is_authenticated(),
+            "is_admin": is_admin(),
+            "current_user": current_user(),
         }
 
     @budget.route("/login", methods=["GET", "POST"])
     def login() -> Any:
         setup_missing = web_config.require_auth and not web_config.admin_password_hash
         if request.method == "POST" and not setup_missing:
-            username = request.form.get("username", "")
+            username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
             if (
                 secrets.compare_digest(username, web_config.admin_username)
@@ -274,10 +362,34 @@ def create_app() -> Flask:
                 and verify_password(password, web_config.admin_password_hash)
             ):
                 session.clear()
-                session["budget_auth"] = True
+                session["auth_role"] = "admin"
                 csrf_token()
-                next_url = request.args.get("next") or url_for("budget.dashboard")
-                return redirect(next_url)
+                return redirect(url_for("budget.admin_users"))
+
+            email = _normalize_email(username)
+            if _valid_email(email):
+                cfg = load_config(require_teller=False)
+                conn = connect(cfg.oracle)
+                try:
+                    store = BudgetStore(conn)
+                    user = store.get_user_by_email(email)
+                    if (
+                        user
+                        and user["status"] == "ACTIVE"
+                        and verify_password(password, user["password_hash"])
+                    ):
+                        store.mark_user_login(user["user_id"])
+                        conn.commit()
+                        session.clear()
+                        session["auth_role"] = "user"
+                        session["user_id"] = user["user_id"]
+                        session["user_email"] = user["email"]
+                        session["display_name"] = user["display_name"] or user["email"]
+                        csrf_token()
+                        next_url = request.args.get("next") or url_for("budget.dashboard")
+                        return redirect(next_url)
+                finally:
+                    conn.close()
             flash("Invalid username or password.", "error")
         return render_template("login.html", setup_missing=setup_missing, web_config=web_config)
 
@@ -289,8 +401,9 @@ def create_app() -> Flask:
         return redirect(url_for("budget.login"))
 
     @budget.route("/")
-    @login_required
+    @user_required
     def dashboard() -> Any:
+        user_id = current_user_id()
         month_start, month_end = _month_bounds()
         previous_start, previous_end = _previous_month_bounds()
         summary = _query_one(
@@ -301,9 +414,11 @@ def create_app() -> Flask:
                 SUM(CASE WHEN AMOUNT < 0 THEN ABS(AMOUNT) ELSE 0 END) AS payment_total
             FROM BUDGET_TRANSACTIONS
             WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
               AND TRANSACTION_DATE >= :month_start
               AND TRANSACTION_DATE < :month_end
             """,
+            user_id=user_id,
             month_start=month_start,
             month_end=month_end,
         ) or {}
@@ -312,9 +427,11 @@ def create_app() -> Flask:
             SELECT SUM(CASE WHEN AMOUNT > 0 THEN AMOUNT ELSE 0 END) AS spend_total
             FROM BUDGET_TRANSACTIONS
             WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
               AND TRANSACTION_DATE >= :month_start
               AND TRANSACTION_DATE < :month_end
             """,
+            user_id=user_id,
             month_start=previous_start,
             month_end=previous_end,
         ) or {}
@@ -323,16 +440,20 @@ def create_app() -> Flask:
             SELECT COUNT(*) AS account_count
             FROM BUDGET_ACCOUNTS
             WHERE PROVIDER = 'teller'
-            """
+              AND USER_ID = :user_id
+            """,
+            user_id=user_id,
         ) or {}
         recent_transactions = _query_all(
             """
             SELECT TRANSACTION_DATE, AMOUNT, STATUS, CATEGORY, DESCRIPTION, COUNTERPARTY_NAME, TRANSACTION_TYPE
             FROM BUDGET_TRANSACTIONS
             WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
             ORDER BY TRANSACTION_DATE DESC, UPDATED_AT DESC
             FETCH FIRST 12 ROWS ONLY
-            """
+            """,
+            user_id=user_id,
         )
         categories = _query_all(
             """
@@ -341,12 +462,14 @@ def create_app() -> Flask:
                    COUNT(*) AS TRANSACTION_COUNT
             FROM BUDGET_TRANSACTIONS
             WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
               AND TRANSACTION_DATE >= :month_start
               AND TRANSACTION_DATE < :month_end
             GROUP BY NVL(CATEGORY, 'uncategorized')
             ORDER BY SPEND_TOTAL DESC NULLS LAST
             FETCH FIRST 8 ROWS ONLY
             """,
+            user_id=user_id,
             month_start=month_start,
             month_end=month_end,
         )
@@ -362,13 +485,15 @@ def create_app() -> Flask:
         )
 
     @budget.route("/transactions")
-    @login_required
+    @user_required
     def transactions() -> Any:
+        user_id = current_user_id()
         search = request.args.get("q", "").strip()
         status = request.args.get("status", "").strip()
         account_id = request.args.get("account", "").strip()
-        params: dict[str, Any] = {}
-        clauses = ["t.PROVIDER = 'teller'"]
+        institution_id = request.args.get("institution", "").strip()
+        params: dict[str, Any] = {"user_id": user_id}
+        clauses = ["t.PROVIDER = 'teller'", "t.USER_ID = :user_id"]
         if search:
             clauses.append("(LOWER(t.DESCRIPTION) LIKE :search OR LOWER(NVL(t.COUNTERPARTY_NAME, '')) LIKE :search)")
             params["search"] = f"%{search.lower()}%"
@@ -378,6 +503,9 @@ def create_app() -> Flask:
         if account_id:
             clauses.append("t.PROVIDER_ACCOUNT_ID = :account_id")
             params["account_id"] = account_id
+        if institution_id:
+            clauses.append("NVL(t.INSTITUTION_ID, a.INSTITUTION_ID) = :institution_id")
+            params["institution_id"] = institution_id
 
         rows = _query_all(
             f"""
@@ -391,11 +519,14 @@ def create_app() -> Flask:
                 t.DESCRIPTION,
                 t.TRANSACTION_TYPE,
                 a.ACCOUNT_NAME,
+                NVL(t.INSTITUTION_ID, a.INSTITUTION_ID) AS INSTITUTION_ID,
+                NVL(t.INSTITUTION_NAME, a.INSTITUTION_NAME) AS INSTITUTION_NAME,
                 t.PROVIDER_TRANSACTION_ID
             FROM BUDGET_TRANSACTIONS t
             LEFT JOIN BUDGET_ACCOUNTS a
               ON a.PROVIDER = t.PROVIDER
              AND a.PROVIDER_ACCOUNT_ID = t.PROVIDER_ACCOUNT_ID
+             AND a.USER_ID = t.USER_ID
             WHERE {" AND ".join(clauses)}
             ORDER BY t.TRANSACTION_DATE DESC, t.UPDATED_AT DESC
             FETCH FIRST 250 ROWS ONLY
@@ -407,19 +538,34 @@ def create_app() -> Flask:
             SELECT PROVIDER_ACCOUNT_ID, ACCOUNT_NAME, LAST_FOUR
             FROM BUDGET_ACCOUNTS
             WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
             ORDER BY ACCOUNT_NAME
+            """,
+            user_id=user_id,
+        )
+        institutions = _query_all(
             """
+            SELECT DISTINCT INSTITUTION_ID, INSTITUTION_NAME
+            FROM BUDGET_ACCOUNTS
+            WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
+              AND INSTITUTION_ID IS NOT NULL
+            ORDER BY INSTITUTION_NAME
+            """,
+            user_id=user_id,
         )
         return render_template(
             "transactions.html",
             transactions=rows,
             accounts=accounts,
-            filters={"q": search, "status": status, "account": account_id},
+            institutions=institutions,
+            filters={"q": search, "status": status, "account": account_id, "institution": institution_id},
         )
 
     @budget.route("/budgets")
-    @login_required
+    @user_required
     def budgets() -> Any:
+        user_id = current_user_id()
         month_start, month_end = _month_bounds()
         rows = _query_all(
             """
@@ -428,11 +574,13 @@ def create_app() -> Flask:
                    COUNT(*) AS TRANSACTION_COUNT
             FROM BUDGET_TRANSACTIONS
             WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
               AND TRANSACTION_DATE >= :month_start
               AND TRANSACTION_DATE < :month_end
             GROUP BY NVL(CATEGORY, 'uncategorized')
             ORDER BY SPEND_TOTAL DESC NULLS LAST
             """,
+            user_id=user_id,
             month_start=month_start,
             month_end=month_end,
         )
@@ -440,8 +588,9 @@ def create_app() -> Flask:
         return render_template("budgets.html", categories=rows, month_start=month_start)
 
     @budget.route("/accounts")
-    @login_required
+    @user_required
     def accounts() -> Any:
+        user_id = current_user_id()
         rows = _query_all(
             """
             SELECT
@@ -460,44 +609,63 @@ def create_app() -> Flask:
             FROM BUDGET_ACCOUNTS a
             LEFT JOIN BUDGET_CONNECTIONS c
               ON c.CONNECTION_ID = a.CONNECTION_ID
+             AND c.USER_ID = a.USER_ID
             LEFT JOIN BUDGET_TRANSACTIONS t
               ON t.PROVIDER = a.PROVIDER
              AND t.PROVIDER_ACCOUNT_ID = a.PROVIDER_ACCOUNT_ID
+             AND t.USER_ID = a.USER_ID
             WHERE a.PROVIDER = 'teller'
+              AND a.USER_ID = :user_id
             GROUP BY
                 a.PROVIDER_ACCOUNT_ID, a.ACCOUNT_NAME, a.ACCOUNT_TYPE, a.ACCOUNT_SUBTYPE,
                 a.CURRENCY_CODE, a.LAST_FOUR, a.STATUS, a.INSTITUTION_NAME, a.CONNECTION_ID, c.LAST_SYNC_AT
             ORDER BY a.INSTITUTION_NAME, a.ACCOUNT_NAME
-            """
+            """,
+            user_id=user_id,
         )
         connections = _query_all(
             """
-            SELECT CONNECTION_ID, ENVIRONMENT, INSTITUTION_NAME, STATUS, LAST_SYNC_AT, CREATED_AT
+            SELECT CONNECTION_ID, ENVIRONMENT, INSTITUTION_ID, INSTITUTION_NAME, STATUS, LAST_SYNC_AT, CREATED_AT
             FROM BUDGET_CONNECTIONS
             WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
             ORDER BY UPDATED_AT DESC
-            """
+            """,
+            user_id=user_id,
         )
         return render_template("accounts.html", accounts=rows, connections=connections)
 
     @budget.route("/connect")
-    @login_required
+    @user_required
     def connect_page() -> Any:
-        return render_template("connect.html")
+        institution_options = [
+            {"id": "", "name": "Teller institution picker"},
+            {"id": "amex", "name": "American Express"},
+        ]
+        return render_template(
+            "connect.html",
+            default_institution_id=app_config.teller.institution_id,
+            institution_options=institution_options,
+        )
 
     @budget.route("/settings")
-    @login_required
+    @admin_required
     def settings() -> Any:
         return render_template("settings.html", web_config=web_config, app_config=app_config)
 
     @budget.route("/actions/sync/<connection_id>", methods=["POST"])
-    @login_required
+    @user_required
     def sync_action(connection_id: str) -> Any:
         try:
             require_csrf()
             start_date = request.form.get("start_date") or None
             end_date = request.form.get("end_date") or None
-            summary = _execute_sync(connection_id, start_date=start_date, end_date=end_date)
+            summary = _execute_sync(
+                connection_id,
+                user_id=current_user_id(),
+                start_date=start_date,
+                end_date=end_date,
+            )
             flash(
                 f"Synced {summary['accounts']} accounts and {summary['transactions']} transactions.",
                 "success",
@@ -507,28 +675,37 @@ def create_app() -> Flask:
         return redirect(url_for("budget.accounts"))
 
     @budget.route("/api/config")
-    @login_required
+    @user_required
     def teller_config() -> Any:
-        csrf_token()
+        try:
+            institution_id = _selected_institution_id(app_config.teller.institution_id)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": "invalid_institution_id", "message": str(exc)}), 400
+
+        nonce = secrets.token_urlsafe(32)
+        teller_csrf_token = secrets.token_urlsafe(32)
+        session["teller_nonce"] = nonce
+        session["teller_csrf_token"] = teller_csrf_token
+        session["teller_institution_id"] = institution_id
         return jsonify(
             {
                 "ok": True,
                 "applicationId": app_config.teller.application_id,
                 "environment": app_config.teller.environment,
                 "products": ["transactions", "balance"],
-                "nonce": state.nonce,
-                "csrfToken": state.csrf_token,
-                "institutionId": app_config.teller.institution_id,
+                "nonce": nonce,
+                "csrfToken": teller_csrf_token,
+                "institutionId": institution_id,
             }
         )
 
     @budget.route("/api/status")
-    @login_required
+    @user_required
     def teller_status() -> Any:
         return jsonify({"ok": True, "lastEvent": state.last_event})
 
     @budget.route("/api/teller/enrollment", methods=["POST"])
-    @login_required
+    @user_required
     def teller_enrollment() -> Any:
         expected_origin = web_config.external_origin or request.host_url.rstrip("/")
         origin = request.headers.get("Origin")
@@ -540,14 +717,14 @@ def create_app() -> Flask:
             state.remember("blocked", "Rejected non-JSON enrollment callback")
             return jsonify({"ok": False, "error": "json_required"}), 415
 
-        if not secrets.compare_digest(request.headers.get("X-CSRF-Token") or "", state.csrf_token):
+        if not secrets.compare_digest(request.headers.get("X-CSRF-Token") or "", session.get("teller_csrf_token", "")):
             state.remember("blocked", "Rejected enrollment callback CSRF token")
             return jsonify({"ok": False, "error": "csrf_check_failed"}), 403
 
         try:
             payload = request.get_json(force=True)
             nonce = payload.get("nonce")
-            if not secrets.compare_digest(nonce or "", state.nonce):
+            if not secrets.compare_digest(nonce or "", session.get("teller_nonce", "")):
                 state.remember("blocked", "Rejected enrollment callback nonce")
                 return jsonify({"ok": False, "error": "nonce_mismatch"}), 400
 
@@ -557,6 +734,7 @@ def create_app() -> Flask:
             enrollment = enrollment_payload.get("enrollment", {})
             enrollment_id = enrollment.get("id")
             institution = enrollment.get("institution") or {}
+            institution_id = institution.get("id") or session.get("teller_institution_id")
             institution_name = institution.get("name")
             signatures = enrollment_payload.get("signatures") or []
 
@@ -587,9 +765,11 @@ def create_app() -> Flask:
             try:
                 store = BudgetStore(conn)
                 connection_id = store.upsert_connection(
+                    user_id=current_user_id(),
                     environment=app_config.teller.environment,
                     provider_user_id=user_id,
                     provider_enrollment_id=enrollment_id,
+                    institution_id=institution_id,
                     institution_name=institution_name,
                     access_token_cipher=encrypted_token,
                     token_key_id=app_config.key_id,
@@ -599,8 +779,10 @@ def create_app() -> Flask:
             finally:
                 conn.close()
 
-            summary = _execute_sync(connection_id)
-            state.rotate()
+            summary = _execute_sync(connection_id, user_id=current_user_id())
+            session.pop("teller_nonce", None)
+            session.pop("teller_csrf_token", None)
+            session.pop("teller_institution_id", None)
             state.remember(
                 "sync_success",
                 "Stored encrypted Teller token and synced account data",
@@ -640,10 +822,84 @@ def create_app() -> Flask:
                 )
             return jsonify(payload), 500
 
+    @budget.route("/admin/users", methods=["GET", "POST"])
+    @admin_required
+    def admin_users() -> Any:
+        cfg = load_config(require_teller=False)
+        conn = connect(cfg.oracle)
+        try:
+            store = BudgetStore(conn)
+            if request.method == "POST":
+                require_csrf()
+                action = request.form.get("action", "")
+                if action == "create":
+                    email = _normalize_email(request.form.get("email", ""))
+                    display_name = request.form.get("display_name", "").strip() or None
+                    password = request.form.get("password", "")
+                    if not _valid_email(email):
+                        flash("Enter a valid email address.", "error")
+                    elif not _valid_password(password):
+                        flash("Use at least 12 characters for user passwords.", "error")
+                    elif store.get_user_by_email(email):
+                        flash("A user with that email already exists.", "error")
+                    else:
+                        store.create_user(
+                            email=email,
+                            display_name=display_name,
+                            password_hash=hash_password(password),
+                        )
+                        conn.commit()
+                        flash(f"Created user {email}.", "success")
+                        return redirect(url_for("budget.admin_users"))
+                elif action == "reset_password":
+                    user_id = request.form.get("user_id", "")
+                    password = request.form.get("password", "")
+                    if not user_id:
+                        flash("Missing user id.", "error")
+                    elif not _valid_password(password):
+                        flash("Use at least 12 characters for user passwords.", "error")
+                    else:
+                        store.set_user_password(user_id=user_id, password_hash=hash_password(password))
+                        conn.commit()
+                        flash("User password was reset.", "success")
+                        return redirect(url_for("budget.admin_users"))
+                elif action == "set_status":
+                    user_id = request.form.get("user_id", "")
+                    status = request.form.get("status", "")
+                    if status not in {"ACTIVE", "DISABLED"}:
+                        flash("Invalid user status.", "error")
+                    else:
+                        store.set_user_status(user_id=user_id, status=status)
+                        conn.commit()
+                        flash("User status was updated.", "success")
+                        return redirect(url_for("budget.admin_users"))
+                elif action == "assign_unowned":
+                    user_id = request.form.get("user_id", "")
+                    if not user_id:
+                        flash("Missing user id.", "error")
+                    else:
+                        counts = store.assign_unowned_data(user_id=user_id)
+                        conn.commit()
+                        flash(
+                            "Assigned unowned rows: "
+                            f"{counts['connections']} connections, "
+                            f"{counts['accounts']} accounts, "
+                            f"{counts['transactions']} transactions.",
+                            "success",
+                        )
+                        return redirect(url_for("budget.admin_users"))
+
+            users = store.list_users()
+        finally:
+            conn.close()
+        return render_template("admin_users.html", users=users)
+
     app.register_blueprint(budget)
 
     @app.route("/")
     def root() -> Any:
+        if is_admin():
+            return redirect(url_for("budget.admin_users"))
         return redirect(url_for("budget.dashboard"))
 
     return app
