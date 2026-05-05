@@ -99,7 +99,14 @@ else
   echo "BUDGET_ADMIN_PASSWORD secret not provided; preserving existing admin password hash."
 fi
 
-"$VENV_DIR/bin/python" -m budget_teller_oracle init-db
+sudo APP_DIR="$APP_DIR" VENV_DIR="$VENV_DIR" ENV_FILE="$ENV_FILE" bash -c '
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+  cd "$APP_DIR"
+  "$VENV_DIR/bin/python" -m budget_teller_oracle init-db
+'
 
 sudo install -m 644 "$APP_DIR/deploy/budget-arc.service" "$SERVICE_FILE"
 sudo systemctl daemon-reload
