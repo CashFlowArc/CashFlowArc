@@ -50,6 +50,12 @@ Put the resulting hash in:
 BUDGET_ADMIN_PASSWORD_HASH=
 ```
 
+For the GitHub Actions deployment, prefer storing the raw password as a GitHub Actions secret named
+`BUDGET_ADMIN_PASSWORD`. The OEL installer hashes it on the server and writes only
+`BUDGET_ADMIN_PASSWORD_HASH` to `/etc/budget-arc/budget.env`.
+
+The deployment workflow can also be run manually from GitHub Actions after the secret is created.
+
 Generate `BUDGET_MASTER_KEY` on the server if you are not sourcing it from a secrets manager:
 
 ```bash

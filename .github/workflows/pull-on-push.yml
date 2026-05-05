@@ -3,6 +3,7 @@ name: Pull latest code on OEL
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   pull:
@@ -36,6 +37,8 @@ jobs:
           fi
 
       - name: Install or update BudgetArc on OEL
+        env:
+          BUDGET_ADMIN_PASSWORD: ${{ secrets.BUDGET_ADMIN_PASSWORD }}
         run: |
           cd /home/opc/CashFlowArc/budget_arc
           bash deploy/install_budget_arc_on_oel.sh

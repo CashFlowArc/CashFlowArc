@@ -70,6 +70,35 @@ else
   echo "$ENV_FILE already exists; preserving existing secrets."
 fi
 
+if [[ -n "${BUDGET_ADMIN_PASSWORD:-}" ]]; then
+  ADMIN_HASH="$("$VENV_DIR/bin/python" -m budget_teller_oracle hash-password --password-env BUDGET_ADMIN_PASSWORD)"
+  TMP_ENV_UPDATE="$(sudo mktemp)"
+  sudo python3 - "$ENV_FILE" "$TMP_ENV_UPDATE" "$ADMIN_HASH" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+password_hash = sys.argv[3]
+lines = source.read_text().splitlines()
+updated = False
+for index, line in enumerate(lines):
+    if line.startswith("BUDGET_ADMIN_PASSWORD_HASH="):
+        lines[index] = f"BUDGET_ADMIN_PASSWORD_HASH={password_hash}"
+        updated = True
+        break
+if not updated:
+    lines.append(f"BUDGET_ADMIN_PASSWORD_HASH={password_hash}")
+target.write_text("\n".join(lines) + "\n")
+PY
+  sudo install -m 600 "$TMP_ENV_UPDATE" "$ENV_FILE"
+  sudo rm -f "$TMP_ENV_UPDATE"
+  unset ADMIN_HASH
+  echo "Updated BudgetArc admin password hash from GitHub Actions secret."
+else
+  echo "BUDGET_ADMIN_PASSWORD secret not provided; preserving existing admin password hash."
+fi
+
 sudo install -m 644 "$APP_DIR/deploy/budget-arc.service" "$SERVICE_FILE"
 sudo systemctl daemon-reload
 sudo systemctl enable budget-arc

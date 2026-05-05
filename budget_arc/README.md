@@ -73,6 +73,8 @@ Generate a web admin password hash:
 python -m budget_teller_oracle hash-password
 ```
 
+For server deployment through GitHub Actions, set a repository secret named `BUDGET_ADMIN_PASSWORD` instead. The server installer hashes it and writes only the hash into `/etc/budget-arc/budget.env`.
+
 Put the result into `.env`:
 
 ```text

@@ -23,14 +23,20 @@ def _cmd_generate_key(_: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_hash_password(_: argparse.Namespace) -> int:
+def _cmd_hash_password(args: argparse.Namespace) -> int:
     import getpass
 
-    password = getpass.getpass("Budget admin password: ")
-    confirm = getpass.getpass("Confirm password: ")
-    if password != confirm:
-        print("Passwords did not match")
-        return 1
+    if args.password_env:
+        password = os.getenv(args.password_env, "")
+        if not password:
+            print(f"{args.password_env} is not set")
+            return 1
+    else:
+        password = getpass.getpass("Budget admin password: ")
+        confirm = getpass.getpass("Confirm password: ")
+        if password != confirm:
+            print("Passwords did not match")
+            return 1
     if len(password) < 12:
         print("Use at least 12 characters for the budget admin password")
         return 1
@@ -263,6 +269,7 @@ def build_parser() -> argparse.ArgumentParser:
     generate_key.set_defaults(func=_cmd_generate_key)
 
     password_hash = subparsers.add_parser("hash-password", help="Hash a budget web admin password")
+    password_hash.add_argument("--password-env", help="Read the password from this environment variable")
     password_hash.set_defaults(func=_cmd_hash_password)
 
     bootstrap_env = subparsers.add_parser("bootstrap-env", help="Create a local .env for Amex setup")

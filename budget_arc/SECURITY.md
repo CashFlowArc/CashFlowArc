@@ -39,4 +39,6 @@ The `/budget` web app must be served behind HTTPS in production and must require
 python -m budget_teller_oracle hash-password
 ```
 
+For server deployment, the GitHub Actions secret `BUDGET_ADMIN_PASSWORD` can be used by the installer to generate the hash on the server without committing or printing the raw password.
+
 Do not deploy with an empty `BUDGET_ADMIN_PASSWORD_HASH`.
