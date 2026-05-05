@@ -19,8 +19,10 @@ jobs:
         run: |
           if [ -d /home/opc/CashFlowArc/budget_arc ]; then
             cd /home/opc/CashFlowArc/budget_arc
-            python3 -m venv .venv
-            . .venv/bin/activate
+            sudo mkdir -p /opt/budget-arc
+            sudo chown -R opc:opc /opt/budget-arc
+            python3 -m venv /opt/budget-arc/venv
+            . /opt/budget-arc/venv/bin/activate
             pip install -r requirements.txt
           fi
 

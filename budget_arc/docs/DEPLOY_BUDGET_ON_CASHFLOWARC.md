@@ -11,6 +11,7 @@ Recommended paths:
 ```text
 /home/opc/CashFlowArc            # existing CashFlowArc git checkout used by pull-on-push
 /home/opc/CashFlowArc/budget_arc # BudgetArc app directory in that checkout
+/opt/budget-arc/venv             # BudgetArc production Python virtualenv
 /etc/budget-arc/budget.env       # server secrets
 /etc/budget-arc/teller/          # Teller certificate and private key
 /home/opc/CashFlowArc/budget_arc/wallet/ # Oracle wallet, readable by service user only
@@ -22,8 +23,10 @@ Recommended paths:
 cd /home/opc
 git clone <CashFlowArc-repo-url> CashFlowArc
 cd /home/opc/CashFlowArc/budget_arc
-python3 -m venv .venv
-. .venv/bin/activate
+sudo mkdir -p /opt/budget-arc
+sudo chown opc:opc /opt/budget-arc
+python3 -m venv /opt/budget-arc/venv
+. /opt/budget-arc/venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -38,7 +41,7 @@ sudo chmod 600 /etc/budget-arc/budget.env
 Generate a web admin password hash locally on the server:
 
 ```bash
-/home/opc/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle hash-password
+/opt/budget-arc/venv/bin/python -m budget_teller_oracle hash-password
 ```
 
 Put the resulting hash in:
@@ -50,7 +53,7 @@ BUDGET_ADMIN_PASSWORD_HASH=
 Generate `BUDGET_MASTER_KEY` on the server if you are not sourcing it from a secrets manager:
 
 ```bash
-/home/opc/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle generate-key
+/opt/budget-arc/venv/bin/python -m budget_teller_oracle generate-key
 ```
 
 ## Required Server Environment
@@ -84,7 +87,7 @@ BUDGET_COOKIE_SECURE=true
 Initialize the isolated budget tables:
 
 ```bash
-/home/opc/CashFlowArc/budget_arc/.venv/bin/python -m budget_teller_oracle init-db
+/opt/budget-arc/venv/bin/python -m budget_teller_oracle init-db
 ```
 
 The app uses `BUDGET_` tables and does not write to CashFlowArc market-data tables.
@@ -132,7 +135,7 @@ https://CashFlowArc.com/budget
 cd /home/opc/CashFlowArc
 git pull
 cd /home/opc/CashFlowArc/budget_arc
-. .venv/bin/activate
+. /opt/budget-arc/venv/bin/activate
 pip install -r requirements.txt
 sudo systemctl restart budget-arc
 ```

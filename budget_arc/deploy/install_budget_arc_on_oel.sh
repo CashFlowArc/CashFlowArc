@@ -2,12 +2,14 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/home/opc/CashFlowArc/budget_arc}"
+VENV_DIR="${VENV_DIR:-/opt/budget-arc/venv}"
 ENV_DIR="${ENV_DIR:-/etc/budget-arc}"
 ENV_FILE="${ENV_FILE:-$ENV_DIR/budget.env}"
 SERVICE_FILE="/etc/systemd/system/budget-arc.service"
 NGINX_CONF="${NGINX_CONF:-/etc/nginx/conf.d/app.conf}"
 
 echo "BudgetArc installer: app dir=$APP_DIR"
+echo "BudgetArc installer: venv=$VENV_DIR"
 
 if [[ ! -d "$APP_DIR" ]]; then
   echo "BudgetArc app dir is missing: $APP_DIR" >&2
@@ -15,8 +17,10 @@ if [[ ! -d "$APP_DIR" ]]; then
 fi
 
 cd "$APP_DIR"
-python3 -m venv .venv
-. .venv/bin/activate
+sudo mkdir -p "$(dirname "$VENV_DIR")"
+sudo chown -R opc:opc "$(dirname "$VENV_DIR")"
+python3 -m venv "$VENV_DIR"
+. "$VENV_DIR/bin/activate"
 pip install -r requirements.txt
 
 sudo mkdir -p "$ENV_DIR"
@@ -28,7 +32,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
     WALLET_DIR_DEFAULT="$APP_DIR/wallet"
   fi
 
-  MASTER_KEY="$("$APP_DIR/.venv/bin/python" -m budget_teller_oracle generate-key)"
+  MASTER_KEY="$("$VENV_DIR/bin/python" -m budget_teller_oracle generate-key)"
   TMP_ENV="$(mktemp)"
   cat > "$TMP_ENV" <<EOF
 # BudgetArc server config. Keep this file out of git.
