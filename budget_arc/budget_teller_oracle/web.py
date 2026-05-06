@@ -222,6 +222,7 @@ def _execute_sync(
 def create_app() -> Flask:
     app_config = load_config(require_teller=False)
     web_config = load_web_config()
+    institution_cache: dict[str, Any] = {"loaded_at": None, "items": []}
     app = Flask(__name__, static_folder=None)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     app.secret_key = secrets.token_urlsafe(32) if not app_config.master_key else app_config.master_key
@@ -330,6 +331,24 @@ def create_app() -> Flask:
         provided = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
         if not expected or not provided or not secrets.compare_digest(expected, provided):
             raise PermissionError("CSRF check failed")
+
+    def cached_teller_institutions() -> list[dict[str, Any]]:
+        loaded_at = institution_cache.get("loaded_at")
+        now = dt.datetime.now(dt.UTC)
+        if loaded_at and now - loaded_at < dt.timedelta(hours=12):
+            return list(institution_cache.get("items") or [])
+
+        items = TellerClient(app_config.teller).list_institutions()
+        institution_cache["loaded_at"] = now
+        institution_cache["items"] = items
+        return list(items)
+
+    def public_institution_payload(institution: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": institution.get("id"),
+            "name": institution.get("name"),
+            "products": institution.get("products") or [],
+        }
 
     @app.after_request
     def add_security_headers(response: Response) -> Response:
@@ -799,14 +818,9 @@ def create_app() -> Flask:
     @budget.route("/connect")
     @user_required
     def connect_page() -> Any:
-        institution_options = [
-            {"id": "", "name": "Teller institution picker"},
-            {"id": "amex", "name": "American Express"},
-        ]
         return render_template(
             "connect.html",
             default_institution_id=app_config.teller.institution_id,
-            institution_options=institution_options,
         )
 
     @budget.route("/settings")
@@ -873,6 +887,60 @@ def create_app() -> Flask:
                 "nonce": nonce,
                 "csrfToken": teller_csrf_token,
                 "institutionId": institution_id,
+            }
+        )
+
+    @budget.route("/api/institutions")
+    @user_required
+    def teller_institutions() -> Any:
+        query = request.args.get("q", "").strip()
+        if len(query) > 80:
+            return jsonify({"ok": False, "error": "query_too_long"}), 400
+
+        limit_raw = request.args.get("limit", "30")
+        try:
+            limit = min(max(int(limit_raw), 1), 100)
+        except ValueError:
+            limit = 30
+
+        try:
+            institutions = cached_teller_institutions()
+        except Exception as exc:
+            return jsonify({"ok": False, "error": type(exc).__name__, "message": str(exc)[:300]}), 502
+
+        default_institution = None
+        default_id = app_config.teller.institution_id
+        if default_id:
+            default_institution = next(
+                (
+                    public_institution_payload(institution)
+                    for institution in institutions
+                    if institution.get("id") == default_id
+                ),
+                {"id": default_id, "name": f"Configured default ({default_id})", "products": []},
+            )
+
+        results: list[dict[str, Any]] = []
+        if query:
+            terms = [term.lower() for term in query.split() if term.strip()]
+            for institution in institutions:
+                institution_id = str(institution.get("id") or "")
+                institution_name = str(institution.get("name") or "")
+                products = institution.get("products") or []
+                if "transactions" not in products or "balance" not in products:
+                    continue
+                haystack = f"{institution_name} {institution_id}".lower()
+                if all(term in haystack for term in terms):
+                    results.append(public_institution_payload(institution))
+                    if len(results) >= limit:
+                        break
+
+        return jsonify(
+            {
+                "ok": True,
+                "query": query,
+                "institutions": results,
+                "defaultInstitution": default_institution,
             }
         )
 

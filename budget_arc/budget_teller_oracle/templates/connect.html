@@ -9,16 +9,19 @@
     <h2>Add another account</h2>
     <p>Teller handles credentials and MFA. BudgetArc receives a signed enrollment, verifies it, encrypts the access token, stores it in Oracle, and starts a transaction sync.</p>
     <label>
+      Find institution
+      <input id="institution-search" placeholder="Search Teller institutions, for example American Express">
+    </label>
+    <label>
       Institution
       <select id="institution-select">
-        {% for option in institution_options %}
-          <option value="{{ option.id }}">{{ option.name }}</option>
-        {% endfor %}
-        {% if default_institution_id and default_institution_id != "amex" %}
-          <option value="__default__">Configured default: {{ default_institution_id }}</option>
+        <option value="">Teller institution picker</option>
+        {% if default_institution_id %}
+          <option value="{{ default_institution_id }}">Configured default: {{ default_institution_id }}</option>
         {% endif %}
       </select>
     </label>
+    <p id="institution-status" class="form-note">Leave blank to use Teller's own institution picker.</p>
     <label>
       Optional Teller institution id
       <input id="institution-custom" placeholder="Leave blank for the Teller picker">
