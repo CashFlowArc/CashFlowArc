@@ -928,6 +928,73 @@ class BudgetStore:
                 params,
             )
 
+    def delete_connection(self, *, user_id: str, connection_id: str) -> dict[str, Any] | None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT INSTITUTION_ID, INSTITUTION_NAME
+                FROM BUDGET_CONNECTIONS
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                  AND CONNECTION_ID = :connection_id
+                FOR UPDATE
+                """,
+                user_id=user_id,
+                connection_id=connection_id,
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+
+            result: dict[str, Any] = {
+                "institution_id": row[0],
+                "institution_name": row[1],
+            }
+
+            deletes = [
+                (
+                    "sync_events",
+                    """
+                    DELETE FROM BUDGET_SYNC_EVENTS
+                    WHERE PROVIDER = 'teller'
+                      AND (USER_ID = :user_id OR USER_ID IS NULL)
+                      AND CONNECTION_ID = :connection_id
+                    """,
+                ),
+                (
+                    "transactions",
+                    """
+                    DELETE FROM BUDGET_TRANSACTIONS
+                    WHERE PROVIDER = 'teller'
+                      AND (USER_ID = :user_id OR USER_ID IS NULL)
+                      AND CONNECTION_ID = :connection_id
+                    """,
+                ),
+                (
+                    "accounts",
+                    """
+                    DELETE FROM BUDGET_ACCOUNTS
+                    WHERE PROVIDER = 'teller'
+                      AND (USER_ID = :user_id OR USER_ID IS NULL)
+                      AND CONNECTION_ID = :connection_id
+                    """,
+                ),
+                (
+                    "connections",
+                    """
+                    DELETE FROM BUDGET_CONNECTIONS
+                    WHERE PROVIDER = 'teller'
+                      AND USER_ID = :user_id
+                      AND CONNECTION_ID = :connection_id
+                    """,
+                ),
+            ]
+            for key, sql in deletes:
+                cur.execute(sql, user_id=user_id, connection_id=connection_id)
+                result[key] = cur.rowcount
+
+            return result
+
     def list_connections(self, *, user_id: str | None = None) -> list[dict[str, Any]]:
         user_clause = "AND USER_ID = :user_id" if user_id else ""
         params: dict[str, Any] = {}

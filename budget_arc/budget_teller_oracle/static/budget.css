@@ -137,7 +137,7 @@ input, select {
   color: var(--ink);
   background: white;
 }
-.primary-button, .ghost-button {
+.primary-button, .ghost-button, .danger-button {
   border: 0;
   border-radius: 14px;
   cursor: pointer;
@@ -151,6 +151,7 @@ input, select {
 }
 .primary-button { background: var(--mint); color: white; }
 .ghost-button { background: white; border: 1px solid var(--line); color: var(--mint-dark); }
+.danger-button { background: #fff1ef; border: 1px solid #f0c4bf; color: var(--red); }
 
 .table-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 860px; }
@@ -190,6 +191,13 @@ td span { color: var(--muted); font-size: .9rem; }
 }
 .connection-card { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
 .connection-card span, .connection-card em, .account-meta span, .account-card p { display: block; color: var(--muted); font-style: normal; margin-top: 4px; }
+.connection-actions { display: grid; gap: 10px; min-width: 220px; }
+.connection-actions form, .delete-institution-form { display: grid; gap: 8px; }
+.delete-institution-form {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.delete-institution-form label { font-size: .76rem; }
 .account-card h3 { margin-bottom: 12px; }
 .account-meta { display: grid; gap: 4px; }
 
@@ -246,6 +254,7 @@ pre {
   .sidebar { position: static; height: auto; }
   .nav { grid-template-columns: repeat(3, 1fr); }
   .hero-grid, .two-column, .connection-grid, .account-grid, .connect-panel { grid-template-columns: 1fr; }
+  .connection-card { grid-template-columns: 1fr; }
   .filters, .admin-form, .inline-admin-form { grid-template-columns: 1fr; }
   .budget-row { grid-template-columns: 1fr; }
   .budget-amount { text-align: left; }

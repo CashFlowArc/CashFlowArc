@@ -82,6 +82,7 @@ class TellerClient:
         path: str,
         *,
         access_token: str | None = None,
+        method: str = "GET",
         query: dict[str, str | int | None] | None = None,
     ) -> Any:
         url = self.api_base_url + path
@@ -100,7 +101,7 @@ class TellerClient:
             auth = base64.b64encode(f"{access_token}:".encode("utf-8")).decode("ascii")
             headers["Authorization"] = f"Basic {auth}"
 
-        request = urllib.request.Request(url, headers=headers, method="GET")
+        request = urllib.request.Request(url, headers=headers, method=method)
         try:
             with urllib.request.urlopen(request, context=self._ssl_context(), timeout=45) as response:
                 body = response.read()
@@ -136,6 +137,9 @@ class TellerClient:
 
     def list_accounts(self, access_token: str) -> list[dict[str, Any]]:
         return self._request("/accounts", access_token=access_token)
+
+    def delete_accounts(self, access_token: str) -> None:
+        self._request("/accounts", access_token=access_token, method="DELETE")
 
     def list_transactions(
         self,

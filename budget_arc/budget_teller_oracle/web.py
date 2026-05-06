@@ -867,6 +867,53 @@ def create_app() -> Flask:
             flash(f"Sync failed: {type(exc).__name__}: {str(exc)[:220]}", "error")
         return redirect(url_for("budget.accounts"))
 
+    @budget.route("/actions/delete-institution/<connection_id>", methods=["POST"])
+    @user_required
+    def delete_institution_action(connection_id: str) -> Any:
+        try:
+            require_csrf()
+            confirmation = request.form.get("confirm_delete", "").strip().upper()
+            if confirmation != "DELETE":
+                flash("Type DELETE before removing an institution.", "error")
+                return redirect(url_for("budget.accounts"))
+
+            conn = connect(app_config.oracle)
+            try:
+                store = BudgetStore(conn)
+                user_id = current_user_id()
+                try:
+                    token_cipher = store.get_connection_token_cipher(connection_id, user_id=user_id)
+                except RuntimeError:
+                    flash("That institution connection was not found for your user.", "error")
+                    return redirect(url_for("budget.accounts"))
+
+                access_token = TokenCipher(app_config.master_key).decrypt(token_cipher)
+                try:
+                    TellerClient(app_config.teller).delete_accounts(access_token)
+                except TellerAPIError as exc:
+                    if exc.status not in {404, 410}:
+                        raise
+
+                result = store.delete_connection(user_id=user_id, connection_id=connection_id)
+                if not result:
+                    flash("That institution connection was not found for your user.", "error")
+                    conn.rollback()
+                    return redirect(url_for("budget.accounts"))
+
+                conn.commit()
+            finally:
+                conn.close()
+
+            institution_name = result["institution_name"] or "Institution"
+            flash(
+                f"Deleted {institution_name}: removed {result['accounts']} accounts, "
+                f"{result['transactions']} transactions, sync history, and the encrypted Teller token.",
+                "success",
+            )
+        except Exception as exc:
+            flash(f"Delete failed: {type(exc).__name__}: {str(exc)[:220]}", "error")
+        return redirect(url_for("budget.accounts"))
+
     @budget.route("/api/config")
     @user_required
     def teller_config() -> Any:

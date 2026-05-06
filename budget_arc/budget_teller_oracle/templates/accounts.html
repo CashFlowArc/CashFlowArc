@@ -19,11 +19,21 @@
           <span>{{ connection.environment }} · {{ connection.status }}</span>
           <em>Last sync: {{ format_date(connection.last_sync_at) if connection.last_sync_at else "Not synced yet" }}</em>
         </div>
-        <form method="post" action="{{ url_for('budget.sync_action', connection_id=connection.connection_id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input name="start_date" type="date" value="{{ (connection.last_sync_at or '').strftime('%Y-%m-%d') if connection.last_sync_at else '' }}">
-          <button class="ghost-button" type="submit">Sync</button>
-        </form>
+        <div class="connection-actions">
+          <form method="post" action="{{ url_for('budget.sync_action', connection_id=connection.connection_id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input name="start_date" type="date" value="{{ (connection.last_sync_at or '').strftime('%Y-%m-%d') if connection.last_sync_at else '' }}">
+            <button class="ghost-button" type="submit">Sync</button>
+          </form>
+          <form method="post" action="{{ url_for('budget.delete_institution_action', connection_id=connection.connection_id) }}" class="delete-institution-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>
+              Type DELETE to remove
+              <input name="confirm_delete" type="text" autocomplete="off" spellcheck="false">
+            </label>
+            <button class="danger-button" type="submit">Delete institution</button>
+          </form>
+        </div>
       </article>
     {% else %}
       <p class="empty">No Teller connections yet.</p>
@@ -57,4 +67,3 @@
   </div>
 </section>
 {% endblock %}
-
