@@ -318,7 +318,7 @@ def build_parser() -> argparse.ArgumentParser:
     list_connections = subparsers.add_parser("list-connections", help="List stored Teller connections")
     list_connections.set_defaults(func=_cmd_list_connections)
 
-    web = subparsers.add_parser("web", help="Run the Mint-style budget web app")
+    web = subparsers.add_parser("web", help="Run the BudgetArc web app")
     web.set_defaults(func=_cmd_web)
 
     test_email = subparsers.add_parser("test-email", help="Send a BudgetArc SMTP test email")

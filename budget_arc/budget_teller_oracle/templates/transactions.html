@@ -1,91 +1,95 @@
 {% extends "layout.html" %}
 {% block title %}BudgetArc Transactions{% endblock %}
 {% block heading %}Transactions{% endblock %}
-{% block eyebrow %}Search, filter, and review {{ month_start.strftime('%B %Y') }} transactions{% endblock %}
+{% block eyebrow %}{{ month_start.strftime('%B %Y') }} ledger{% endblock %}
 {% block content %}
-<section class="panel">
-  <form class="filters" method="get">
-    <label>
-      Month
-      <input name="month" type="month" value="{{ filters.month }}">
-    </label>
-    <label>
-      Search
-      <input name="q" value="{{ filters.q }}" placeholder="merchant, description, category">
-    </label>
-    <label>
-      Account
-      <select name="account">
-        <option value="">All accounts</option>
-        {% for account in accounts %}
-          <option value="{{ account.provider_account_id }}" {{ 'selected' if filters.account == account.provider_account_id else '' }}>
-            {{ account.account_name }}{% if account.last_four %} · {{ account.last_four }}{% endif %}
-          </option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>
-      Institution
-      <select name="institution">
-        <option value="">All institutions</option>
-        {% for institution in institutions %}
-          <option value="{{ institution.institution_id }}" {{ 'selected' if filters.institution == institution.institution_id else '' }}>
-            {{ institution.institution_name or institution.institution_id }}
-          </option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>
-      Status
-      <select name="status">
-        <option value="">All</option>
-        <option value="posted" {{ 'selected' if filters.status == 'posted' else '' }}>Posted</option>
-        <option value="pending" {{ 'selected' if filters.status == 'pending' else '' }}>Pending</option>
-      </select>
-    </label>
-    <button class="primary-button" type="submit">Filter</button>
-  </form>
-</section>
+<section class="transactions-layout">
+  <aside class="filter-rail">
+    <form class="filter-stack" method="get">
+      <label>
+        Month
+        <input name="month" type="month" value="{{ filters.month }}">
+      </label>
+      <label>
+        Search
+        <input name="q" value="{{ filters.q }}" placeholder="merchant or category">
+      </label>
+      <label>
+        Account
+        <select name="account">
+          <option value="">All accounts</option>
+          {% for account in accounts %}
+            <option value="{{ account.provider_account_id }}" {{ 'selected' if filters.account == account.provider_account_id else '' }}>
+              {{ account.account_name }}{% if account.last_four %} ending {{ account.last_four }}{% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Institution
+        <select name="institution">
+          <option value="">All institutions</option>
+          {% for institution in institutions %}
+            <option value="{{ institution.institution_id }}" {{ 'selected' if filters.institution == institution.institution_id else '' }}>
+              {{ institution.institution_name or institution.institution_id }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Status
+        <select name="status">
+          <option value="">All</option>
+          <option value="posted" {{ 'selected' if filters.status == 'posted' else '' }}>Posted</option>
+          <option value="pending" {{ 'selected' if filters.status == 'pending' else '' }}>Pending</option>
+        </select>
+      </label>
+      <button class="primary-button" type="submit">Search</button>
+    </form>
+  </aside>
 
-<section class="panel table-panel">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">Oracle ledger</p>
-      <h2>{{ transactions|length }} transactions shown</h2>
+  <section class="module ledger-panel">
+    <div class="module-heading ledger-heading">
+      <div>
+        <h2>All Cash &amp; Credit Accounts</h2>
+        <p>{{ transactions|length }} transactions shown</p>
+      </div>
+      <a class="ghost-button small-button" href="{{ url_for('budget.transactions', month=filters.month) }}">Clear</a>
     </div>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Description</th>
-          <th>Institution</th>
-          <th>Account</th>
-          <th>Category</th>
-          <th>Status</th>
-          <th class="right">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for txn in transactions %}
+    <div class="table-wrap ledger-table">
+      <table>
+        <thead>
           <tr>
-            <td>{{ iso_date(txn.transaction_date) }}</td>
-            <td>
-              <strong>{{ txn.counterparty_name or txn.description }}</strong>
-              <span>{{ txn.description }}</span>
-            </td>
-            <td>{{ txn.institution_name or "Institution" }}</td>
-            <td>{{ txn.account_name or "Account" }}</td>
-            <td><span class="pill">{{ txn.category or "Uncategorized" }}</span></td>
-            <td><span class="status {{ txn.status }}">{{ txn.status }}</span></td>
-            <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Category</th>
+            <th>Account</th>
+            <th>Status</th>
+            <th class="right">Amount</th>
           </tr>
-        {% else %}
-          <tr><td colspan="7" class="empty">No transactions match this filter.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          {% for txn in transactions %}
+            <tr>
+              <td>{{ iso_date(txn.transaction_date) }}</td>
+              <td>
+                <strong>{{ txn.counterparty_name or txn.description }}</strong>
+                <span>{{ txn.institution_name or "Institution" }}</span>
+              </td>
+              <td><span class="pill">{{ txn.category or "Uncategorized" }}</span></td>
+              <td>
+                {{ txn.account_name or "Account" }}
+                <span>{{ txn.description }}</span>
+              </td>
+              <td><span class="status {{ txn.status }}">{{ txn.status }}</span></td>
+              <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="empty">No transactions match this filter.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 </section>
 {% endblock %}

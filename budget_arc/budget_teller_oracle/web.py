@@ -314,6 +314,61 @@ def _account_balance_from_raw(raw_json: Any) -> Decimal | None:
         return None
 
 
+def _account_group_label(account_type: str | None, account_subtype: str | None) -> str:
+    type_value = (account_type or "").strip().lower()
+    subtype_value = (account_subtype or "").strip().lower()
+    if type_value in {"depository", "bank"} or subtype_value in {"checking", "savings", "money_market"}:
+        return "Cash"
+    if type_value == "credit" or subtype_value in {"credit_card", "line_of_credit"}:
+        return "Credit Cards"
+    if type_value == "loan" or subtype_value in {"loan", "mortgage", "student", "student_loan", "auto", "auto_loan"}:
+        return "Loans"
+    if type_value in {"investment", "brokerage"} or subtype_value in {"brokerage", "ira", "401k"}:
+        return "Investments"
+    if type_value in {"property", "asset"} or subtype_value in {"vehicle", "home", "real_estate"}:
+        return "Property"
+    return "Other Accounts"
+
+
+def _dashboard_account_groups(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], Decimal]:
+    order = ["Cash", "Credit Cards", "Loans", "Investments", "Property", "Other Accounts"]
+    groups: dict[str, dict[str, Any]] = {}
+    net_worth = Decimal("0")
+
+    for row in rows:
+        balance = _account_balance_from_raw(row.get("raw_json"))
+        if balance is None:
+            balance = _decimal(row.get("running_balance"))
+        signed_balance = _signed_net_worth_balance(
+            balance,
+            row.get("account_type"),
+            row.get("account_subtype"),
+        )
+        net_worth += signed_balance
+
+        label = _account_group_label(row.get("account_type"), row.get("account_subtype"))
+        group = groups.setdefault(label, {"label": label, "total": Decimal("0"), "accounts": []})
+        group["total"] += signed_balance
+        group["accounts"].append(
+            {
+                "provider_account_id": row.get("provider_account_id"),
+                "account_name": row.get("account_name") or "Account",
+                "institution_name": row.get("institution_name") or "Institution",
+                "account_type": row.get("account_type"),
+                "account_subtype": row.get("account_subtype"),
+                "last_four": row.get("last_four"),
+                "status": row.get("status"),
+                "last_transaction_date": row.get("last_transaction_date"),
+                "balance": signed_balance,
+            }
+        )
+
+    grouped_rows = [groups[label] for label in order if label in groups]
+    for group in grouped_rows:
+        group["accounts"].sort(key=lambda account: abs(_decimal(account["balance"])), reverse=True)
+    return grouped_rows, net_worth
+
+
 def _net_worth_svg(series: list[dict[str, Any]]) -> dict[str, Any]:
     width = Decimal("720")
     height = Decimal("190")
@@ -944,6 +999,61 @@ def create_app() -> Flask:
             """,
             user_id=user_id,
         ) or {}
+        account_rows = _query_all(
+            """
+            WITH latest_balances AS (
+                SELECT PROVIDER, PROVIDER_ACCOUNT_ID, USER_ID, RUNNING_BALANCE
+                FROM (
+                    SELECT
+                        t.PROVIDER,
+                        t.PROVIDER_ACCOUNT_ID,
+                        t.USER_ID,
+                        t.RUNNING_BALANCE,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY t.PROVIDER, t.PROVIDER_ACCOUNT_ID, t.USER_ID
+                            ORDER BY t.TRANSACTION_DATE DESC, t.UPDATED_AT DESC, t.PROVIDER_TRANSACTION_ID DESC
+                        ) AS RN
+                    FROM BUDGET_TRANSACTIONS t
+                    WHERE t.PROVIDER = 'teller'
+                      AND t.USER_ID = :user_id
+                      AND t.RUNNING_BALANCE IS NOT NULL
+                )
+                WHERE RN = 1
+            ),
+            last_transactions AS (
+                SELECT PROVIDER, PROVIDER_ACCOUNT_ID, USER_ID, MAX(TRANSACTION_DATE) AS LAST_TRANSACTION_DATE
+                FROM BUDGET_TRANSACTIONS
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                GROUP BY PROVIDER, PROVIDER_ACCOUNT_ID, USER_ID
+            )
+            SELECT
+                a.PROVIDER_ACCOUNT_ID,
+                a.ACCOUNT_NAME,
+                a.ACCOUNT_TYPE,
+                a.ACCOUNT_SUBTYPE,
+                a.LAST_FOUR,
+                a.STATUS,
+                a.INSTITUTION_NAME,
+                DBMS_LOB.SUBSTR(a.RAW_JSON, 32767, 1) AS RAW_JSON,
+                lt.LAST_TRANSACTION_DATE,
+                lb.RUNNING_BALANCE
+            FROM BUDGET_ACCOUNTS a
+            LEFT JOIN latest_balances lb
+              ON lb.PROVIDER = a.PROVIDER
+             AND lb.PROVIDER_ACCOUNT_ID = a.PROVIDER_ACCOUNT_ID
+             AND lb.USER_ID = a.USER_ID
+            LEFT JOIN last_transactions lt
+              ON lt.PROVIDER = a.PROVIDER
+             AND lt.PROVIDER_ACCOUNT_ID = a.PROVIDER_ACCOUNT_ID
+             AND lt.USER_ID = a.USER_ID
+            WHERE a.PROVIDER = 'teller'
+              AND a.USER_ID = :user_id
+            ORDER BY a.INSTITUTION_NAME, a.ACCOUNT_NAME
+            """,
+            user_id=user_id,
+        )
+        account_groups, net_worth_total = _dashboard_account_groups(account_rows)
         recent_transactions = _query_all(
             """
             SELECT TRANSACTION_DATE, AMOUNT, STATUS, CATEGORY, DESCRIPTION, COUNTERPARTY_NAME, TRANSACTION_TYPE
@@ -983,6 +1093,8 @@ def create_app() -> Flask:
             summary=summary,
             previous=previous,
             accounts=accounts,
+            account_groups=account_groups,
+            net_worth_total=net_worth_total,
             recent_transactions=recent_transactions,
             categories=categories,
             month_start=month_start,

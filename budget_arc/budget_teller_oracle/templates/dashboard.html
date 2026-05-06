@@ -1,87 +1,157 @@
 {% extends "layout.html" %}
 {% block title %}BudgetArc Overview{% endblock %}
 {% block heading %}Overview{% endblock %}
-{% block eyebrow %}{{ month_start.strftime('%B %Y') }} spending snapshot{% endblock %}
+{% block eyebrow %}{{ month_start.strftime('%B %Y') }} account summary{% endblock %}
 {% block content %}
-<section class="panel month-panel">
-  <form class="month-selector" method="get">
-    <label>
-      Review month
-      <input name="month" type="month" value="{{ selected_month }}" onchange="this.form.submit()">
-    </label>
-  </form>
+<section class="status-strip">
+  <span class="sync-icon" aria-hidden="true"></span>
+  <span>Your accounts are ready for review.</span>
+  <a href="{{ url_for('budget.accounts') }}">Refresh account data</a>
 </section>
 
-<section class="hero-grid">
-  <article class="hero-card mint-glow">
-    <p class="card-label">Selected Month Spending</p>
-    <strong>{{ format_money(summary.spend_total) }}</strong>
-    <span>{{ summary.transaction_count or 0 }} transactions synced</span>
-  </article>
-  <article class="hero-card">
-    <p class="card-label">Payments & Credits</p>
-    <strong>{{ format_money(summary.payment_total) }}</strong>
-    <span>Credit card payments and refunds</span>
-  </article>
-  <article class="hero-card">
-    <p class="card-label">Connected Accounts</p>
-    <strong>{{ accounts.account_count or 0 }}</strong>
-    <span>Tracked through Teller + Oracle</span>
-  </article>
-  <article class="hero-card">
-    <p class="card-label">Previous Month Spend</p>
-    <strong>{{ format_money(previous.spend_total) }}</strong>
-    <span>For quick trend comparison</span>
-  </article>
-</section>
-
-<section class="two-column">
-  <article class="panel">
-    <div class="panel-heading">
-      <div>
-        <p class="eyebrow">Budget bars</p>
-        <h2>Spending by category</h2>
-      </div>
-      <a class="text-link" href="{{ url_for('budget.budgets', month=selected_month) }}">View budgets</a>
+<section class="dashboard-layout">
+  <aside class="account-rail" aria-label="Accounts">
+    <div class="rail-heading">
+      <h2>Accounts</h2>
+      <a class="icon-link" href="{{ url_for('budget.accounts') }}" aria-label="Manage accounts">Manage</a>
     </div>
-    <div class="budget-list">
-      {% for row in categories %}
-        {% set spend = row.spend_total or 0 %}
-        <div class="budget-row">
-          <div class="budget-meta">
-            <strong>{{ row.category|title }}</strong>
-            <span>{{ row.transaction_count }} txns</span>
-          </div>
-          <div class="progress"><span style="width: {{ row.bar_pct }}%"></span></div>
-          <div class="budget-amount">{{ format_money(spend) }}</div>
+
+    {% for group in account_groups %}
+      <section class="account-group">
+        <div class="account-group-summary">
+          <span class="group-caret" aria-hidden="true"></span>
+          <span class="account-type-icon type-{{ group.label|lower|replace(' ', '-') }}"></span>
+          <strong>{{ group.label }}</strong>
+          <b>{{ format_money(group.total) }}</b>
         </div>
-      {% else %}
-        <p class="empty">No spending has been synced for this month.</p>
-      {% endfor %}
-    </div>
-  </article>
+        <div class="account-items">
+          {% for account in group.accounts[:5] %}
+            <a class="account-line" href="{{ url_for('budget.transactions', month=selected_month, account=account.provider_account_id) }}">
+              <span>
+                <strong>{{ account.account_name }}</strong>
+                <em>{{ account.institution_name }}{% if account.last_four %} ending {{ account.last_four }}{% endif %}</em>
+              </span>
+              <b>{{ format_money(account.balance) }}</b>
+            </a>
+          {% endfor %}
+        </div>
+      </section>
+    {% else %}
+      <p class="empty compact-empty">No accounts have been synced yet.</p>
+    {% endfor %}
 
-  <article class="panel">
-    <div class="panel-heading">
-      <div>
-        <p class="eyebrow">Recent activity</p>
-        <h2>Latest transactions</h2>
+    <div class="net-worth-row">
+      <span>Net Worth</span>
+      <strong>{{ format_money(net_worth_total) }}</strong>
+    </div>
+  </aside>
+
+  <div class="dashboard-main">
+    <section class="summary-strip compact">
+      <article>
+        <span>Spending</span>
+        <strong>{{ format_money(summary.spend_total) }}</strong>
+      </article>
+      <article>
+        <span>Payments</span>
+        <strong>{{ format_money(summary.payment_total) }}</strong>
+      </article>
+      <article>
+        <span>Accounts</span>
+        <strong>{{ accounts.account_count or 0 }}</strong>
+      </article>
+      <article>
+        <span>Prior Month</span>
+        <strong>{{ format_money(previous.spend_total) }}</strong>
+      </article>
+    </section>
+
+    <section class="module alerts-module">
+      <div class="module-heading">
+        <h2>Alerts</h2>
       </div>
-      <a class="text-link" href="{{ url_for('budget.transactions', month=selected_month) }}">See all</a>
-    </div>
-    <div class="mini-transactions">
-      {% for txn in recent_transactions %}
-        <a class="mini-transaction" href="{{ url_for('budget.transactions', month=selected_month, q=txn.description) }}">
-          <span>
-            <strong>{{ txn.counterparty_name or txn.description }}</strong>
-            <em>{{ format_date(txn.transaction_date) }} · {{ txn.status }}</em>
-          </span>
-          <b class="{{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</b>
+      <div class="alert-list">
+        <a class="alert-row" href="{{ url_for('budget.accounts') }}">
+          <span class="alert-icon notice" aria-hidden="true"></span>
+          <span>You have {{ accounts.account_count or 0 }} connected accounts in BudgetArc.</span>
+          <time>{{ month_start.strftime('%b') }}</time>
         </a>
-      {% else %}
-        <p class="empty">No transactions found.</p>
-      {% endfor %}
-    </div>
-  </article>
+        {% if categories %}
+          {% set top_category = categories[0] %}
+          <a class="alert-row" href="{{ url_for('budget.budgets', month=selected_month) }}">
+            <span class="alert-icon warning" aria-hidden="true"></span>
+            <span>Your largest {{ month_start.strftime('%B') }} category is {{ top_category.category|title }} at {{ format_money(top_category.spend_total) }}.</span>
+            <time>{{ month_start.strftime('%b') }}</time>
+          </a>
+        {% endif %}
+        {% if summary.spend_total and previous.spend_total and summary.spend_total > previous.spend_total %}
+          <a class="alert-row" href="{{ url_for('budget.budgets', month=selected_month) }}">
+            <span class="alert-icon warning" aria-hidden="true"></span>
+            <span>Monthly spending is running above the previous month.</span>
+            <time>{{ month_start.strftime('%b') }}</time>
+          </a>
+        {% endif %}
+        <a class="alert-row" href="{{ url_for('budget.transactions', month=selected_month) }}">
+          <span class="alert-icon ledger" aria-hidden="true"></span>
+          <span>{{ summary.transaction_count or 0 }} transactions are available for review.</span>
+          <time>{{ month_start.strftime('%b') }}</time>
+        </a>
+      </div>
+    </section>
+
+    <section class="module advice-module">
+      <div class="module-heading">
+        <h2>Advice</h2>
+      </div>
+      <div class="advice-row">
+        <span class="advice-icon" aria-hidden="true"></span>
+        <span>Check the largest categories before the month closes.</span>
+        <a class="primary-button small-button" href="{{ url_for('budget.budgets', month=selected_month) }}">Show details</a>
+      </div>
+    </section>
+
+    <section class="module">
+      <div class="module-heading">
+        <h2>Recent Activity</h2>
+        <a class="text-link" href="{{ url_for('budget.transactions', month=selected_month) }}">View all</a>
+      </div>
+      <div class="activity-list">
+        {% for txn in recent_transactions[:6] %}
+          <a class="activity-row" href="{{ url_for('budget.transactions', month=selected_month, q=txn.description) }}">
+            <time>{{ format_date(txn.transaction_date) }}</time>
+            <span>
+              <strong>{{ txn.counterparty_name or txn.description }}</strong>
+              <em>{{ txn.category or "Uncategorized" }} / {{ txn.status }}</em>
+            </span>
+            <b class="{{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</b>
+          </a>
+        {% else %}
+          <p class="empty">No transactions found.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="module">
+      <div class="module-heading">
+        <h2>Budgets {{ month_start.strftime('%B') }}</h2>
+        <a class="text-link" href="{{ url_for('budget.budgets', month=selected_month) }}">Edit</a>
+      </div>
+      <div class="budget-list">
+        {% for row in categories[:5] %}
+          {% set spend = row.spend_total or 0 %}
+          <div class="budget-row">
+            <div class="budget-meta">
+              <strong>{{ row.category|title }}</strong>
+              <span>{{ row.transaction_count }} txns</span>
+            </div>
+            <div class="progress"><span style="width: {{ row.bar_pct }}%"></span></div>
+            <div class="budget-amount">{{ format_money(spend) }}</div>
+          </div>
+        {% else %}
+          <p class="empty">No spending has been synced for this month.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
 </section>
 {% endblock %}

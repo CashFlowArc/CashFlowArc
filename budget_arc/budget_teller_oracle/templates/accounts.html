@@ -1,22 +1,22 @@
 {% extends "layout.html" %}
 {% block title %}BudgetArc Accounts{% endblock %}
-{% block heading %}Manage Accounts{% endblock %}
-{% block eyebrow %}Connections, account inventory, and safe manual sync controls{% endblock %}
+{% block heading %}Accounts{% endblock %}
+{% block eyebrow %}Connections, balances, and sync controls{% endblock %}
 {% block content %}
-<section class="panel">
-  <div class="panel-heading">
+<section class="module">
+  <div class="module-heading">
     <div>
-      <p class="eyebrow">Teller enrollments</p>
       <h2>Connections</h2>
+      <p>{{ connections|length }} Teller enrollments</p>
     </div>
-    <a class="primary-button" href="{{ url_for('budget.connect_page') }}">Connect account</a>
+    <a class="primary-button small-button" href="{{ url_for('budget.connect_page') }}">Connect account</a>
   </div>
   <div class="connection-grid">
     {% for connection in connections %}
       <article class="connection-card">
         <div>
           <strong>{{ connection.institution_name or "Financial institution" }}</strong>
-          <span>{{ connection.status }} · Last sync: {{ format_date(connection.last_sync_at) if connection.last_sync_at else "Not synced yet" }}</span>
+          <span>{{ connection.status }} / Last sync: {{ format_date(connection.last_sync_at) if connection.last_sync_at else "Not synced yet" }}</span>
           {% if connection.status == 'RECONNECT_REQUIRED' %}
             <p class="connection-warning">Repair required before sync.</p>
           {% endif %}
@@ -43,29 +43,43 @@
   </div>
 </section>
 
-<section class="panel">
-  <div class="panel-heading">
+<section class="module account-inventory">
+  <div class="module-heading">
     <div>
-      <p class="eyebrow">Account manager</p>
-      <h2>{{ accounts|length }} linked accounts</h2>
+      <h2>{{ accounts|length }} Linked Accounts</h2>
+      <p>Account inventory</p>
     </div>
   </div>
-  <div class="account-grid">
-    {% for account in accounts %}
-      <article class="account-card">
-        <p>{{ account.institution_name }}</p>
-        <h3>{{ account.account_name }}</h3>
-        <div class="account-meta">
-          <span>{{ account.account_type }} · {{ account.account_subtype }}</span>
-          <span>Last four: {{ account.last_four or "n/a" }}</span>
-          <span>Status: {{ account.status }}</span>
-          <span>{{ account.transaction_count }} transactions</span>
-          <span>Latest: {{ iso_date(account.last_transaction_date) or "n/a" }}</span>
-        </div>
-      </article>
-    {% else %}
-      <p class="empty">No accounts have been imported.</p>
-    {% endfor %}
+  <div class="table-wrap account-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>Institution</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th class="right">Transactions</th>
+          <th>Latest</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for account in accounts %}
+          <tr>
+            <td>
+              <strong>{{ account.account_name }}</strong>
+              <span>{% if account.last_four %}Ending {{ account.last_four }}{% else %}No masked number{% endif %}</span>
+            </td>
+            <td>{{ account.institution_name }}</td>
+            <td>{{ account.account_type }}{% if account.account_subtype %} / {{ account.account_subtype }}{% endif %}</td>
+            <td><span class="status {{ account.status|lower }}">{{ account.status }}</span></td>
+            <td class="right amount">{{ account.transaction_count }}</td>
+            <td>{{ iso_date(account.last_transaction_date) or "n/a" }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="empty">No accounts have been imported.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </section>
 {% endblock %}
