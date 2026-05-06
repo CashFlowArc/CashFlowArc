@@ -842,6 +842,17 @@ def create_app() -> Flask:
             institution_id = _selected_institution_id(app_config.teller.institution_id)
         except ValueError as exc:
             return jsonify({"ok": False, "error": "invalid_institution_id", "message": str(exc)}), 400
+        if not app_config.teller.application_id:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "missing_teller_application_id",
+                        "message": "Teller application id is not configured on the server.",
+                    }
+                ),
+                500,
+            )
 
         nonce = secrets.token_urlsafe(32)
         teller_csrf_token = secrets.token_urlsafe(32)

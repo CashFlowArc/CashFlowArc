@@ -108,6 +108,8 @@ The deployment installer runs `init-db` on each deploy. Existing installs are mi
 
 After signing in as `admin`, create regular users from `Users`, or enable self-registration by configuring SMTP. If older Teller rows were loaded before user ownership existed, use `Assign unowned data` on the intended user once.
 
+The installer preserves `/etc/budget-arc/budget.env` using a privileged file check because the directory is intentionally owner-only. Teller values can be refreshed from GitHub Actions secrets/defaults without committing private certs or keys.
+
 ## Email Registration
 
 For GitHub Actions deployment, add these repository secrets if you want verification and password-reset emails to send:

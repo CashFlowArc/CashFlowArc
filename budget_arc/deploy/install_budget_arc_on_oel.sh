@@ -40,7 +40,7 @@ fi
 sudo mkdir -p "$ENV_DIR"
 sudo chmod 700 "$ENV_DIR"
 
-if [[ ! -f "$ENV_FILE" ]]; then
+if ! sudo test -f "$ENV_FILE"; then
   WALLET_DIR_DEFAULT="/home/opc/wallets/myadb"
   if [[ ! -f "$WALLET_DIR_DEFAULT/tnsnames.ora" ]]; then
     WALLET_DIR_DEFAULT="$APP_DIR/wallet"
@@ -93,6 +93,69 @@ else
   echo "$ENV_FILE already exists; preserving existing secrets."
 fi
 
+TELLER_ENV_KEYS=(
+  TELLER_APPLICATION_ID
+  TELLER_ENVIRONMENT
+  TELLER_API_VERSION
+  TELLER_CERT_PATH
+  TELLER_CERT_KEY_PATH
+  TELLER_SIGNING_PUBLIC_KEY
+  TELLER_ALLOW_UNVERIFIED_SIGNATURES
+  TELLER_INSTITUTION_ID
+)
+TELLER_ENV_PROVIDED=false
+for key in "${TELLER_ENV_KEYS[@]}"; do
+  if [[ -n "${!key:-}" ]]; then
+    TELLER_ENV_PROVIDED=true
+    break
+  fi
+done
+
+if [[ "$TELLER_ENV_PROVIDED" == true ]]; then
+  TMP_TELLER_SECRETS="$(mktemp)"
+  trap 'rm -f "${TMP_TELLER_SECRETS:-}" "${TMP_EMAIL_SECRETS:-}"' EXIT
+  chmod 600 "$TMP_TELLER_SECRETS"
+  for key in "${TELLER_ENV_KEYS[@]}"; do
+    if [[ -n "${!key:-}" ]]; then
+      printf '%s=%s\n' "$key" "${!key}" >> "$TMP_TELLER_SECRETS"
+    fi
+  done
+  TMP_ENV_UPDATE="$(sudo mktemp)"
+  sudo python3 - "$ENV_FILE" "$TMP_ENV_UPDATE" "$TMP_TELLER_SECRETS" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+secret_file = Path(sys.argv[3])
+updates = {}
+for line in secret_file.read_text().splitlines():
+    if "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    if value:
+        updates[key] = value
+
+lines = source.read_text().splitlines()
+for key, value in updates.items():
+    prefix = f"{key}="
+    for index, line in enumerate(lines):
+        if line.startswith(prefix):
+            lines[index] = f"{key}={value}"
+            break
+    else:
+        lines.append(f"{key}={value}")
+
+target.write_text("\n".join(lines) + "\n")
+PY
+  sudo install -m 600 "$TMP_ENV_UPDATE" "$ENV_FILE"
+  sudo rm -f "$TMP_ENV_UPDATE"
+  rm -f "$TMP_TELLER_SECRETS"
+  echo "Updated BudgetArc Teller settings from GitHub Actions secrets/defaults."
+else
+  echo "BudgetArc Teller settings not provided; preserving existing Teller settings."
+fi
+
 if [[ -n "${BUDGET_ADMIN_PASSWORD:-}" ]]; then
   ADMIN_HASH="$("$VENV_DIR/bin/python" -m budget_teller_oracle hash-password --password-env BUDGET_ADMIN_PASSWORD)"
   TMP_ENV_UPDATE="$(sudo mktemp)"
@@ -142,7 +205,7 @@ done
 
 if [[ "$EMAIL_ENV_PROVIDED" == true ]]; then
   TMP_EMAIL_SECRETS="$(mktemp)"
-  trap 'rm -f "${TMP_EMAIL_SECRETS:-}"' EXIT
+  trap 'rm -f "${TMP_TELLER_SECRETS:-}" "${TMP_EMAIL_SECRETS:-}"' EXIT
   chmod 600 "$TMP_EMAIL_SECRETS"
   for key in "${EMAIL_ENV_KEYS[@]}"; do
     if [[ -n "${!key:-}" ]]; then

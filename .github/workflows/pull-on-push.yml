@@ -47,6 +47,14 @@ jobs:
           BUDGET_SMTP_USE_TLS: ${{ secrets.BUDGET_SMTP_USE_TLS || 'true' }}
           BUDGET_SMTP_USE_SSL: ${{ secrets.BUDGET_SMTP_USE_SSL || 'false' }}
           BUDGET_SMTP_TIMEOUT: ${{ secrets.BUDGET_SMTP_TIMEOUT || '20' }}
+          TELLER_APPLICATION_ID: ${{ secrets.TELLER_APPLICATION_ID || 'app_pruhi46s81ij37cq5i000' }}
+          TELLER_ENVIRONMENT: ${{ secrets.TELLER_ENVIRONMENT || 'development' }}
+          TELLER_API_VERSION: ${{ secrets.TELLER_API_VERSION }}
+          TELLER_CERT_PATH: ${{ secrets.TELLER_CERT_PATH || '/etc/budget-arc/teller/certificate.pem' }}
+          TELLER_CERT_KEY_PATH: ${{ secrets.TELLER_CERT_KEY_PATH || '/etc/budget-arc/teller/private_key.pem' }}
+          TELLER_SIGNING_PUBLIC_KEY: ${{ secrets.TELLER_SIGNING_PUBLIC_KEY }}
+          TELLER_ALLOW_UNVERIFIED_SIGNATURES: ${{ secrets.TELLER_ALLOW_UNVERIFIED_SIGNATURES || 'false' }}
+          TELLER_INSTITUTION_ID: ${{ secrets.TELLER_INSTITUTION_ID || 'amex' }}
         run: |
           cd /home/opc/CashFlowArc/budget_arc
           bash deploy/install_budget_arc_on_oel.sh
