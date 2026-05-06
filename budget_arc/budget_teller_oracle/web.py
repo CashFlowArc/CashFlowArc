@@ -334,7 +334,7 @@ def create_app() -> Flask:
 
     def cached_teller_institutions() -> list[dict[str, Any]]:
         loaded_at = institution_cache.get("loaded_at")
-        now = dt.datetime.now(dt.UTC)
+        now = dt.datetime.now(dt.timezone.utc)
         if loaded_at and now - loaded_at < dt.timedelta(hours=12):
             return list(institution_cache.get("items") or [])
 
