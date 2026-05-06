@@ -148,10 +148,8 @@ def _valid_password(value: str) -> bool:
     return len(value) >= 12
 
 
-def _selected_institution_id(default_id: str | None) -> str | None:
+def _selected_institution_id() -> str | None:
     raw = (request.args.get("institution_id") or "").strip()
-    if raw == "__default__":
-        raw = default_id or ""
     if not raw:
         return None
     if not INSTITUTION_ID_RE.fullmatch(raw):
@@ -818,10 +816,7 @@ def create_app() -> Flask:
     @budget.route("/connect")
     @user_required
     def connect_page() -> Any:
-        return render_template(
-            "connect.html",
-            default_institution_id=app_config.teller.institution_id,
-        )
+        return render_template("connect.html")
 
     @budget.route("/settings")
     @admin_required
@@ -858,7 +853,7 @@ def create_app() -> Flask:
     @user_required
     def teller_config() -> Any:
         try:
-            institution_id = _selected_institution_id(app_config.teller.institution_id)
+            institution_id = _selected_institution_id()
         except ValueError as exc:
             return jsonify({"ok": False, "error": "invalid_institution_id", "message": str(exc)}), 400
         if not app_config.teller.application_id:
@@ -903,44 +898,33 @@ def create_app() -> Flask:
         except ValueError:
             limit = 30
 
+        if not query:
+            return jsonify({"ok": True, "query": query, "institutions": []})
+
         try:
             institutions = cached_teller_institutions()
         except Exception as exc:
             return jsonify({"ok": False, "error": type(exc).__name__, "message": str(exc)[:300]}), 502
 
-        default_institution = None
-        default_id = app_config.teller.institution_id
-        if default_id:
-            default_institution = next(
-                (
-                    public_institution_payload(institution)
-                    for institution in institutions
-                    if institution.get("id") == default_id
-                ),
-                {"id": default_id, "name": f"Configured default ({default_id})", "products": []},
-            )
-
         results: list[dict[str, Any]] = []
-        if query:
-            terms = [term.lower() for term in query.split() if term.strip()]
-            for institution in institutions:
-                institution_id = str(institution.get("id") or "")
-                institution_name = str(institution.get("name") or "")
-                products = institution.get("products") or []
-                if "transactions" not in products or "balance" not in products:
-                    continue
-                haystack = f"{institution_name} {institution_id}".lower()
-                if all(term in haystack for term in terms):
-                    results.append(public_institution_payload(institution))
-                    if len(results) >= limit:
-                        break
+        terms = [term.lower() for term in query.split() if term.strip()]
+        for institution in institutions:
+            institution_id = str(institution.get("id") or "")
+            institution_name = str(institution.get("name") or "")
+            products = institution.get("products") or []
+            if "transactions" not in products or "balance" not in products:
+                continue
+            haystack = f"{institution_name} {institution_id}".lower()
+            if all(term in haystack for term in terms):
+                results.append(public_institution_payload(institution))
+                if len(results) >= limit:
+                    break
 
         return jsonify(
             {
                 "ok": True,
                 "query": query,
                 "institutions": results,
-                "defaultInstitution": default_institution,
             }
         )
 

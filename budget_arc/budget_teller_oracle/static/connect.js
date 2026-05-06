@@ -2,13 +2,15 @@
   const status = document.getElementById("connect-status");
   const button = document.getElementById("connect");
   const institutionSearch = document.getElementById("institution-search");
-  const institutionSelect = document.getElementById("institution-select");
-  const institutionCustom = document.getElementById("institution-custom");
+  const institutionOptions = document.getElementById("institution-options");
+  const institutionIdInput = document.getElementById("institution-id");
   const institutionStatus = document.getElementById("institution-status");
   let tellerConnect = null;
   let configuredInstitutionId = null;
   let setupRequestId = 0;
   let institutionSearchTimer = null;
+  let institutionOptionsByLabel = new Map();
+  let selectedInstitutionLabel = "";
 
   function show(payload) {
     status.textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
@@ -21,60 +23,69 @@
   }
 
   function selectedInstitutionId() {
-    const custom = institutionCustom ? institutionCustom.value.trim() : "";
-    if (custom) {
-      return custom;
-    }
-    return institutionSelect ? institutionSelect.value : "";
+    return institutionIdInput ? institutionIdInput.value.trim() : "";
   }
 
-  function addInstitutionOption(id, label, products) {
+  function institutionLabel(institution) {
+    return `${institution.name || institution.id} (${institution.id})`;
+  }
+
+  function addInstitutionOption(institution) {
     const option = document.createElement("option");
-    option.value = id;
-    option.textContent = products && products.length ? `${label} (${id})` : label;
-    institutionSelect.appendChild(option);
+    const label = institutionLabel(institution);
+    option.value = label;
+    institutionOptions.appendChild(option);
+    institutionOptionsByLabel.set(label, institution.id);
   }
 
-  function setInstitutionOptions(institutions, defaultInstitution) {
-    if (!institutionSelect) {
-      return;
+  function updateSelectedInstitutionFromInput() {
+    if (!institutionSearch || !institutionIdInput) {
+      return false;
     }
 
-    const current = institutionSelect.value;
-    institutionSelect.replaceChildren();
-    addInstitutionOption("", "Teller institution picker", []);
+    const previousId = institutionIdInput.value;
+    const typedValue = institutionSearch.value.trim();
+    const selectedId = institutionOptionsByLabel.get(typedValue) || "";
+    institutionIdInput.value = selectedId;
+    selectedInstitutionLabel = selectedId ? typedValue : "";
 
-    const seen = new Set([""]);
-    if (defaultInstitution && defaultInstitution.id) {
-      addInstitutionOption(
-        defaultInstitution.id,
-        `Configured default: ${defaultInstitution.name || defaultInstitution.id}`,
-        defaultInstitution.products
-      );
-      seen.add(defaultInstitution.id);
+    if (selectedId) {
+      showInstitutionStatus(`Selected ${typedValue}.`);
+    } else if (!typedValue) {
+      showInstitutionStatus("Leave blank to use Teller's own institution picker.");
+    } else {
+      showInstitutionStatus("Keep typing to narrow the list, then select a suggestion.");
     }
+
+    return previousId !== selectedId;
+  }
+
+  function setInstitutionOptions(institutions) {
+    if (!institutionOptions) {
+      return false;
+    }
+
+    institutionOptions.replaceChildren();
+    institutionOptionsByLabel = new Map();
 
     for (const institution of institutions) {
-      if (!institution.id || seen.has(institution.id)) {
+      if (!institution.id) {
         continue;
       }
-      addInstitutionOption(institution.id, institution.name || institution.id, institution.products);
-      seen.add(institution.id);
+      addInstitutionOption(institution);
     }
 
-    if (seen.has(current)) {
-      institutionSelect.value = current;
-    }
-    return institutionSelect.value !== current;
+    return updateSelectedInstitutionFromInput();
   }
 
   async function loadInstitutions(query) {
-    if (!institutionSelect) {
+    if (!institutionOptions) {
       return;
     }
 
     const cleanQuery = query.trim();
     if (cleanQuery && cleanQuery.length < 2) {
+      setInstitutionOptions([]);
       showInstitutionStatus("Type at least 2 characters to search Teller institutions.");
       return;
     }
@@ -83,7 +94,7 @@
     if (cleanQuery) {
       params.set("q", cleanQuery);
     }
-    showInstitutionStatus(cleanQuery ? "Searching Teller institutions..." : "Loading configured institution...");
+    showInstitutionStatus(cleanQuery ? "Searching Teller institutions..." : "Leave blank to use Teller's own institution picker.");
     const response = await fetch(`./api/institutions?${params.toString()}`, { cache: "no-store" });
     const payload = await response.json();
     if (!payload.ok) {
@@ -91,14 +102,20 @@
       return;
     }
 
-    const selectionChanged = setInstitutionOptions(payload.institutions || [], payload.defaultInstitution || null);
+    if (selectedInstitutionId() && institutionSearch.value.trim() === selectedInstitutionLabel) {
+      return;
+    }
+
+    const selectionChanged = setInstitutionOptions(payload.institutions || []);
     if (selectionChanged) {
       refreshForInstitutionChange();
     }
     if (!cleanQuery) {
       showInstitutionStatus("Leave blank to use Teller's own institution picker.");
     } else if ((payload.institutions || []).length) {
-      showInstitutionStatus(`Found ${(payload.institutions || []).length} matching Teller institutions.`);
+      if (!selectedInstitutionId()) {
+        showInstitutionStatus(`Found ${(payload.institutions || []).length} matching Teller institutions. Select one from the dropdown.`);
+      }
     } else {
       showInstitutionStatus("No matching Teller institutions found. Try a broader search or use the Teller picker.");
     }
@@ -201,26 +218,21 @@
       tellerConnect.open();
     });
 
-    if (institutionSelect) {
-      institutionSelect.addEventListener("change", function () {
-        if (institutionSelect.value && institutionCustom) {
-          institutionCustom.value = "";
-        }
-        refreshForInstitutionChange();
-      });
-    }
     if (institutionSearch) {
       institutionSearch.addEventListener("input", function () {
+        if (updateSelectedInstitutionFromInput()) {
+          refreshForInstitutionChange();
+        }
         window.clearTimeout(institutionSearchTimer);
+        if (selectedInstitutionId()) {
+          return;
+        }
         institutionSearchTimer = window.setTimeout(function () {
           loadInstitutions(institutionSearch.value).catch(function (error) {
             showInstitutionStatus("Institution lookup failed: " + error.message);
           });
         }, 300);
       });
-    }
-    if (institutionCustom) {
-      institutionCustom.addEventListener("change", refreshForInstitutionChange);
     }
   } catch (error) {
     show("Setup error: " + error.message);

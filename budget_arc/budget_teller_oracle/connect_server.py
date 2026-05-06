@@ -170,7 +170,7 @@ def make_handler(state: ConnectState) -> type[BaseHTTPRequestHandler]:
                         "products": ["transactions", "balance"],
                         "nonce": state.nonce,
                         "csrfToken": state.csrf_token,
-                        "institutionId": cfg.teller.institution_id,
+                        "institutionId": None,
                     },
                 )
                 return

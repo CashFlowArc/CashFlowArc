@@ -78,13 +78,12 @@ TELLER_CERT_PATH=
 TELLER_CERT_KEY_PATH=
 TELLER_SIGNING_PUBLIC_KEY=
 TELLER_ALLOW_UNVERIFIED_SIGNATURES=false
-TELLER_INSTITUTION_ID=amex
 
 CONNECT_HOST=127.0.0.1
 CONNECT_PORT=8787
 """
     env_path.write_text(contents, encoding="utf-8")
-    print("Created .env with Amex defaults and a generated encryption key")
+    print("Created .env with Teller picker defaults and a generated encryption key")
     print("Still needed: DB_USER, DB_PASSWORD, TELLER_APPLICATION_ID, TELLER_CERT_PATH, TELLER_CERT_KEY_PATH, TELLER_SIGNING_PUBLIC_KEY")
     return 0
 
@@ -186,21 +185,15 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
     try:
         teller_client = TellerClient(teller)
         institutions = teller_client.list_institutions()
-        matches = [
-            item
-            for item in institutions
-            if item.get("id") == (teller.institution_id or "")
-        ]
-        supports_transactions = bool(matches and "transactions" in matches[0].get("products", []))
         add(
-            "institution",
-            supports_transactions,
-            f"{teller.institution_id} supports transactions"
-            if supports_transactions
-            else f"{teller.institution_id or '<unset>'} does not support transactions",
+            "institutions",
+            bool(institutions),
+            "Teller institutions are reachable for dynamic search"
+            if institutions
+            else "Teller institution list is empty",
         )
     except Exception as exc:
-        add("institution", False, f"Could not check Teller institutions: {type(exc).__name__}")
+        add("institutions", False, f"Could not check Teller institutions: {type(exc).__name__}")
 
     try:
         oracle = load_oracle_config()

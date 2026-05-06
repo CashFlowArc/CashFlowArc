@@ -66,7 +66,6 @@ TELLER_CERT_PATH=/etc/budget-arc/teller/certificate.pem
 TELLER_CERT_KEY_PATH=/etc/budget-arc/teller/private_key.pem
 TELLER_SIGNING_PUBLIC_KEY=
 TELLER_ALLOW_UNVERIFIED_SIGNATURES=false
-TELLER_INSTITUTION_ID=amex
 
 BUDGET_BASE_PATH=/budget
 BUDGET_WEB_HOST=127.0.0.1
@@ -93,6 +92,24 @@ else
   echo "$ENV_FILE already exists; preserving existing secrets."
 fi
 
+TMP_ENV_UPDATE="$(sudo mktemp)"
+sudo python3 - "$ENV_FILE" "$TMP_ENV_UPDATE" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+lines = [
+    line
+    for line in source.read_text().splitlines()
+    if not line.startswith("TELLER_INSTITUTION_ID=")
+]
+target.write_text("\n".join(lines) + "\n")
+PY
+sudo install -m 600 "$TMP_ENV_UPDATE" "$ENV_FILE"
+sudo rm -f "$TMP_ENV_UPDATE"
+echo "Removed legacy BudgetArc Teller default institution setting."
+
 TELLER_ENV_KEYS=(
   TELLER_APPLICATION_ID
   TELLER_ENVIRONMENT
@@ -101,7 +118,6 @@ TELLER_ENV_KEYS=(
   TELLER_CERT_KEY_PATH
   TELLER_SIGNING_PUBLIC_KEY
   TELLER_ALLOW_UNVERIFIED_SIGNATURES
-  TELLER_INSTITUTION_ID
 )
 TELLER_ENV_PROVIDED=false
 for key in "${TELLER_ENV_KEYS[@]}"; do

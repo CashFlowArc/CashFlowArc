@@ -12,7 +12,7 @@
       <dt>Auth required</dt><dd>{{ web_config.require_auth }}</dd>
       <dt>Cookie secure</dt><dd>{{ web_config.cookie_secure }}</dd>
       <dt>Teller environment</dt><dd>{{ app_config.teller.environment }}</dd>
-      <dt>Teller institution</dt><dd>{{ app_config.teller.institution_id or "picker" }}</dd>
+      <dt>Teller institution selection</dt><dd>dynamic search or Teller picker</dd>
       <dt>Oracle DSN</dt><dd>{{ app_config.oracle.dsn }}</dd>
       <dt>User storage</dt><dd>BUDGET_USERS plus USER_ID-scoped Teller rows</dd>
       <dt>Email delivery</dt><dd>{{ "configured" if email_config.configured else "not configured" }}</dd>

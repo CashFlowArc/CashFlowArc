@@ -79,7 +79,6 @@ TELLER_ENVIRONMENT=development
 TELLER_CERT_PATH=/etc/budget-arc/teller/certificate.pem
 TELLER_CERT_KEY_PATH=/etc/budget-arc/teller/private_key.pem
 TELLER_SIGNING_PUBLIC_KEY=
-TELLER_INSTITUTION_ID=amex
 BUDGET_BASE_PATH=/budget
 BUDGET_WEB_HOST=127.0.0.1
 BUDGET_WEB_PORT=8788

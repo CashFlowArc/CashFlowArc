@@ -46,7 +46,6 @@ class TellerConfig:
     cert_key_path: str | None
     signing_public_key: str | None
     allow_unverified_signatures: bool
-    institution_id: str | None
 
 
 @dataclass(frozen=True)
@@ -158,7 +157,6 @@ def load_teller_config(require_app_id: bool = False) -> TellerConfig:
         cert_key_path=os.getenv("TELLER_CERT_KEY_PATH") or None,
         signing_public_key=os.getenv("TELLER_SIGNING_PUBLIC_KEY") or None,
         allow_unverified_signatures=_bool_env("TELLER_ALLOW_UNVERIFIED_SIGNATURES", False),
-        institution_id=os.getenv("TELLER_INSTITUTION_ID") or None,
     )
 
 
