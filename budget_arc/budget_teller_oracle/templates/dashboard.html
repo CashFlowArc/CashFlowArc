@@ -3,9 +3,19 @@
 {% block heading %}Overview{% endblock %}
 {% block eyebrow %}{{ month_start.strftime('%B %Y') }} spending snapshot{% endblock %}
 {% block content %}
+<section class="panel month-panel">
+  <form class="month-selector" method="get">
+    <label>
+      Review month
+      <input name="month" type="month" value="{{ selected_month }}">
+    </label>
+    <button class="primary-button" type="submit">Review</button>
+  </form>
+</section>
+
 <section class="hero-grid">
   <article class="hero-card mint-glow">
-    <p class="card-label">This Month Spending</p>
+    <p class="card-label">Selected Month Spending</p>
     <strong>{{ format_money(summary.spend_total) }}</strong>
     <span>{{ summary.transaction_count or 0 }} transactions synced</span>
   </article>
@@ -33,7 +43,7 @@
         <p class="eyebrow">Budget bars</p>
         <h2>Spending by category</h2>
       </div>
-      <a class="text-link" href="{{ url_for('budget.budgets') }}">View budgets</a>
+      <a class="text-link" href="{{ url_for('budget.budgets', month=selected_month) }}">View budgets</a>
     </div>
     <div class="budget-list">
       {% for row in categories %}
@@ -47,7 +57,7 @@
           <div class="budget-amount">{{ format_money(spend) }}</div>
         </div>
       {% else %}
-        <p class="empty">No spending has been synced for this month yet.</p>
+        <p class="empty">No spending has been synced for this month.</p>
       {% endfor %}
     </div>
   </article>
@@ -58,11 +68,11 @@
         <p class="eyebrow">Recent activity</p>
         <h2>Latest transactions</h2>
       </div>
-      <a class="text-link" href="{{ url_for('budget.transactions') }}">See all</a>
+      <a class="text-link" href="{{ url_for('budget.transactions', month=selected_month) }}">See all</a>
     </div>
     <div class="mini-transactions">
       {% for txn in recent_transactions %}
-        <a class="mini-transaction" href="{{ url_for('budget.transactions', q=txn.description) }}">
+        <a class="mini-transaction" href="{{ url_for('budget.transactions', month=selected_month, q=txn.description) }}">
           <span>
             <strong>{{ txn.counterparty_name or txn.description }}</strong>
             <em>{{ format_date(txn.transaction_date) }} · {{ txn.status }}</em>

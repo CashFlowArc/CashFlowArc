@@ -3,6 +3,16 @@
 {% block heading %}Budgets{% endblock %}
 {% block eyebrow %}Mint-inspired category progress for {{ month_start.strftime('%B %Y') }}{% endblock %}
 {% block content %}
+<section class="panel month-panel">
+  <form class="month-selector" method="get">
+    <label>
+      Review month
+      <input name="month" type="month" value="{{ selected_month }}">
+    </label>
+    <button class="primary-button" type="submit">Review</button>
+  </form>
+</section>
+
 <section class="panel">
   <div class="panel-heading">
     <div>

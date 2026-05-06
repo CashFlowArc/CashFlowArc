@@ -126,7 +126,9 @@ h2 { font-size: 1.45rem; margin-bottom: 0; }
 .mini-transaction strong { display: block; max-width: 370px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .credit { color: var(--mint-dark); }
 
-.filters { display: grid; grid-template-columns: 1.6fr 1.2fr 1.2fr 1fr auto; gap: 12px; align-items: end; }
+.month-panel { padding: 16px 18px; }
+.month-selector { display: grid; grid-template-columns: minmax(180px, 240px) auto; gap: 12px; align-items: end; justify-content: start; }
+.filters { display: grid; grid-template-columns: 1fr 1.5fr 1.15fr 1.15fr .85fr auto; gap: 12px; align-items: end; }
 label { display: grid; gap: 6px; font-family: "Trebuchet MS", Verdana, sans-serif; font-size: .85rem; font-weight: 800; color: var(--muted); }
 .form-note { color: var(--muted); font-size: .86rem; line-height: 1.45; margin: -2px 0 2px; }
 input, select {
@@ -255,7 +257,7 @@ pre {
   .nav { grid-template-columns: repeat(3, 1fr); }
   .hero-grid, .two-column, .connection-grid, .account-grid, .connect-panel { grid-template-columns: 1fr; }
   .connection-card { grid-template-columns: 1fr; }
-  .filters, .admin-form, .inline-admin-form { grid-template-columns: 1fr; }
+  .filters, .month-selector, .admin-form, .inline-admin-form { grid-template-columns: 1fr; }
   .budget-row { grid-template-columns: 1fr; }
   .budget-amount { text-align: left; }
 }

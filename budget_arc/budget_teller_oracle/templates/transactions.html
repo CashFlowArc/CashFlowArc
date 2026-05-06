@@ -1,10 +1,14 @@
 {% extends "layout.html" %}
 {% block title %}BudgetArc Transactions{% endblock %}
 {% block heading %}Transactions{% endblock %}
-{% block eyebrow %}Search, filter, and review imported Oracle transactions{% endblock %}
+{% block eyebrow %}Search, filter, and review {{ month_start.strftime('%B %Y') }} transactions{% endblock %}
 {% block content %}
 <section class="panel">
   <form class="filters" method="get">
+    <label>
+      Month
+      <input name="month" type="month" value="{{ filters.month }}">
+    </label>
     <label>
       Search
       <input name="q" value="{{ filters.q }}" placeholder="merchant, description, category">

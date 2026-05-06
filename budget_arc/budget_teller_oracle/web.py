@@ -175,21 +175,53 @@ def _normalized_origin(value: str | None) -> str | None:
     return f"{scheme}://{hostname}{port_part}"
 
 
-def _month_bounds() -> tuple[dt.date, dt.date]:
-    today = dt.date.today()
-    start = today.replace(day=1)
-    if today.month == 12:
-        end = dt.date(today.year + 1, 1, 1)
-    else:
-        end = dt.date(today.year, today.month + 1, 1)
-    return start, end
+def _month_end(start: dt.date) -> dt.date:
+    if start.month == 12:
+        return dt.date(start.year + 1, 1, 1)
+    return dt.date(start.year, start.month + 1, 1)
 
 
-def _previous_month_bounds() -> tuple[dt.date, dt.date]:
-    start, _ = _month_bounds()
+def _parse_month(value: str | None) -> dt.date | None:
+    if not value:
+        return None
+    if not re.fullmatch(r"\d{4}-\d{2}", value):
+        return None
+    try:
+        return dt.date.fromisoformat(f"{value}-01")
+    except ValueError:
+        return None
+
+
+def _month_bounds(month_value: str | None = None) -> tuple[dt.date, dt.date]:
+    start = _parse_month(month_value) or dt.date.today().replace(day=1)
+    return start, _month_end(start)
+
+
+def _selected_month_bounds() -> tuple[dt.date, dt.date, str]:
+    start, end = _month_bounds(request.args.get("month"))
+    return start, end, start.strftime("%Y-%m")
+
+
+def _previous_month_bounds(start: dt.date | None = None) -> tuple[dt.date, dt.date]:
+    if start is None:
+        start, _ = _month_bounds()
     previous_end = start
     previous_start = (start - dt.timedelta(days=1)).replace(day=1)
     return previous_start, previous_end
+
+
+def _teller_sync_error_message(exc: TellerAPIError) -> str:
+    if exc.code and exc.teller_message:
+        detail = f"{exc.code}: {exc.teller_message}"
+    else:
+        detail = exc.teller_message or exc.code or f"HTTP {exc.status}"
+    if exc.code and exc.code.startswith("enrollment.disconnected.user_action"):
+        return (
+            "Sync failed: Teller needs you to reconnect this institution or complete MFA. "
+            "Open Connect account, complete the Teller prompts for this institution, then try Sync again. "
+            f"Teller reported: {detail}"
+        )
+    return f"Sync failed: Teller API HTTP {exc.status}: {detail}"
 
 
 def _query_all(sql: str, **params: Any) -> list[dict[str, Any]]:
@@ -600,8 +632,8 @@ def create_app() -> Flask:
     @user_required
     def dashboard() -> Any:
         user_id = current_user_id()
-        month_start, month_end = _month_bounds()
-        previous_start, previous_end = _previous_month_bounds()
+        month_start, month_end, selected_month = _selected_month_bounds()
+        previous_start, previous_end = _previous_month_bounds(month_start)
         summary = _query_one(
             """
             SELECT
@@ -646,10 +678,14 @@ def create_app() -> Flask:
             FROM BUDGET_TRANSACTIONS
             WHERE PROVIDER = 'teller'
               AND USER_ID = :user_id
+              AND TRANSACTION_DATE >= :month_start
+              AND TRANSACTION_DATE < :month_end
             ORDER BY TRANSACTION_DATE DESC, UPDATED_AT DESC
             FETCH FIRST 12 ROWS ONLY
             """,
             user_id=user_id,
+            month_start=month_start,
+            month_end=month_end,
         )
         categories = _query_all(
             """
@@ -678,18 +714,25 @@ def create_app() -> Flask:
             recent_transactions=recent_transactions,
             categories=categories,
             month_start=month_start,
+            selected_month=selected_month,
         )
 
     @budget.route("/transactions")
     @user_required
     def transactions() -> Any:
         user_id = current_user_id()
+        month_start, month_end, selected_month = _selected_month_bounds()
         search = request.args.get("q", "").strip()
         status = request.args.get("status", "").strip()
         account_id = request.args.get("account", "").strip()
         institution_id = request.args.get("institution", "").strip()
-        params: dict[str, Any] = {"user_id": user_id}
-        clauses = ["t.PROVIDER = 'teller'", "t.USER_ID = :user_id"]
+        params: dict[str, Any] = {"user_id": user_id, "month_start": month_start, "month_end": month_end}
+        clauses = [
+            "t.PROVIDER = 'teller'",
+            "t.USER_ID = :user_id",
+            "t.TRANSACTION_DATE >= :month_start",
+            "t.TRANSACTION_DATE < :month_end",
+        ]
         if search:
             clauses.append("(LOWER(t.DESCRIPTION) LIKE :search OR LOWER(NVL(t.COUNTERPARTY_NAME, '')) LIKE :search)")
             params["search"] = f"%{search.lower()}%"
@@ -755,14 +798,21 @@ def create_app() -> Flask:
             transactions=rows,
             accounts=accounts,
             institutions=institutions,
-            filters={"q": search, "status": status, "account": account_id, "institution": institution_id},
+            filters={
+                "q": search,
+                "status": status,
+                "account": account_id,
+                "institution": institution_id,
+                "month": selected_month,
+            },
+            month_start=month_start,
         )
 
     @budget.route("/budgets")
     @user_required
     def budgets() -> Any:
         user_id = current_user_id()
-        month_start, month_end = _month_bounds()
+        month_start, month_end, selected_month = _selected_month_bounds()
         rows = _query_all(
             """
             SELECT NVL(CATEGORY, 'uncategorized') AS CATEGORY,
@@ -781,7 +831,12 @@ def create_app() -> Flask:
             month_end=month_end,
         )
         rows = _attach_bar_percent(rows, "spend_total")
-        return render_template("budgets.html", categories=rows, month_start=month_start)
+        return render_template(
+            "budgets.html",
+            categories=rows,
+            month_start=month_start,
+            selected_month=selected_month,
+        )
 
     @budget.route("/accounts")
     @user_required
@@ -863,6 +918,8 @@ def create_app() -> Flask:
                 f"Synced {summary['accounts']} accounts and {summary['transactions']} transactions.",
                 "success",
             )
+        except TellerAPIError as exc:
+            flash(_teller_sync_error_message(exc), "error")
         except Exception as exc:
             flash(f"Sync failed: {type(exc).__name__}: {str(exc)[:220]}", "error")
         return redirect(url_for("budget.accounts"))
@@ -1120,7 +1177,8 @@ def create_app() -> Flask:
                     }
                 )
             state.remember("sync_error", "Enrollment callback failed before sync completed", **details)
-            payload = {"ok": False, "error": type(exc).__name__, "message": str(exc)[:500]}
+            message = _teller_sync_error_message(exc) if isinstance(exc, TellerAPIError) else str(exc)[:500]
+            payload = {"ok": False, "error": type(exc).__name__, "message": message}
             if isinstance(exc, TellerAPIError):
                 payload.update(
                     {
