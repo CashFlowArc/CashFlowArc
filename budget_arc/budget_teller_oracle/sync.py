@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime as dt
 from dataclasses import dataclass
 
 from .crypto import TokenCipher
@@ -31,6 +32,30 @@ def sync_connection(
     total_transactions = 0
 
     for account in accounts:
+        links = account.get("links") or {}
+        if links.get("balances"):
+            try:
+                balances = teller.get_balances(access_token, account["id"])
+                account["balances"] = balances
+                account["balances_synced_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
+                store.record_sync_event(
+                    user_id=user_id,
+                    connection_id=connection_id,
+                    account_id=account.get("id"),
+                    event_type="balances_sync",
+                    status="success",
+                    rows_upserted=1,
+                )
+            except Exception as exc:
+                store.record_sync_event(
+                    user_id=user_id,
+                    connection_id=connection_id,
+                    account_id=account.get("id"),
+                    event_type="balances_sync",
+                    status="failed",
+                    error_code=type(exc).__name__,
+                    error_message=str(exc),
+                )
         store.upsert_account(user_id=user_id, connection_id=connection_id, account=account)
     store.conn.commit()
 

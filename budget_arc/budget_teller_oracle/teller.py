@@ -138,6 +138,12 @@ class TellerClient:
     def list_accounts(self, access_token: str) -> list[dict[str, Any]]:
         return self._request("/accounts", access_token=access_token)
 
+    def get_balances(self, access_token: str, account_id: str) -> dict[str, Any]:
+        return self._request(
+            f"/accounts/{urllib.parse.quote(account_id)}/balances",
+            access_token=access_token,
+        )
+
     def delete_accounts(self, access_token: str) -> None:
         self._request("/accounts", access_token=access_token, method="DELETE")
 

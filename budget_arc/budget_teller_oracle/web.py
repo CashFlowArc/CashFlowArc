@@ -290,6 +290,30 @@ def _signed_net_worth_balance(
     return -amount if _is_liability_account(account_type, account_subtype) else amount
 
 
+def _account_balance_from_raw(raw_json: Any) -> Decimal | None:
+    if raw_json is None:
+        return None
+    text = raw_json.read() if hasattr(raw_json, "read") else str(raw_json)
+    if not text:
+        return None
+    try:
+        account = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    balances = account.get("balances") or {}
+    if not isinstance(balances, dict):
+        return None
+    value = balances.get("ledger")
+    if value is None:
+        value = balances.get("available")
+    if value is None:
+        return None
+    try:
+        return _decimal(value)
+    except Exception:
+        return None
+
+
 def _net_worth_svg(series: list[dict[str, Any]]) -> dict[str, Any]:
     width = Decimal("720")
     height = Decimal("260")
@@ -335,47 +359,91 @@ def _net_worth_svg(series: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _build_net_worth_series(
-    rows: list[dict[str, Any]],
+    account_rows: list[dict[str, Any]],
+    transaction_rows: list[dict[str, Any]],
     *,
     start_date: dt.date | None,
     end_date: dt.date,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    dated_rows = []
-    for row in rows:
+    dated_transactions = []
+    latest_transaction_by_account: dict[str, dt.date] = {}
+    for row in transaction_rows:
         row_date = row.get("transaction_date")
         if hasattr(row_date, "date"):
             row_date = row_date.date()
-        if row_date and row.get("running_balance") is not None:
+        if row_date:
             dated_row = dict(row)
             dated_row["transaction_date"] = row_date
-            dated_rows.append(dated_row)
-    if not dated_rows:
+            dated_transactions.append(dated_row)
+            account_id = str(row.get("provider_account_id"))
+            if account_id and (
+                account_id not in latest_transaction_by_account
+                or row_date > latest_transaction_by_account[account_id]
+            ):
+                latest_transaction_by_account[account_id] = row_date
+
+    balances: dict[str, dict[str, Any]] = {}
+    for row in account_rows:
+        account_id = str(row.get("provider_account_id") or "")
+        if not account_id:
+            continue
+        balance = _account_balance_from_raw(row.get("raw_json"))
+        if balance is None:
+            continue
+        balances[account_id] = {
+            "provider_account_id": account_id,
+            "account_name": row.get("account_name") or "Account",
+            "institution_name": row.get("institution_name") or "Institution",
+            "account_type": row.get("account_type"),
+            "account_subtype": row.get("account_subtype"),
+            "running_balance": balance,
+            "last_transaction_date": latest_transaction_by_account.get(account_id),
+        }
+
+    if not balances:
+        latest_running_rows: dict[str, dict[str, Any]] = {}
+        for row in dated_transactions:
+            if row.get("running_balance") is None:
+                continue
+            account_id = str(row.get("provider_account_id") or "")
+            if not account_id:
+                continue
+            existing = latest_running_rows.get(account_id)
+            if not existing or row["transaction_date"] >= existing["transaction_date"]:
+                latest_running_rows[account_id] = row
+        for account_id, row in latest_running_rows.items():
+            balances[account_id] = {
+                "provider_account_id": account_id,
+                "account_name": row.get("account_name") or "Account",
+                "institution_name": row.get("institution_name") or "Institution",
+                "account_type": row.get("account_type"),
+                "account_subtype": row.get("account_subtype"),
+                "running_balance": _decimal(row.get("running_balance")),
+                "last_transaction_date": latest_transaction_by_account.get(account_id),
+            }
+
+    if not balances:
         return [], []
 
-    first_data_date = min(row["transaction_date"] for row in dated_rows)
+    first_data_date = min([row["transaction_date"] for row in dated_transactions] or [end_date])
     start = start_date or first_data_date
     if start > end_date:
         start = end_date
 
-    balances: dict[str, dict[str, Any]] = {}
-    rows_by_day: dict[dt.date, list[dict[str, Any]]] = {}
-    for row in dated_rows:
+    balances_by_account = {account_id: _decimal(row["running_balance"]) for account_id, row in balances.items()}
+    transactions_by_day: dict[dt.date, list[dict[str, Any]]] = {}
+    for row in dated_transactions:
         row_date = row["transaction_date"]
-        if row_date < start:
-            balances[row["provider_account_id"]] = row
-        elif row_date <= end_date:
-            rows_by_day.setdefault(row_date, []).append(row)
+        if start <= row_date <= end_date and row.get("amount") is not None:
+            transactions_by_day.setdefault(row_date, []).append(row)
 
-    series: list[dict[str, Any]] = []
-    day = start
-    while day <= end_date:
-        for row in rows_by_day.get(day, []):
-            balances[row["provider_account_id"]] = row
-
+    reversed_series: list[dict[str, Any]] = []
+    day = end_date
+    while day >= start:
         assets = Decimal("0")
         liabilities = Decimal("0")
-        for row in balances.values():
-            balance = _decimal(row["running_balance"])
+        for account_id, balance in balances_by_account.items():
+            row = balances[account_id]
             if _is_liability_account(row.get("account_type"), row.get("account_subtype")):
                 liabilities += balance
             else:
@@ -383,7 +451,7 @@ def _build_net_worth_series(
 
         net_worth = assets - liabilities
         if balances:
-            series.append(
+            reversed_series.append(
                 {
                     "date": day,
                     "assets": assets,
@@ -391,7 +459,13 @@ def _build_net_worth_series(
                     "net_worth": net_worth,
                 }
             )
-        day += dt.timedelta(days=1)
+        for row in transactions_by_day.get(day, []):
+            account_id = str(row.get("provider_account_id") or "")
+            if account_id in balances_by_account:
+                balances_by_account[account_id] -= _decimal(row.get("amount"))
+        day -= dt.timedelta(days=1)
+
+    series = list(reversed(reversed_series))
 
     latest_rows = sorted(
         balances.values(),
@@ -410,7 +484,7 @@ def _build_net_worth_series(
                 row.get("account_type"),
                 row.get("account_subtype"),
             ),
-            "last_transaction_date": row.get("transaction_date"),
+            "last_transaction_date": row.get("last_transaction_date"),
             "is_liability": _is_liability_account(row.get("account_type"), row.get("account_subtype")),
         }
         for row in latest_rows
@@ -1043,9 +1117,28 @@ def create_app() -> Flask:
         period, period_label, start_date, end_date = _net_worth_period(request.args.get("period"))
         end_exclusive = end_date + dt.timedelta(days=1)
 
+        account_rows = _query_all(
+            """
+            SELECT
+                PROVIDER_ACCOUNT_ID,
+                ACCOUNT_NAME,
+                ACCOUNT_TYPE,
+                ACCOUNT_SUBTYPE,
+                INSTITUTION_NAME,
+                UPDATED_AT,
+                DBMS_LOB.SUBSTR(RAW_JSON, 32767, 1) AS RAW_JSON
+            FROM BUDGET_ACCOUNTS
+            WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
+            ORDER BY INSTITUTION_NAME, ACCOUNT_NAME
+            """,
+            user_id=user_id,
+        )
+
         select_columns = """
             t.PROVIDER_ACCOUNT_ID,
             t.TRANSACTION_DATE,
+            t.AMOUNT,
             t.RUNNING_BALANCE,
             t.UPDATED_AT,
             t.PROVIDER_TRANSACTION_ID,
@@ -1062,54 +1155,14 @@ def create_app() -> Flask:
              AND a.USER_ID = t.USER_ID
             WHERE t.PROVIDER = 'teller'
               AND t.USER_ID = :user_id
-              AND t.RUNNING_BALANCE IS NOT NULL
               AND t.TRANSACTION_DATE < :end_exclusive
         """
         if start_date:
-            rows = _query_all(
+            transaction_rows = _query_all(
                 f"""
-                WITH prior_tx AS (
-                    SELECT *
-                    FROM (
-                        SELECT
-                            {select_columns},
-                            ROW_NUMBER() OVER (
-                                PARTITION BY t.PROVIDER_ACCOUNT_ID
-                                ORDER BY t.TRANSACTION_DATE DESC, t.UPDATED_AT DESC, t.PROVIDER_TRANSACTION_ID DESC
-                            ) AS RN
-                        {join_clause}
-                          AND t.TRANSACTION_DATE < :start_date
-                    )
-                    WHERE RN = 1
-                ),
-                range_tx AS (
-                    SELECT {select_columns}
-                    {join_clause}
-                      AND t.TRANSACTION_DATE >= :start_date
-                )
-                SELECT
-                    PROVIDER_ACCOUNT_ID,
-                    TRANSACTION_DATE,
-                    RUNNING_BALANCE,
-                    UPDATED_AT,
-                    PROVIDER_TRANSACTION_ID,
-                    ACCOUNT_NAME,
-                    ACCOUNT_TYPE,
-                    ACCOUNT_SUBTYPE,
-                    INSTITUTION_NAME
-                FROM prior_tx
-                UNION ALL
-                SELECT
-                    PROVIDER_ACCOUNT_ID,
-                    TRANSACTION_DATE,
-                    RUNNING_BALANCE,
-                    UPDATED_AT,
-                    PROVIDER_TRANSACTION_ID,
-                    ACCOUNT_NAME,
-                    ACCOUNT_TYPE,
-                    ACCOUNT_SUBTYPE,
-                    INSTITUTION_NAME
-                FROM range_tx
+                SELECT {select_columns}
+                {join_clause}
+                  AND t.TRANSACTION_DATE >= :start_date
                 ORDER BY PROVIDER_ACCOUNT_ID, TRANSACTION_DATE, UPDATED_AT, PROVIDER_TRANSACTION_ID
                 """,
                 user_id=user_id,
@@ -1117,7 +1170,7 @@ def create_app() -> Flask:
                 end_exclusive=end_exclusive,
             )
         else:
-            rows = _query_all(
+            transaction_rows = _query_all(
                 f"""
                 SELECT {select_columns}
                 {join_clause}
@@ -1127,7 +1180,12 @@ def create_app() -> Flask:
                 end_exclusive=end_exclusive,
             )
 
-        series, accounts = _build_net_worth_series(rows, start_date=start_date, end_date=end_date)
+        series, accounts = _build_net_worth_series(
+            account_rows,
+            transaction_rows,
+            start_date=start_date,
+            end_date=end_date,
+        )
         first_point = series[0] if series else {}
         latest_point = series[-1] if series else {}
         net_change = _decimal(latest_point.get("net_worth")) - _decimal(first_point.get("net_worth"))
