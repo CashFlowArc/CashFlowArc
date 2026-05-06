@@ -316,11 +316,11 @@ def _account_balance_from_raw(raw_json: Any) -> Decimal | None:
 
 def _net_worth_svg(series: list[dict[str, Any]]) -> dict[str, Any]:
     width = Decimal("720")
-    height = Decimal("260")
+    height = Decimal("190")
     left = Decimal("96")
     right = Decimal("14")
-    top = Decimal("16")
-    bottom = Decimal("34")
+    top = Decimal("12")
+    bottom = Decimal("24")
     chart_width = width - left - right
     chart_height = height - top - bottom
 

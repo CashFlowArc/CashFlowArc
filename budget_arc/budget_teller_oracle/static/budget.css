@@ -139,8 +139,8 @@ h2 { font-size: 1.45rem; margin-bottom: 0; }
   padding: 8px 12px;
 }
 .period-tabs a.active { background: var(--mint); border-color: var(--mint); color: white; }
-.net-worth-chart { display: grid; gap: 8px; }
-.net-worth-chart svg { display: block; width: 100%; min-height: 260px; }
+.net-worth-chart { display: grid; gap: 6px; }
+.net-worth-chart svg { display: block; width: 100%; min-height: 170px; max-height: 220px; }
 .net-worth-chart line { stroke: var(--line); stroke-width: 1; }
 .net-worth-chart text {
   fill: var(--muted);
