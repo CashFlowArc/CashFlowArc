@@ -193,6 +193,7 @@ td span { color: var(--muted); font-size: .9rem; }
 }
 .connection-card { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
 .connection-card span, .connection-card em, .account-meta span, .account-card p { display: block; color: var(--muted); font-style: normal; margin-top: 4px; }
+.connection-warning { color: var(--red); font-size: .9rem; line-height: 1.35; margin: 10px 0 0; }
 .connection-actions { display: grid; gap: 10px; min-width: 220px; }
 .connection-actions form, .delete-institution-form { display: grid; gap: 8px; }
 .delete-institution-form {

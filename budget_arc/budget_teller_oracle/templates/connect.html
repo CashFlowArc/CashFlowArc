@@ -6,16 +6,23 @@
 <section class="panel connect-panel">
   <div>
     <p class="eyebrow">Secure account linking</p>
-    <h2>Add another account</h2>
-    <p>Teller handles credentials and MFA. BudgetArc receives a signed enrollment, verifies it, encrypts the access token, stores it in Oracle, and starts a transaction sync.</p>
-    <label>
-      Institution
-      <input id="institution-search" list="institution-options" autocomplete="off" placeholder="Start typing an institution, or leave blank for Teller's picker">
-      <datalist id="institution-options"></datalist>
-      <input id="institution-id" type="hidden">
-    </label>
-    <p id="institution-status" class="form-note">Select a suggestion to skip Teller's picker, or leave blank to use Teller's own institution picker.</p>
-    <button id="connect" class="primary-button" type="button">Connect with Teller</button>
+    {% if repair_connection %}
+      <h2>Repair {{ repair_connection.institution_name or "connection" }}</h2>
+      <p>Teller will repair the existing enrollment instead of creating a new one. If the bank requires MFA, complete that prompt once and BudgetArc will keep using the existing encrypted token.</p>
+      <p id="institution-status" class="form-note">Repairing the existing Teller enrollment for this institution.</p>
+      <button id="connect" class="primary-button" type="button">Repair with Teller</button>
+    {% else %}
+      <h2>Add another account</h2>
+      <p>Teller handles credentials and MFA. BudgetArc receives a signed enrollment, verifies it, encrypts the access token, stores it in Oracle, and starts a transaction sync.</p>
+      <label>
+        Institution
+        <input id="institution-search" list="institution-options" autocomplete="off" placeholder="Start typing an institution, or leave blank for Teller's picker">
+        <datalist id="institution-options"></datalist>
+        <input id="institution-id" type="hidden">
+      </label>
+      <p id="institution-status" class="form-note">Select a suggestion to skip Teller's picker, or leave blank to use Teller's own institution picker.</p>
+      <button id="connect" class="primary-button" type="button">Connect with Teller</button>
+    {% endif %}
   </div>
   <pre id="connect-status">Loading Teller configuration...</pre>
 </section>

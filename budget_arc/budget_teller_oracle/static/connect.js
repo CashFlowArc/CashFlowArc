@@ -11,6 +11,8 @@
   let institutionSearchTimer = null;
   let institutionOptionsByLabel = new Map();
   let selectedInstitutionLabel = "";
+  const pageParams = new URLSearchParams(window.location.search);
+  const repairConnectionId = pageParams.get("connection_id") || "";
 
   function show(payload) {
     status.textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
@@ -127,6 +129,9 @@
     if (institutionId) {
       params.set("institution_id", institutionId);
     }
+    if (repairConnectionId) {
+      params.set("connection_id", repairConnectionId);
+    }
     const url = params.toString() ? `./api/config?${params.toString()}` : "./api/config";
     const configResponse = await fetch(url, { cache: "no-store" });
     const config = await configResponse.json();
@@ -159,7 +164,6 @@
         applicationId: config.applicationId,
         environment: config.environment,
         products: config.products,
-        selectAccount: "multiple",
         nonce: config.nonce,
         onSuccess: async function (enrollment) {
           show("Enrollment received. Verifying signature, encrypting token, and syncing Oracle...");
@@ -181,14 +185,23 @@
           show(failure);
         }
       };
-      if (config.institutionId) {
+      if (config.enrollmentId) {
+        setupOptions.enrollmentId = config.enrollmentId;
+      } else {
+        setupOptions.selectAccount = "multiple";
+      }
+      if (config.institutionId && !config.enrollmentId) {
         setupOptions.institution = config.institutionId;
       }
       tellerConnect = TellerConnect.setup(setupOptions);
 
       button.disabled = false;
       configuredInstitutionId = config.institutionId || "";
-      show(`Ready. Environment: ${config.environment}; institution: ${configuredInstitutionId || "Teller picker"}`);
+      if (config.mode === "repair") {
+        show(`Ready to repair ${config.institutionName || "Teller enrollment"}. Environment: ${config.environment}`);
+      } else {
+        show(`Ready. Environment: ${config.environment}; institution: ${configuredInstitutionId || "Teller picker"}`);
+      }
     } catch (error) {
       show("Teller setup error: " + error.message);
     }

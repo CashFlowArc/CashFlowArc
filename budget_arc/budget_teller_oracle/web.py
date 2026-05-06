@@ -37,6 +37,7 @@ from .web_security import hash_password, verify_password
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 INSTITUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+CONNECTION_ID_RE = re.compile(r"^[A-Fa-f0-9]{64}$")
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,7 @@ class WebConfig:
     admin_password_hash: str | None
     cookie_secure: bool
     external_origin: str | None
+    session_days: int
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -56,6 +58,17 @@ def _bool_env(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _int_env(name: str, default: int, *, minimum: int, maximum: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        return default
+    return min(max(parsed, minimum), maximum)
 
 
 def load_web_config() -> WebConfig:
@@ -75,6 +88,7 @@ def load_web_config() -> WebConfig:
         admin_password_hash=os.getenv("BUDGET_ADMIN_PASSWORD_HASH") or None,
         cookie_secure=_bool_env("BUDGET_COOKIE_SECURE", False),
         external_origin=(os.getenv("BUDGET_EXTERNAL_ORIGIN") or "").rstrip("/") or None,
+        session_days=_int_env("BUDGET_SESSION_DAYS", 30, minimum=1, maximum=90),
     )
 
 
@@ -158,6 +172,15 @@ def _selected_institution_id() -> str | None:
     return raw
 
 
+def _selected_connection_id() -> str | None:
+    raw = (request.args.get("connection_id") or "").strip()
+    if not raw:
+        return None
+    if not CONNECTION_ID_RE.fullmatch(raw):
+        raise ValueError("Invalid connection id")
+    return raw.lower()
+
+
 def _normalized_origin(value: str | None) -> str | None:
     raw = (value or "").strip().rstrip("/")
     if not raw:
@@ -224,6 +247,10 @@ def _teller_sync_error_message(exc: TellerAPIError) -> str:
     return f"Sync failed: Teller API HTTP {exc.status}: {detail}"
 
 
+def _teller_requires_reconnect(exc: TellerAPIError) -> bool:
+    return bool(exc.code and exc.code.startswith("enrollment.disconnected"))
+
+
 def _query_all(sql: str, **params: Any) -> list[dict[str, Any]]:
     cfg = load_config()
     conn = connect(cfg.oracle)
@@ -278,6 +305,8 @@ def create_app() -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=web_config.cookie_secure,
+        PERMANENT_SESSION_LIFETIME=dt.timedelta(days=web_config.session_days),
+        SESSION_REFRESH_EACH_REQUEST=True,
         MAX_CONTENT_LENGTH=1_000_000,
     )
 
@@ -446,6 +475,7 @@ def create_app() -> Flask:
                 and verify_password(password, web_config.admin_password_hash)
             ):
                 session.clear()
+                session.permanent = True
                 session["auth_role"] = "admin"
                 csrf_token()
                 return redirect(url_for("budget.admin_users"))
@@ -465,6 +495,7 @@ def create_app() -> Flask:
                         store.mark_user_login(user["user_id"])
                         conn.commit()
                         session.clear()
+                        session.permanent = True
                         session["auth_role"] = "user"
                         session["user_id"] = user["user_id"]
                         session["user_email"] = user["email"]
@@ -876,7 +907,15 @@ def create_app() -> Flask:
         )
         connections = _query_all(
             """
-            SELECT CONNECTION_ID, ENVIRONMENT, INSTITUTION_ID, INSTITUTION_NAME, STATUS, LAST_SYNC_AT, CREATED_AT
+            SELECT
+                CONNECTION_ID,
+                ENVIRONMENT,
+                INSTITUTION_ID,
+                INSTITUTION_NAME,
+                PROVIDER_ENROLLMENT_ID,
+                STATUS,
+                LAST_SYNC_AT,
+                CREATED_AT
             FROM BUDGET_CONNECTIONS
             WHERE PROVIDER = 'teller'
               AND USER_ID = :user_id
@@ -889,7 +928,27 @@ def create_app() -> Flask:
     @budget.route("/connect")
     @user_required
     def connect_page() -> Any:
-        return render_template("connect.html")
+        repair_connection: dict[str, Any] | None = None
+        try:
+            connection_id = _selected_connection_id()
+        except ValueError:
+            connection_id = None
+            flash("That Teller connection id is invalid.", "error")
+        if connection_id:
+            repair_connection = _query_one(
+                """
+                SELECT CONNECTION_ID, INSTITUTION_NAME, PROVIDER_ENROLLMENT_ID
+                FROM BUDGET_CONNECTIONS
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                  AND CONNECTION_ID = :connection_id
+                """,
+                user_id=current_user_id(),
+                connection_id=connection_id,
+            )
+            if not repair_connection:
+                flash("That Teller connection was not found for your user.", "error")
+        return render_template("connect.html", repair_connection=repair_connection)
 
     @budget.route("/settings")
     @admin_required
@@ -919,6 +978,24 @@ def create_app() -> Flask:
                 "success",
             )
         except TellerAPIError as exc:
+            if _teller_requires_reconnect(exc):
+                conn = connect(app_config.oracle)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            UPDATE BUDGET_CONNECTIONS
+                            SET STATUS = 'RECONNECT_REQUIRED',
+                                UPDATED_AT = SYSTIMESTAMP
+                            WHERE CONNECTION_ID = :connection_id
+                              AND USER_ID = :user_id
+                            """,
+                            connection_id=connection_id,
+                            user_id=current_user_id(),
+                        )
+                    conn.commit()
+                finally:
+                    conn.close()
             flash(_teller_sync_error_message(exc), "error")
         except Exception as exc:
             flash(f"Sync failed: {type(exc).__name__}: {str(exc)[:220]}", "error")
@@ -976,8 +1053,9 @@ def create_app() -> Flask:
     def teller_config() -> Any:
         try:
             institution_id = _selected_institution_id()
+            repair_connection_id = _selected_connection_id()
         except ValueError as exc:
-            return jsonify({"ok": False, "error": "invalid_institution_id", "message": str(exc)}), 400
+            return jsonify({"ok": False, "error": "invalid_request", "message": str(exc)}), 400
         if not app_config.teller.application_id:
             return (
                 jsonify(
@@ -990,22 +1068,59 @@ def create_app() -> Flask:
                 500,
             )
 
+        repair_connection = None
+        if repair_connection_id:
+            repair_connection = _query_one(
+                """
+                SELECT CONNECTION_ID, PROVIDER_ENROLLMENT_ID, INSTITUTION_NAME
+                FROM BUDGET_CONNECTIONS
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                  AND CONNECTION_ID = :connection_id
+                """,
+                user_id=current_user_id(),
+                connection_id=repair_connection_id,
+            )
+            if not repair_connection:
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "error": "connection_not_found",
+                            "message": "That Teller connection was not found for your user.",
+                        }
+                    ),
+                    404,
+                )
+
         nonce = secrets.token_urlsafe(32)
         teller_csrf_token = secrets.token_urlsafe(32)
         session["teller_nonce"] = nonce
         session["teller_csrf_token"] = teller_csrf_token
         session["teller_institution_id"] = institution_id
-        return jsonify(
-            {
-                "ok": True,
-                "applicationId": app_config.teller.application_id,
-                "environment": app_config.teller.environment,
-                "products": ["transactions", "balance"],
-                "nonce": nonce,
-                "csrfToken": teller_csrf_token,
-                "institutionId": institution_id,
-            }
-        )
+        session["teller_repair_connection_id"] = repair_connection_id
+
+        payload = {
+            "ok": True,
+            "applicationId": app_config.teller.application_id,
+            "environment": app_config.teller.environment,
+            "products": ["transactions", "balance"],
+            "nonce": nonce,
+            "csrfToken": teller_csrf_token,
+            "institutionId": institution_id,
+        }
+        if repair_connection:
+            payload.update(
+                {
+                    "mode": "repair",
+                    "connectionId": repair_connection["connection_id"],
+                    "enrollmentId": repair_connection["provider_enrollment_id"],
+                    "institutionName": repair_connection["institution_name"],
+                }
+            )
+        else:
+            payload["mode"] = "connect"
+        return jsonify(payload)
 
     @budget.route("/api/institutions")
     @user_required
@@ -1126,6 +1241,29 @@ def create_app() -> Flask:
                 state.remember("blocked", "Rejected invalid Teller enrollment signature")
                 return jsonify({"ok": False, "error": "invalid_teller_signature"}), 400
 
+            repair_connection_id = session.get("teller_repair_connection_id")
+            if repair_connection_id:
+                repair_connection = _query_one(
+                    """
+                    SELECT PROVIDER_ENROLLMENT_ID
+                    FROM BUDGET_CONNECTIONS
+                    WHERE PROVIDER = 'teller'
+                      AND USER_ID = :user_id
+                      AND CONNECTION_ID = :connection_id
+                    """,
+                    user_id=current_user_id(),
+                    connection_id=repair_connection_id,
+                )
+                if not repair_connection:
+                    state.remember("blocked", "Rejected repair for unknown Teller connection")
+                    return jsonify({"ok": False, "error": "connection_not_found"}), 404
+                if not secrets.compare_digest(
+                    str(repair_connection["provider_enrollment_id"]),
+                    str(enrollment_id),
+                ):
+                    state.remember("blocked", "Rejected repair enrollment mismatch")
+                    return jsonify({"ok": False, "error": "enrollment_mismatch"}), 400
+
             cipher = TokenCipher(app_config.master_key)
             encrypted_token = cipher.encrypt(access_token)
             conn = connect(app_config.oracle)
@@ -1150,6 +1288,7 @@ def create_app() -> Flask:
             session.pop("teller_nonce", None)
             session.pop("teller_csrf_token", None)
             session.pop("teller_institution_id", None)
+            session.pop("teller_repair_connection_id", None)
             state.remember(
                 "sync_success",
                 "Stored encrypted Teller token and synced account data",
