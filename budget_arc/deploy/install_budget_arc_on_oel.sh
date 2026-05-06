@@ -172,6 +172,47 @@ else
   echo "BudgetArc Teller settings not provided; preserving existing Teller settings."
 fi
 
+# The service runs as opc. systemd can read budget.env as root, but the app itself
+# must be able to traverse /etc/budget-arc and read the Teller mTLS cert/key.
+sudo chown root:opc "$ENV_DIR"
+sudo chmod 750 "$ENV_DIR"
+readarray -t TELLER_FILE_PATHS < <(sudo python3 - "$ENV_FILE" <<'PY'
+from pathlib import Path
+import sys
+
+env_file = Path(sys.argv[1])
+values = {}
+for raw_line in env_file.read_text().splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    values[key.strip()] = value.strip().strip('"').strip("'")
+
+for key in ("TELLER_CERT_PATH", "TELLER_CERT_KEY_PATH"):
+    value = values.get(key)
+    if value:
+        print(value)
+PY
+)
+for teller_file in "${TELLER_FILE_PATHS[@]}"; do
+  teller_dir="$(dirname "$teller_file")"
+  sudo mkdir -p "$teller_dir"
+  sudo chown root:opc "$teller_dir"
+  sudo chmod 750 "$teller_dir"
+  if sudo test -e "$teller_file"; then
+    sudo chown root:opc "$teller_file"
+    sudo chmod 640 "$teller_file"
+    if sudo -u opc test -r "$teller_file"; then
+      echo "BudgetArc service user can read Teller file: $teller_file"
+    else
+      echo "BudgetArc service user cannot read Teller file: $teller_file" >&2
+    fi
+  else
+    echo "Teller file is not present yet: $teller_file"
+  fi
+done
+
 if [[ -n "${BUDGET_ADMIN_PASSWORD:-}" ]]; then
   ADMIN_HASH="$("$VENV_DIR/bin/python" -m budget_teller_oracle hash-password --password-env BUDGET_ADMIN_PASSWORD)"
   TMP_ENV_UPDATE="$(sudo mktemp)"

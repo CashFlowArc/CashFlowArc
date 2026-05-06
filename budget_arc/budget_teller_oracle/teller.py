@@ -54,15 +54,27 @@ class TellerClient:
                     "Teller development/production API requests require "
                     "TELLER_CERT_PATH and TELLER_CERT_KEY_PATH"
                 )
-            context.load_cert_chain(
-                certfile=self.config.cert_path,
-                keyfile=self.config.cert_key_path,
-            )
+            try:
+                context.load_cert_chain(
+                    certfile=self.config.cert_path,
+                    keyfile=self.config.cert_key_path,
+                )
+            except PermissionError as exc:
+                raise PermissionError(
+                    "BudgetArc cannot read the Teller certificate or private key. "
+                    "Check TELLER_CERT_PATH/TELLER_CERT_KEY_PATH file permissions for the service user."
+                ) from exc
         elif self.config.cert_path and self.config.cert_key_path:
-            context.load_cert_chain(
-                certfile=self.config.cert_path,
-                keyfile=self.config.cert_key_path,
-            )
+            try:
+                context.load_cert_chain(
+                    certfile=self.config.cert_path,
+                    keyfile=self.config.cert_key_path,
+                )
+            except PermissionError as exc:
+                raise PermissionError(
+                    "BudgetArc cannot read the Teller certificate or private key. "
+                    "Check TELLER_CERT_PATH/TELLER_CERT_KEY_PATH file permissions for the service user."
+                ) from exc
         return context
 
     def _request(
