@@ -93,6 +93,13 @@ BUDGET_SMTP_PASSWORD=
 BUDGET_SMTP_USE_TLS=true
 ```
 
+When deploying through GitHub Actions, store the Teller PEM file contents as repository secrets:
+
+- `TELLER_CERTIFICATE_PEM`: contents of Teller `certificate.pem`.
+- `TELLER_PRIVATE_KEY_PEM`: contents of Teller `private_key.pem`.
+
+The deploy workflow writes those secrets to `TELLER_CERT_PATH` and `TELLER_CERT_KEY_PATH` with root ownership and read access for the BudgetArc service user only.
+
 ## Oracle Tables
 
 Initialize the isolated budget tables:

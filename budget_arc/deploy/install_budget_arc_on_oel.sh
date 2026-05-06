@@ -172,6 +172,48 @@ else
   echo "BudgetArc Teller settings not provided; preserving existing Teller settings."
 fi
 
+install_teller_pem_secret() {
+  local secret_env_name="$1"
+  local target_path="$2"
+  local label="$3"
+
+  if [[ -z "${!secret_env_name:-}" ]]; then
+    return
+  fi
+
+  local target_dir
+  local tmp_pem
+  target_dir="$(dirname "$target_path")"
+  tmp_pem="$(mktemp)"
+  chmod 600 "$tmp_pem"
+  SECRET_ENV_NAME="$secret_env_name" TARGET_PATH="$tmp_pem" python3 - <<'PY'
+import os
+from pathlib import Path
+
+secret_name = os.environ["SECRET_ENV_NAME"]
+target = Path(os.environ["TARGET_PATH"])
+content = os.environ.get(secret_name, "")
+if "\\n" in content and "\n" not in content:
+    content = content.replace("\\n", "\n")
+target.write_text(content.strip() + "\n")
+PY
+  sudo mkdir -p "$target_dir"
+  sudo chown root:opc "$target_dir"
+  sudo chmod 750 "$target_dir"
+  sudo install -m 640 -o root -g opc "$tmp_pem" "$target_path"
+  rm -f "$tmp_pem"
+  echo "Installed Teller $label from GitHub Actions secret."
+}
+
+install_teller_pem_secret \
+  TELLER_CERTIFICATE_PEM \
+  "${TELLER_CERT_PATH:-/etc/budget-arc/teller/certificate.pem}" \
+  "certificate"
+install_teller_pem_secret \
+  TELLER_PRIVATE_KEY_PEM \
+  "${TELLER_CERT_KEY_PATH:-/etc/budget-arc/teller/private_key.pem}" \
+  "private key"
+
 # The service runs as opc. systemd can read budget.env as root, but the app itself
 # must be able to traverse /etc/budget-arc and read the Teller mTLS cert/key.
 sudo chown root:opc "$ENV_DIR"

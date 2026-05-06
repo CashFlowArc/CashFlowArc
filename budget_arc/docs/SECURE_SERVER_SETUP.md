@@ -65,6 +65,8 @@ If we cannot create a separate Oracle user yet, the current fallback still keeps
 | `TELLER_APPLICATION_ID` | Teller Dashboard | Server env or secret store |
 | `TELLER_CERT_PATH` | Teller certificate download | Protected server file path |
 | `TELLER_CERT_KEY_PATH` | Teller certificate download | Protected server file path |
+| `TELLER_CERTIFICATE_PEM` | Teller certificate download | GitHub Actions secret for deployment |
+| `TELLER_PRIVATE_KEY_PEM` | Teller certificate download | GitHub Actions secret for deployment |
 | `TELLER_SIGNING_PUBLIC_KEY` | Teller Dashboard | Server env or secret store |
 | `DB_USER` / `DB_PASSWORD` | Oracle | Server secret store |
 | `WALLET_DIR` | Oracle wallet | Protected server directory |
