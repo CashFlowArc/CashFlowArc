@@ -334,7 +334,12 @@ def create_app() -> Flask:
     @app.after_request
     def add_security_headers(response: Response) -> Response:
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        referrer_policy = (
+            "strict-origin-when-cross-origin"
+            if request.endpoint == "budget.connect_page"
+            else "no-referrer"
+        )
+        response.headers.setdefault("Referrer-Policy", referrer_policy)
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault(
             "Content-Security-Policy",
