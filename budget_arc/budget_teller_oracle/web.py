@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from functools import wraps
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint,
@@ -155,6 +156,23 @@ def _selected_institution_id() -> str | None:
     if not INSTITUTION_ID_RE.fullmatch(raw):
         raise ValueError("Invalid institution id")
     return raw
+
+
+def _normalized_origin(value: str | None) -> str | None:
+    raw = (value or "").strip().rstrip("/")
+    if not raw:
+        return None
+
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.hostname:
+        return None
+
+    scheme = parsed.scheme.lower()
+    hostname = parsed.hostname.lower()
+    port = parsed.port
+    default_port = (scheme == "https" and port == 443) or (scheme == "http" and port == 80)
+    port_part = "" if port is None or default_port else f":{port}"
+    return f"{scheme}://{hostname}{port_part}"
 
 
 def _month_bounds() -> tuple[dt.date, dt.date]:
@@ -936,10 +954,26 @@ def create_app() -> Flask:
     @budget.route("/api/teller/enrollment", methods=["POST"])
     @user_required
     def teller_enrollment() -> Any:
-        expected_origin = web_config.external_origin or request.host_url.rstrip("/")
         origin = request.headers.get("Origin")
-        if origin and origin.rstrip("/") != expected_origin:
-            state.remember("blocked", "Rejected enrollment callback origin", origin=origin)
+        normalized_origin = _normalized_origin(origin)
+        allowed_origins = {
+            allowed
+            for allowed in (
+                _normalized_origin(web_config.external_origin),
+                _normalized_origin(request.host_url),
+            )
+            if allowed
+        }
+        if normalized_origin and not any(
+            secrets.compare_digest(normalized_origin, allowed_origin)
+            for allowed_origin in allowed_origins
+        ):
+            state.remember(
+                "blocked",
+                "Rejected enrollment callback origin",
+                origin=normalized_origin,
+                allowedOrigins=sorted(allowed_origins),
+            )
             return jsonify({"ok": False, "error": "origin_check_failed"}), 403
 
         if not request.is_json:

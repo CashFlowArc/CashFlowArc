@@ -1,6 +1,6 @@
 # Deploy BudgetArc Beside CashFlowArc
 
-This deploys the budget app as a separate service mounted at `https://CashFlowArc.com/budget`.
+This deploys the budget app as a separate service mounted at `https://cashflowarc.com/budget`.
 
 It does not modify CashFlowArc's existing `server/server.py`.
 
@@ -82,7 +82,7 @@ TELLER_SIGNING_PUBLIC_KEY=
 BUDGET_BASE_PATH=/budget
 BUDGET_WEB_HOST=127.0.0.1
 BUDGET_WEB_PORT=8788
-BUDGET_EXTERNAL_ORIGIN=https://CashFlowArc.com
+BUDGET_EXTERNAL_ORIGIN=https://cashflowarc.com
 BUDGET_REQUIRE_AUTH=true
 BUDGET_COOKIE_SECURE=true
 BUDGET_EMAIL_FROM=
@@ -156,13 +156,13 @@ If CashFlowArc uses Apache or another reverse proxy, use the same concept:
 
 ```bash
 curl -I http://127.0.0.1:8788/budget/login
-curl -I https://CashFlowArc.com/budget/login
+curl -I https://cashflowarc.com/budget/login
 ```
 
 Then sign in at:
 
 ```text
-https://CashFlowArc.com/budget
+https://cashflowarc.com/budget
 ```
 
 ## Updating
