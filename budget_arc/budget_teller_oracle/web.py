@@ -1310,13 +1310,25 @@ def create_app() -> Flask:
     def sync_action(connection_id: str) -> Any:
         try:
             require_csrf()
-            start_date = request.form.get("start_date") or None
-            end_date = request.form.get("end_date") or None
+            connection = _query_one(
+                """
+                SELECT LAST_SYNC_AT
+                FROM BUDGET_CONNECTIONS
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                  AND CONNECTION_ID = :connection_id
+                """,
+                user_id=current_user_id(),
+                connection_id=connection_id,
+            )
+            if connection is None:
+                flash("That institution connection was not found for your user.", "error")
+                return redirect(url_for("budget.accounts"))
+            start_date = _iso_date(connection.get("last_sync_at")) or None
             summary = _execute_sync(
                 connection_id,
                 user_id=current_user_id(),
                 start_date=start_date,
-                end_date=end_date,
             )
             flash(
                 f"Synced {summary['accounts']} accounts and {summary['transactions']} transactions.",

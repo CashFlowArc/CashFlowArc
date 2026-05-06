@@ -16,17 +16,15 @@
       <article class="connection-card">
         <div>
           <strong>{{ connection.institution_name or "Financial institution" }}</strong>
-          <span>{{ connection.environment }} · {{ connection.status }}</span>
-          <em>Last sync: {{ format_date(connection.last_sync_at) if connection.last_sync_at else "Not synced yet" }}</em>
+          <span>{{ connection.status }} · Last sync: {{ format_date(connection.last_sync_at) if connection.last_sync_at else "Not synced yet" }}</span>
           {% if connection.status == 'RECONNECT_REQUIRED' %}
-            <p class="connection-warning">Teller needs this enrollment repaired before sync can run.</p>
+            <p class="connection-warning">Repair required before sync.</p>
           {% endif %}
         </div>
         <div class="connection-actions">
-          <a class="primary-button" href="{{ url_for('budget.connect_page', connection_id=connection.connection_id) }}">Repair connection</a>
+          <a class="primary-button" href="{{ url_for('budget.connect_page', connection_id=connection.connection_id) }}">Repair</a>
           <form method="post" action="{{ url_for('budget.sync_action', connection_id=connection.connection_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input name="start_date" type="date" value="{{ (connection.last_sync_at or '').strftime('%Y-%m-%d') if connection.last_sync_at else '' }}">
             <button class="ghost-button" type="submit">Sync</button>
           </form>
           <form method="post" action="{{ url_for('budget.delete_institution_action', connection_id=connection.connection_id) }}" class="delete-institution-form">
@@ -35,7 +33,7 @@
               Type DELETE to remove
               <input name="confirm_delete" type="text" autocomplete="off" spellcheck="false">
             </label>
-            <button class="danger-button" type="submit">Delete institution</button>
+            <button class="danger-button" type="submit">Delete</button>
           </form>
         </div>
       </article>
