@@ -7,9 +7,8 @@
   <form class="month-selector" method="get">
     <label>
       Review month
-      <input name="month" type="month" value="{{ selected_month }}">
+      <input name="month" type="month" value="{{ selected_month }}" onchange="this.form.submit()">
     </label>
-    <button class="primary-button" type="submit">Review</button>
   </form>
 </section>
 

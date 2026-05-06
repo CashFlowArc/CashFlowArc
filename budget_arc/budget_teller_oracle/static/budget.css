@@ -127,7 +127,7 @@ h2 { font-size: 1.45rem; margin-bottom: 0; }
 .credit { color: var(--mint-dark); }
 
 .month-panel { padding: 16px 18px; }
-.month-selector { display: grid; grid-template-columns: minmax(180px, 240px) auto; gap: 12px; align-items: end; justify-content: start; }
+.month-selector { display: grid; grid-template-columns: minmax(180px, 240px); gap: 12px; align-items: end; justify-content: start; }
 .period-tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .period-tabs a {
   border: 1px solid var(--line);
