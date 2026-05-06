@@ -3,6 +3,9 @@
   const button = document.getElementById("connect");
   const institutionSelect = document.getElementById("institution-select");
   const institutionCustom = document.getElementById("institution-custom");
+  let tellerConnect = null;
+  let configuredInstitutionId = null;
+  let setupRequestId = 0;
 
   function show(payload) {
     status.textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
@@ -33,22 +36,24 @@
     return config;
   }
 
-  try {
-    const initialConfig = await loadConfig();
-    if (!initialConfig) {
+  async function configureTellerConnect() {
+    const requestId = ++setupRequestId;
+    tellerConnect = null;
+    button.disabled = true;
+    show("Preparing Teller Connect...");
+
+    const config = await loadConfig();
+    if (!config || requestId !== setupRequestId) {
       return;
     }
-    show(`Ready. Environment: ${initialConfig.environment}; institution: ${initialConfig.institutionId || "picker"}`);
 
-    button.addEventListener("click", async function () {
-      button.disabled = true;
-      const config = await loadConfig();
-      if (!config) {
-        button.disabled = false;
-        return;
-      }
-      show(`Ready. Environment: ${config.environment}; institution: ${config.institutionId || "picker"}`);
-      const tellerConnect = TellerConnect.setup({
+    if (!window.TellerConnect || typeof TellerConnect.setup !== "function") {
+      show("Teller Connect did not load. Check that cdn.teller.io is reachable from this browser/network.");
+      return;
+    }
+
+    try {
+      tellerConnect = TellerConnect.setup({
         applicationId: config.applicationId,
         environment: config.environment,
         products: config.products,
@@ -77,8 +82,42 @@
       });
 
       button.disabled = false;
+      configuredInstitutionId = config.institutionId || "";
+      show(`Ready. Environment: ${config.environment}; institution: ${configuredInstitutionId || "Teller picker"}`);
+    } catch (error) {
+      show("Teller setup error: " + error.message);
+    }
+  }
+
+  function refreshForInstitutionChange() {
+    const institutionId = selectedInstitutionId();
+    if (institutionId === configuredInstitutionId) {
+      return;
+    }
+    configureTellerConnect().catch(function (error) {
+      show("Setup error: " + error.message);
+      button.disabled = true;
+    });
+  }
+
+  try {
+    await configureTellerConnect();
+
+    button.addEventListener("click", function () {
+      if (!tellerConnect) {
+        show("Teller Connect is not ready yet. Refresh the page and try again.");
+        return;
+      }
+      show("Opening Teller Connect...");
       tellerConnect.open();
     });
+
+    if (institutionSelect) {
+      institutionSelect.addEventListener("change", refreshForInstitutionChange);
+    }
+    if (institutionCustom) {
+      institutionCustom.addEventListener("change", refreshForInstitutionChange);
+    }
   } catch (error) {
     show("Setup error: " + error.message);
     button.disabled = true;
