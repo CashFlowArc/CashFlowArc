@@ -39,14 +39,14 @@ jobs:
       - name: Install or update BudgetArc on OEL
         env:
           BUDGET_ADMIN_PASSWORD: ${{ secrets.BUDGET_ADMIN_PASSWORD }}
-          BUDGET_EMAIL_FROM: ${{ secrets.BUDGET_EMAIL_FROM }}
-          BUDGET_SMTP_HOST: ${{ secrets.BUDGET_SMTP_HOST }}
-          BUDGET_SMTP_PORT: ${{ secrets.BUDGET_SMTP_PORT }}
+          BUDGET_EMAIL_FROM: ${{ secrets.BUDGET_EMAIL_FROM || 'info@cashflowarc.com' }}
+          BUDGET_SMTP_HOST: ${{ secrets.BUDGET_SMTP_HOST || 'smtp.email.us-ashburn-1.oci.oraclecloud.com' }}
+          BUDGET_SMTP_PORT: ${{ secrets.BUDGET_SMTP_PORT || '587' }}
           BUDGET_SMTP_USERNAME: ${{ secrets.BUDGET_SMTP_USERNAME }}
           BUDGET_SMTP_PASSWORD: ${{ secrets.BUDGET_SMTP_PASSWORD }}
-          BUDGET_SMTP_USE_TLS: ${{ secrets.BUDGET_SMTP_USE_TLS }}
-          BUDGET_SMTP_USE_SSL: ${{ secrets.BUDGET_SMTP_USE_SSL }}
-          BUDGET_SMTP_TIMEOUT: ${{ secrets.BUDGET_SMTP_TIMEOUT }}
+          BUDGET_SMTP_USE_TLS: ${{ secrets.BUDGET_SMTP_USE_TLS || 'true' }}
+          BUDGET_SMTP_USE_SSL: ${{ secrets.BUDGET_SMTP_USE_SSL || 'false' }}
+          BUDGET_SMTP_TIMEOUT: ${{ secrets.BUDGET_SMTP_TIMEOUT || '20' }}
         run: |
           cd /home/opc/CashFlowArc/budget_arc
           bash deploy/install_budget_arc_on_oel.sh
