@@ -23,6 +23,7 @@
             <a href="{{ url_for('budget.settings') }}" class="{{ 'active' if request.endpoint == 'budget.settings' else '' }}">Settings</a>
           {% else %}
             <a href="{{ url_for('budget.dashboard', month=nav_month) if nav_month else url_for('budget.dashboard') }}" class="{{ 'active' if request.endpoint == 'budget.dashboard' else '' }}">Overview</a>
+            <a href="{{ url_for('budget.net_worth') }}" class="{{ 'active' if request.endpoint == 'budget.net_worth' else '' }}">Net Worth</a>
             <a href="{{ url_for('budget.transactions', month=nav_month) if nav_month else url_for('budget.transactions') }}" class="{{ 'active' if request.endpoint == 'budget.transactions' else '' }}">Transactions</a>
             <a href="{{ url_for('budget.budgets', month=nav_month) if nav_month else url_for('budget.budgets') }}" class="{{ 'active' if request.endpoint == 'budget.budgets' else '' }}">Budgets</a>
             <a href="{{ url_for('budget.accounts') }}" class="{{ 'active' if request.endpoint == 'budget.accounts' else '' }}">Accounts</a>

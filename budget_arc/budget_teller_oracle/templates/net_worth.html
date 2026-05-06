@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+{% block title %}BudgetArc Net Worth{% endblock %}
+{% block heading %}Net Worth{% endblock %}
+{% block eyebrow %}{{ period_label }} balance history{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Balance trend</p>
+      <h2>{{ format_money(summary.net_worth) }}</h2>
+    </div>
+    <nav class="period-tabs" aria-label="Net worth range">
+      {% for key, label in period_options %}
+        <a href="{{ url_for('budget.net_worth', period=key) }}" class="{{ 'active' if period == key else '' }}">{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+</section>
+
+<section class="hero-grid">
+  <article class="hero-card mint-glow">
+    <p class="card-label">Net Worth</p>
+    <strong>{{ format_money(summary.net_worth) }}</strong>
+    <span>{{ format_date(summary.end_date) if summary.end_date else "No balance data" }}</span>
+  </article>
+  <article class="hero-card">
+    <p class="card-label">Assets</p>
+    <strong>{{ format_money(summary.assets) }}</strong>
+    <span>Cash and asset accounts</span>
+  </article>
+  <article class="hero-card">
+    <p class="card-label">Liabilities</p>
+    <strong>{{ format_money(summary.liabilities) }}</strong>
+    <span>Credit and loan balances</span>
+  </article>
+  <article class="hero-card">
+    <p class="card-label">Period Change</p>
+    <strong class="{{ 'credit' if summary.net_change and summary.net_change >= 0 else '' }}">{{ format_money(summary.net_change) }}</strong>
+    <span>{{ format_date(summary.start_date) if summary.start_date else "No starting point" }}</span>
+  </article>
+</section>
+
+<section class="panel">
+  {% if series %}
+    <div class="net-worth-chart">
+      <svg viewBox="0 0 720 260" role="img" aria-label="Net worth chart for {{ period_label }}">
+        <defs>
+          <linearGradient id="netWorthFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#0fa968" stop-opacity="0.28"></stop>
+            <stop offset="100%" stop-color="#0fa968" stop-opacity="0"></stop>
+          </linearGradient>
+        </defs>
+        {% for tick in chart.ticks %}
+          <line x1="96" x2="706" y1="{{ tick.y }}" y2="{{ tick.y }}"></line>
+          <text x="0" y="{{ tick.y + 4 }}">{{ tick.label }}</text>
+        {% endfor %}
+        <polygon points="{{ chart.area_points }}"></polygon>
+        <polyline points="{{ chart.points }}"></polyline>
+      </svg>
+      <div class="chart-dates">
+        <span>{{ iso_date(summary.start_date) }}</span>
+        <span>{{ iso_date(summary.end_date) }}</span>
+      </div>
+    </div>
+  {% else %}
+    <p class="empty">No running balance history has been synced for this period.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Accounts</p>
+      <h2>{{ accounts|length }} balances included</h2>
+    </div>
+  </div>
+  <div class="account-grid">
+    {% for account in accounts %}
+      <article class="account-card">
+        <p>{{ account.institution_name }}</p>
+        <h3>{{ account.account_name }}</h3>
+        <div class="account-meta">
+          <span>{{ account.account_type or "account" }}{% if account.account_subtype %} · {{ account.account_subtype }}{% endif %}</span>
+          <span>{{ "Liability" if account.is_liability else "Asset" }} balance: {{ format_money(account.running_balance) }}</span>
+          <span>Net worth impact: {{ format_money(account.net_worth_balance) }}</span>
+          <span>Latest: {{ iso_date(account.last_transaction_date) or "n/a" }}</span>
+        </div>
+      </article>
+    {% else %}
+      <p class="empty">No accounts with running balances were found.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

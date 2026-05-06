@@ -251,6 +251,173 @@ def _teller_requires_reconnect(exc: TellerAPIError) -> bool:
     return bool(exc.code and exc.code.startswith("enrollment.disconnected"))
 
 
+def _net_worth_period(value: str | None) -> tuple[str, str, dt.date | None, dt.date]:
+    today = dt.date.today()
+    key = (value or "month").strip().lower()
+    options = {
+        "month": ("Current month", today.replace(day=1)),
+        "90d": ("Last 90 days", today - dt.timedelta(days=89)),
+        "year": ("Past year", today - dt.timedelta(days=365)),
+        "all": ("All time", None),
+    }
+    if key not in options:
+        key = "month"
+    label, start = options[key]
+    return key, label, start, today
+
+
+def _is_liability_account(account_type: str | None, account_subtype: str | None) -> bool:
+    type_value = (account_type or "").strip().lower()
+    subtype_value = (account_subtype or "").strip().lower()
+    return type_value in {"credit", "loan"} or subtype_value in {
+        "credit_card",
+        "line_of_credit",
+        "loan",
+        "mortgage",
+        "student",
+        "student_loan",
+        "auto",
+        "auto_loan",
+    }
+
+
+def _signed_net_worth_balance(
+    balance: Any,
+    account_type: str | None,
+    account_subtype: str | None,
+) -> Decimal:
+    amount = _decimal(balance)
+    return -amount if _is_liability_account(account_type, account_subtype) else amount
+
+
+def _net_worth_svg(series: list[dict[str, Any]]) -> dict[str, Any]:
+    width = Decimal("720")
+    height = Decimal("260")
+    left = Decimal("96")
+    right = Decimal("14")
+    top = Decimal("16")
+    bottom = Decimal("34")
+    chart_width = width - left - right
+    chart_height = height - top - bottom
+
+    values = [_decimal(row["net_worth"]) for row in series]
+    if not values:
+        return {"points": "", "area_points": "", "ticks": []}
+
+    minimum = min(values)
+    maximum = max(values)
+    if minimum == maximum:
+        padding = max(abs(maximum) * Decimal("0.08"), Decimal("100"))
+        minimum -= padding
+        maximum += padding
+    value_range = maximum - minimum
+    point_count = max(len(series) - 1, 1)
+
+    points: list[str] = []
+    for index, value in enumerate(values):
+        x = left + (chart_width * Decimal(index) / Decimal(point_count))
+        y = top + ((maximum - value) * chart_height / value_range)
+        points.append(f"{float(x):.2f},{float(y):.2f}")
+
+    first_x = float(left)
+    last_x = float(left + chart_width)
+    base_y = float(top + chart_height)
+    area_points = f"{first_x:.2f},{base_y:.2f} {' '.join(points)} {last_x:.2f},{base_y:.2f}"
+
+    ticks = []
+    for tick in range(5):
+        ratio = Decimal(tick) / Decimal("4")
+        value = maximum - (value_range * ratio)
+        y = top + (chart_height * ratio)
+        ticks.append({"y": float(y), "label": _money(value)})
+
+    return {"points": " ".join(points), "area_points": area_points, "ticks": ticks}
+
+
+def _build_net_worth_series(
+    rows: list[dict[str, Any]],
+    *,
+    start_date: dt.date | None,
+    end_date: dt.date,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    dated_rows = []
+    for row in rows:
+        row_date = row.get("transaction_date")
+        if hasattr(row_date, "date"):
+            row_date = row_date.date()
+        if row_date and row.get("running_balance") is not None:
+            dated_row = dict(row)
+            dated_row["transaction_date"] = row_date
+            dated_rows.append(dated_row)
+    if not dated_rows:
+        return [], []
+
+    first_data_date = min(row["transaction_date"] for row in dated_rows)
+    start = start_date or first_data_date
+    if start > end_date:
+        start = end_date
+
+    balances: dict[str, dict[str, Any]] = {}
+    rows_by_day: dict[dt.date, list[dict[str, Any]]] = {}
+    for row in dated_rows:
+        row_date = row["transaction_date"]
+        if row_date < start:
+            balances[row["provider_account_id"]] = row
+        elif row_date <= end_date:
+            rows_by_day.setdefault(row_date, []).append(row)
+
+    series: list[dict[str, Any]] = []
+    day = start
+    while day <= end_date:
+        for row in rows_by_day.get(day, []):
+            balances[row["provider_account_id"]] = row
+
+        assets = Decimal("0")
+        liabilities = Decimal("0")
+        for row in balances.values():
+            balance = _decimal(row["running_balance"])
+            if _is_liability_account(row.get("account_type"), row.get("account_subtype")):
+                liabilities += balance
+            else:
+                assets += balance
+
+        net_worth = assets - liabilities
+        if balances:
+            series.append(
+                {
+                    "date": day,
+                    "assets": assets,
+                    "liabilities": liabilities,
+                    "net_worth": net_worth,
+                }
+            )
+        day += dt.timedelta(days=1)
+
+    latest_rows = sorted(
+        balances.values(),
+        key=lambda row: abs(_signed_net_worth_balance(row["running_balance"], row.get("account_type"), row.get("account_subtype"))),
+        reverse=True,
+    )
+    accounts = [
+        {
+            "account_name": row.get("account_name") or "Account",
+            "institution_name": row.get("institution_name") or "Institution",
+            "account_type": row.get("account_type"),
+            "account_subtype": row.get("account_subtype"),
+            "running_balance": row.get("running_balance"),
+            "net_worth_balance": _signed_net_worth_balance(
+                row.get("running_balance"),
+                row.get("account_type"),
+                row.get("account_subtype"),
+            ),
+            "last_transaction_date": row.get("transaction_date"),
+            "is_liability": _is_liability_account(row.get("account_type"), row.get("account_subtype")),
+        }
+        for row in latest_rows
+    ]
+    return series, accounts
+
+
 def _query_all(sql: str, **params: Any) -> list[dict[str, Any]]:
     cfg = load_config()
     conn = connect(cfg.oracle)
@@ -867,6 +1034,126 @@ def create_app() -> Flask:
             categories=rows,
             month_start=month_start,
             selected_month=selected_month,
+        )
+
+    @budget.route("/net-worth")
+    @user_required
+    def net_worth() -> Any:
+        user_id = current_user_id()
+        period, period_label, start_date, end_date = _net_worth_period(request.args.get("period"))
+        end_exclusive = end_date + dt.timedelta(days=1)
+
+        select_columns = """
+            t.PROVIDER_ACCOUNT_ID,
+            t.TRANSACTION_DATE,
+            t.RUNNING_BALANCE,
+            t.UPDATED_AT,
+            t.PROVIDER_TRANSACTION_ID,
+            a.ACCOUNT_NAME,
+            a.ACCOUNT_TYPE,
+            a.ACCOUNT_SUBTYPE,
+            a.INSTITUTION_NAME
+        """
+        join_clause = """
+            FROM BUDGET_TRANSACTIONS t
+            JOIN BUDGET_ACCOUNTS a
+              ON a.PROVIDER = t.PROVIDER
+             AND a.PROVIDER_ACCOUNT_ID = t.PROVIDER_ACCOUNT_ID
+             AND a.USER_ID = t.USER_ID
+            WHERE t.PROVIDER = 'teller'
+              AND t.USER_ID = :user_id
+              AND t.RUNNING_BALANCE IS NOT NULL
+              AND t.TRANSACTION_DATE < :end_exclusive
+        """
+        if start_date:
+            rows = _query_all(
+                f"""
+                WITH prior_tx AS (
+                    SELECT *
+                    FROM (
+                        SELECT
+                            {select_columns},
+                            ROW_NUMBER() OVER (
+                                PARTITION BY t.PROVIDER_ACCOUNT_ID
+                                ORDER BY t.TRANSACTION_DATE DESC, t.UPDATED_AT DESC, t.PROVIDER_TRANSACTION_ID DESC
+                            ) AS RN
+                        {join_clause}
+                          AND t.TRANSACTION_DATE < :start_date
+                    )
+                    WHERE RN = 1
+                ),
+                range_tx AS (
+                    SELECT {select_columns}
+                    {join_clause}
+                      AND t.TRANSACTION_DATE >= :start_date
+                )
+                SELECT
+                    PROVIDER_ACCOUNT_ID,
+                    TRANSACTION_DATE,
+                    RUNNING_BALANCE,
+                    UPDATED_AT,
+                    PROVIDER_TRANSACTION_ID,
+                    ACCOUNT_NAME,
+                    ACCOUNT_TYPE,
+                    ACCOUNT_SUBTYPE,
+                    INSTITUTION_NAME
+                FROM prior_tx
+                UNION ALL
+                SELECT
+                    PROVIDER_ACCOUNT_ID,
+                    TRANSACTION_DATE,
+                    RUNNING_BALANCE,
+                    UPDATED_AT,
+                    PROVIDER_TRANSACTION_ID,
+                    ACCOUNT_NAME,
+                    ACCOUNT_TYPE,
+                    ACCOUNT_SUBTYPE,
+                    INSTITUTION_NAME
+                FROM range_tx
+                ORDER BY PROVIDER_ACCOUNT_ID, TRANSACTION_DATE, UPDATED_AT, PROVIDER_TRANSACTION_ID
+                """,
+                user_id=user_id,
+                start_date=start_date,
+                end_exclusive=end_exclusive,
+            )
+        else:
+            rows = _query_all(
+                f"""
+                SELECT {select_columns}
+                {join_clause}
+                ORDER BY t.PROVIDER_ACCOUNT_ID, t.TRANSACTION_DATE, t.UPDATED_AT, t.PROVIDER_TRANSACTION_ID
+                """,
+                user_id=user_id,
+                end_exclusive=end_exclusive,
+            )
+
+        series, accounts = _build_net_worth_series(rows, start_date=start_date, end_date=end_date)
+        first_point = series[0] if series else {}
+        latest_point = series[-1] if series else {}
+        net_change = _decimal(latest_point.get("net_worth")) - _decimal(first_point.get("net_worth"))
+        summary = {
+            "net_worth": latest_point.get("net_worth"),
+            "assets": latest_point.get("assets"),
+            "liabilities": latest_point.get("liabilities"),
+            "net_change": net_change,
+            "start_date": first_point.get("date"),
+            "end_date": latest_point.get("date"),
+        }
+        chart = _net_worth_svg(series)
+        return render_template(
+            "net_worth.html",
+            accounts=accounts,
+            chart=chart,
+            period=period,
+            period_label=period_label,
+            period_options=[
+                ("month", "Current month"),
+                ("90d", "Last 90 days"),
+                ("year", "Past year"),
+                ("all", "All time"),
+            ],
+            series=series,
+            summary=summary,
         )
 
     @budget.route("/accounts")
