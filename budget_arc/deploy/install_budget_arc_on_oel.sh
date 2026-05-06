@@ -23,6 +23,20 @@ python3 -m venv "$VENV_DIR"
 . "$VENV_DIR/bin/activate"
 pip install -r requirements.txt
 
+if ! command -v swaks >/dev/null 2>&1; then
+  echo "Installing swaks for OCI Email Delivery SMTP diagnostics."
+  if command -v dnf >/dev/null 2>&1; then
+    sudo dnf install -y swaks || sudo yum install -y swaks || true
+  else
+    sudo yum install -y swaks || true
+  fi
+fi
+if command -v swaks >/dev/null 2>&1; then
+  echo "swaks is installed: $(swaks --version 2>&1 | head -1)"
+else
+  echo "swaks is not installed; install it with 'sudo yum install swaks -y' if the package repo is enabled."
+fi
+
 sudo mkdir -p "$ENV_DIR"
 sudo chmod 700 "$ENV_DIR"
 

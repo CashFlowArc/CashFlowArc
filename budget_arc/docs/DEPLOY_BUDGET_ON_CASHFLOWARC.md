@@ -123,7 +123,9 @@ BUDGET_SMTP_USE_SSL
 BUDGET_SMTP_TIMEOUT
 ```
 
-The installer writes non-empty secret values to `/etc/budget-arc/budget.env` without printing them. Verification links expire after 24 hours; password-reset links expire after 60 minutes. Raw link tokens are never stored in Oracle, only SHA-256 token hashes.
+The installer writes non-empty secret values to `/etc/budget-arc/budget.env` without printing them. It also installs `swaks` when available from the OEL package repositories so the OCI SMTP relay can be tested from the server. Verification links expire after 24 hours; password-reset links expire after 60 minutes. Raw link tokens are never stored in Oracle, only SHA-256 token hashes.
+
+See [OCI Email Delivery](OCI_EMAIL_DELIVERY.md) for the exact relay values and test commands.
 
 ## systemd
 

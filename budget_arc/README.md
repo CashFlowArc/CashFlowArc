@@ -113,6 +113,7 @@ For CashFlowArc.com deployment, use:
 
 - [Deploy BudgetArc Beside CashFlowArc](docs/DEPLOY_BUDGET_ON_CASHFLOWARC.md)
 - [Secure Server Setup](docs/SECURE_SERVER_SETUP.md)
+- [OCI Email Delivery](docs/OCI_EMAIL_DELIVERY.md)
 - `deploy/budget-arc.service`
 - `deploy/nginx-budget-location.conf`
 

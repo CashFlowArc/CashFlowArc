@@ -16,6 +16,7 @@ from .sync import sync_connection
 from .teller import TellerClient
 from .web import run_web
 from .web_security import hash_password
+from .emailer import load_email_config, send_email
 
 
 def _cmd_generate_key(_: argparse.Namespace) -> int:
@@ -262,6 +263,26 @@ def _cmd_web(_: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_test_email(args: argparse.Namespace) -> int:
+    if args.env_file:
+        load_env_file(args.env_file)
+    config = load_email_config()
+    if not config.configured:
+        print("Email delivery is not configured. Set BUDGET_EMAIL_FROM and BUDGET_SMTP_HOST.")
+        return 1
+
+    send_email(
+        to_email=args.to,
+        subject="BudgetArc SMTP test",
+        body=(
+            "This is a BudgetArc SMTP relay test.\n\n"
+            "If you received this message, the server can send email through the configured relay."
+        ),
+    )
+    print(f"Sent test email to {args.to} through {config.host}:{config.port} as {config.sender}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="budget_teller_oracle")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -306,6 +327,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     web = subparsers.add_parser("web", help="Run the Mint-style budget web app")
     web.set_defaults(func=_cmd_web)
+
+    test_email = subparsers.add_parser("test-email", help="Send a BudgetArc SMTP test email")
+    test_email.add_argument("--env-file", help="Load SMTP settings from a specific env file")
+    test_email.add_argument("--to", required=True, help="Recipient email address for the test message")
+    test_email.set_defaults(func=_cmd_test_email)
 
     return parser
 
