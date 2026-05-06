@@ -344,13 +344,13 @@ def create_app() -> Flask:
         response.headers.setdefault(
             "Content-Security-Policy",
             "default-src 'self'; "
-            "script-src 'self' https://cdn.teller.io https://*.teller.io 'unsafe-inline'; "
-            "connect-src 'self' https://api.teller.io https://cdn.teller.io https://connect.teller.io https://*.teller.io; "
-            "frame-src https://connect.teller.io https://*.teller.io; "
-            "child-src https://connect.teller.io https://*.teller.io; "
-            "img-src 'self' data: https://*.teller.io; "
-            "style-src 'self' https://*.teller.io 'unsafe-inline'; "
-            "font-src 'self' https://*.teller.io",
+            "script-src 'self' https://teller.io https://cdn.teller.io https://*.teller.io 'unsafe-inline'; "
+            "connect-src 'self' https://teller.io https://api.teller.io https://cdn.teller.io https://connect.teller.io https://*.teller.io; "
+            "frame-src https://teller.io https://connect.teller.io https://*.teller.io; "
+            "child-src https://teller.io https://connect.teller.io https://*.teller.io; "
+            "img-src 'self' data: https://teller.io https://*.teller.io; "
+            "style-src 'self' https://teller.io https://*.teller.io 'unsafe-inline'; "
+            "font-src 'self' https://teller.io https://*.teller.io",
         )
         return response
 
