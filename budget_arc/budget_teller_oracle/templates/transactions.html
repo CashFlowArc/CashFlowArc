@@ -74,7 +74,23 @@
         <h2>All Cash &amp; Credit Accounts</h2>
         <p>{{ transactions|length }} transactions shown</p>
       </div>
-      <a class="ghost-button small-button" href="{{ url_for('budget.transactions', month=filters.month) }}">Clear</a>
+      <div class="ledger-heading-actions">
+        <form method="post" action="{{ url_for('budget.review_listed_transactions_action') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="month" value="{{ filters.month }}">
+          <input type="hidden" name="q" value="{{ filters.q }}">
+          <input type="hidden" name="status" value="{{ filters.status }}">
+          <input type="hidden" name="review" value="{{ filters.review }}">
+          <input type="hidden" name="category" value="{{ filters.category }}">
+          <input type="hidden" name="account" value="{{ filters.account }}">
+          <input type="hidden" name="institution" value="{{ filters.institution }}">
+          {% for txn in transactions %}
+            <input type="hidden" name="transaction_id" value="{{ txn.provider_transaction_id }}">
+          {% endfor %}
+          <button class="ghost-button small-button" type="submit" {{ 'disabled' if not transactions else '' }}>Mark listed reviewed</button>
+        </form>
+        <a class="ghost-button small-button" href="{{ url_for('budget.transactions', month=filters.month) }}">Clear</a>
+      </div>
     </div>
     <div class="table-wrap ledger-table">
       <table>
@@ -86,7 +102,6 @@
           <col class="txn-col-review">
           <col class="txn-col-exclude">
           <col class="txn-col-amount">
-          <col class="txn-col-actions">
         </colgroup>
         <thead>
           <tr>
@@ -97,7 +112,6 @@
             <th>Review</th>
             <th>Exclude</th>
             <th class="right">Amount</th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -134,6 +148,7 @@
                 <span class="status {{ txn.status }}">{{ txn.status }}</span>
               </td>
               <td class="editable-cell">
+                <div class="ledger-review-stack">
                 <select class="cell-control ledger-autosave-control review-control" form="{{ edit_form_id }}" name="reviewed_status" aria-label="Review status">
                   <option value="new" {{ 'selected' if review_status == 'new' else '' }}>New</option>
                   <option value="reviewed" {{ 'selected' if review_status == 'reviewed' else '' }}>Reviewed</option>
@@ -141,7 +156,19 @@
                 </select>
                 {% if txn.has_user_edit %}
                   <span class="pill edited-pill">edited</span>
+                  <form id="{{ reset_form_id }}" method="post" action="{{ url_for('budget.reset_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="month" value="{{ filters.month }}">
+                    <input type="hidden" name="q" value="{{ filters.q }}">
+                    <input type="hidden" name="status" value="{{ filters.status }}">
+                    <input type="hidden" name="review" value="{{ filters.review }}">
+                    <input type="hidden" name="category" value="{{ filters.category }}">
+                    <input type="hidden" name="account" value="{{ filters.account }}">
+                    <input type="hidden" name="institution" value="{{ filters.institution }}">
+                    <button class="ghost-button small-button" type="submit">Restore</button>
+                  </form>
                 {% endif %}
+                </div>
               </td>
               <td class="ledger-flags editable-cell">
                 <label class="inline-check">
@@ -154,24 +181,9 @@
                 </label>
               </td>
               <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
-              <td class="ledger-actions">
-                {% if txn.has_user_edit %}
-                  <form id="{{ reset_form_id }}" method="post" action="{{ url_for('budget.reset_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="month" value="{{ filters.month }}">
-                    <input type="hidden" name="q" value="{{ filters.q }}">
-                    <input type="hidden" name="status" value="{{ filters.status }}">
-                    <input type="hidden" name="review" value="{{ filters.review }}">
-                    <input type="hidden" name="category" value="{{ filters.category }}">
-                    <input type="hidden" name="account" value="{{ filters.account }}">
-                    <input type="hidden" name="institution" value="{{ filters.institution }}">
-                  </form>
-                  <button class="ghost-button small-button" form="{{ reset_form_id }}" type="submit">Restore</button>
-                {% endif %}
-              </td>
             </tr>
           {% else %}
-            <tr><td colspan="8" class="empty">No transactions match this filter.</td></tr>
+            <tr><td colspan="7" class="empty">No transactions match this filter.</td></tr>
           {% endfor %}
         </tbody>
       </table>

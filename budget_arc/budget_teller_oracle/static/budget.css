@@ -1090,6 +1090,18 @@ select {
   align-items: end;
 }
 
+.ledger-heading-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.ledger-heading-actions form {
+  margin: 0;
+}
+
 .table-wrap {
   overflow: auto;
 }
@@ -1112,7 +1124,6 @@ table {
 .txn-col-review { width: 70px; }
 .txn-col-exclude { width: 92px; }
 .txn-col-amount { width: 88px; }
-.txn-col-actions { width: 62px; }
 
 .ledger-table th,
 .ledger-table td {
@@ -1233,6 +1244,11 @@ tbody tr.has-user-edit { background: #fffef9; }
   min-width: 0;
 }
 
+.ledger-review-stack {
+  display: grid;
+  gap: 4px;
+}
+
 .inline-check {
   align-items: center;
   color: #59625d;
@@ -1249,13 +1265,7 @@ tbody tr.has-user-edit { background: #fffef9; }
   width: auto;
 }
 
-.ledger-actions {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.ledger-actions .small-button {
+.ledger-review-stack .small-button {
   font-size: 11px;
   min-height: 26px;
   padding: 4px 6px;

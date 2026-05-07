@@ -1699,6 +1699,42 @@ def create_app() -> Flask:
         flash("Transaction edits saved without changing the Teller original.", "success")
         return redirect(url_for("budget.transactions", **clean_return_args))
 
+    @budget.route("/actions/transactions/review-listed", methods=["POST"])
+    @user_required
+    def review_listed_transactions_action() -> Any:
+        require_csrf()
+        user_id = current_user_id()
+        return_args = {
+            "month": request.form.get("month") or None,
+            "q": request.form.get("q") or None,
+            "status": request.form.get("status") or None,
+            "review": request.form.get("review") or None,
+            "category": request.form.get("category") or None,
+            "account": request.form.get("account") or None,
+            "institution": request.form.get("institution") or None,
+        }
+        clean_return_args = {key: value for key, value in return_args.items() if value}
+        provider_transaction_ids = request.form.getlist("transaction_id")
+        if not provider_transaction_ids:
+            flash("No listed transactions were available to review.", "error")
+            return redirect(url_for("budget.transactions", **clean_return_args))
+
+        conn = connect(app_config.oracle)
+        try:
+            store = BudgetStore(conn)
+            reviewed_count = store.mark_transactions_reviewed(
+                user_id=user_id,
+                provider_transaction_ids=provider_transaction_ids,
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        data_version = mark_budget_data_changed()
+        clean_return_args["data_version"] = data_version
+        flash(f"Marked {reviewed_count} listed transactions as reviewed.", "success")
+        return redirect(url_for("budget.transactions", **clean_return_args))
+
     @budget.route("/actions/transactions/<provider_transaction_id>/reset", methods=["POST"])
     @user_required
     def reset_transaction_action(provider_transaction_id: str) -> Any:

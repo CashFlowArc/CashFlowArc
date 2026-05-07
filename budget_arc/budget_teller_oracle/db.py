@@ -1778,6 +1778,72 @@ class BudgetStore:
                 notes=(notes or "").strip()[:1024] or None,
             )
 
+    def mark_transactions_reviewed(
+        self,
+        *,
+        user_id: str,
+        provider_transaction_ids: list[str],
+        reviewed_status: str = "reviewed",
+    ) -> int:
+        if reviewed_status not in {"new", "reviewed", "ignored"}:
+            reviewed_status = "reviewed"
+
+        clean_ids: list[str] = []
+        seen: set[str] = set()
+        for provider_transaction_id in provider_transaction_ids:
+            clean_id = (provider_transaction_id or "").strip()
+            if not clean_id or clean_id in seen:
+                continue
+            seen.add(clean_id)
+            clean_ids.append(clean_id[:128])
+
+        if not clean_ids:
+            return 0
+
+        rows = [
+            {
+                "edit_id": uuid.uuid4().hex,
+                "user_id": user_id,
+                "provider_transaction_id": provider_transaction_id,
+                "reviewed_status": reviewed_status,
+            }
+            for provider_transaction_id in clean_ids
+        ]
+        with self.conn.cursor() as cur:
+            cur.executemany(
+                """
+                MERGE INTO BUDGET_TRANSACTION_EDITS target
+                USING (
+                    SELECT
+                        :edit_id AS EDIT_ID,
+                        t.USER_ID,
+                        t.PROVIDER,
+                        t.PROVIDER_TRANSACTION_ID,
+                        :reviewed_status AS REVIEWED_STATUS
+                    FROM BUDGET_TRANSACTIONS t
+                    WHERE t.USER_ID = :user_id
+                      AND t.PROVIDER = 'teller'
+                      AND t.PROVIDER_TRANSACTION_ID = :provider_transaction_id
+                ) source
+                ON (
+                    target.USER_ID = source.USER_ID
+                    AND target.PROVIDER = source.PROVIDER
+                    AND target.PROVIDER_TRANSACTION_ID = source.PROVIDER_TRANSACTION_ID
+                )
+                WHEN MATCHED THEN UPDATE SET
+                    target.REVIEWED_STATUS = source.REVIEWED_STATUS,
+                    target.UPDATED_AT = SYSTIMESTAMP
+                WHEN NOT MATCHED THEN INSERT (
+                    EDIT_ID, USER_ID, PROVIDER, PROVIDER_TRANSACTION_ID, REVIEWED_STATUS
+                ) VALUES (
+                    source.EDIT_ID, source.USER_ID, source.PROVIDER,
+                    source.PROVIDER_TRANSACTION_ID, source.REVIEWED_STATUS
+                )
+                """,
+                rows,
+            )
+            return max(cur.rowcount, 0)
+
     def reset_transaction_edit(self, *, user_id: str, provider_transaction_id: str) -> int:
         with self.conn.cursor() as cur:
             cur.execute(
