@@ -1232,6 +1232,7 @@ class BudgetStore:
         user_id: str,
         name: str | None,
         category_type: str = "expense",
+        parent_category_id: str | None = None,
         is_system: int = 0,
         activate_existing: bool = True,
     ) -> str | None:
@@ -1241,17 +1242,37 @@ class BudgetStore:
         clean_name = clean_name[:256]
         if category_type not in {"expense", "income", "transfer", "other"}:
             category_type = "expense"
+        clean_parent_id = (parent_category_id or "").strip() or None
         with self.conn.cursor() as cur:
+            if clean_parent_id:
+                cur.execute(
+                    """
+                    SELECT CATEGORY_ID
+                    FROM BUDGET_CATEGORIES
+                    WHERE USER_ID = :user_id
+                      AND CATEGORY_ID = :parent_category_id
+                      AND PARENT_CATEGORY_ID IS NULL
+                      AND STATUS = 'ACTIVE'
+                    """,
+                    user_id=user_id,
+                    parent_category_id=clean_parent_id,
+                )
+                if not cur.fetchone():
+                    clean_parent_id = None
             cur.execute(
                 """
                 SELECT CATEGORY_ID
                 FROM BUDGET_CATEGORIES
                 WHERE USER_ID = :user_id
-                  AND PARENT_CATEGORY_ID IS NULL
+                  AND (
+                    (:parent_category_id IS NULL AND PARENT_CATEGORY_ID IS NULL)
+                    OR PARENT_CATEGORY_ID = :parent_category_id
+                  )
                   AND LOWER(NAME) = LOWER(:name)
                 FETCH FIRST 1 ROWS ONLY
                 """,
                 user_id=user_id,
+                parent_category_id=clean_parent_id,
                 name=clean_name,
             )
             row = cur.fetchone()
@@ -1274,13 +1295,14 @@ class BudgetStore:
             cur.execute(
                 """
                 INSERT INTO BUDGET_CATEGORIES (
-                    CATEGORY_ID, USER_ID, NAME, CATEGORY_TYPE, IS_SYSTEM, STATUS
+                    CATEGORY_ID, USER_ID, PARENT_CATEGORY_ID, NAME, CATEGORY_TYPE, IS_SYSTEM, STATUS
                 ) VALUES (
-                    :category_id, :user_id, :name, :category_type, :is_system, 'ACTIVE'
+                    :category_id, :user_id, :parent_category_id, :name, :category_type, :is_system, 'ACTIVE'
                 )
                 """,
                 category_id=category_id,
                 user_id=user_id,
+                parent_category_id=clean_parent_id,
                 name=clean_name,
                 category_type=category_type,
                 is_system=1 if is_system else 0,
@@ -1404,6 +1426,7 @@ class BudgetStore:
         name: str,
         category_type: str,
         status: str,
+        parent_category_id: str | None = None,
     ) -> bool:
         clean_name = name.strip()
         if not clean_name:
@@ -1412,11 +1435,42 @@ class BudgetStore:
             category_type = "expense"
         if status not in {"ACTIVE", "INACTIVE"}:
             status = "ACTIVE"
+        clean_parent_id = (parent_category_id or "").strip() or None
+        if clean_parent_id == category_id:
+            return False
         with self.conn.cursor() as cur:
+            if clean_parent_id:
+                cur.execute(
+                    """
+                    SELECT CATEGORY_ID
+                    FROM BUDGET_CATEGORIES
+                    WHERE USER_ID = :user_id
+                      AND CATEGORY_ID = :parent_category_id
+                      AND PARENT_CATEGORY_ID IS NULL
+                      AND STATUS = 'ACTIVE'
+                    """,
+                    user_id=user_id,
+                    parent_category_id=clean_parent_id,
+                )
+                if not cur.fetchone():
+                    return False
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM BUDGET_CATEGORIES
+                    WHERE USER_ID = :user_id
+                      AND PARENT_CATEGORY_ID = :category_id
+                    """,
+                    user_id=user_id,
+                    category_id=category_id,
+                )
+                if cur.fetchone()[0]:
+                    return False
             cur.execute(
                 """
                 UPDATE BUDGET_CATEGORIES
                 SET NAME = :name,
+                    PARENT_CATEGORY_ID = :parent_category_id,
                     CATEGORY_TYPE = :category_type,
                     STATUS = :status,
                     UPDATED_AT = SYSTIMESTAMP
@@ -1425,6 +1479,7 @@ class BudgetStore:
                 """,
                 user_id=user_id,
                 category_id=category_id,
+                parent_category_id=clean_parent_id,
                 name=clean_name[:256],
                 category_type=category_type,
                 status=status,

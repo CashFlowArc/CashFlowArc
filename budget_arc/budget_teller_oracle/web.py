@@ -144,6 +144,49 @@ def _date(value: Any) -> str:
     return str(value)
 
 
+def _datetime_label(value: Any) -> str:
+    if value is None:
+        return ""
+    if hasattr(value, "strftime"):
+        month = value.strftime("%b")
+        day = value.strftime("%d").lstrip("0") or "0"
+        year = value.strftime("%Y")
+        time_text = value.strftime("%I:%M %p").lstrip("0")
+        return f"{month} {day}, {year} {time_text}"
+    return str(value)
+
+
+def _category_display(row: dict[str, Any]) -> str:
+    name = str(row.get("name") or row.get("category") or row.get("category_name") or "Uncategorized")
+    parent_name = row.get("parent_name")
+    return f"{parent_name} / {name}" if parent_name else name
+
+
+def _ensure_category_from_input(
+    store: BudgetStore,
+    *,
+    user_id: str,
+    value: str | None,
+    category_type: str = "expense",
+) -> str | None:
+    clean_value = (value or "").strip()
+    if not clean_value:
+        return None
+    if "/" not in clean_value:
+        return store.ensure_category(user_id=user_id, name=clean_value, category_type=category_type)
+
+    parent_name, child_name = [part.strip() for part in clean_value.split("/", 1)]
+    if not parent_name or not child_name:
+        return store.ensure_category(user_id=user_id, name=clean_value, category_type=category_type)
+    parent_id = store.ensure_category(user_id=user_id, name=parent_name, category_type=category_type)
+    return store.ensure_category(
+        user_id=user_id,
+        name=child_name,
+        category_type=category_type,
+        parent_category_id=parent_id,
+    )
+
+
 def _iso_date(value: Any) -> str:
     if value is None:
         return ""
@@ -424,6 +467,8 @@ def _net_worth_svg(series: list[dict[str, Any]]) -> dict[str, Any]:
 
     minimum = min(values)
     maximum = max(values)
+    minimum = min(minimum, Decimal("0"))
+    maximum = max(maximum, Decimal("0"))
     if minimum == maximum:
         padding = max(abs(maximum) * Decimal("0.08"), Decimal("100"))
         minimum -= padding
@@ -442,12 +487,17 @@ def _net_worth_svg(series: list[dict[str, Any]]) -> dict[str, Any]:
     base_y = float(top + chart_height)
     area_points = f"{first_x:.2f},{base_y:.2f} {' '.join(points)} {last_x:.2f},{base_y:.2f}"
 
+    def tick_y(value: Decimal) -> Decimal:
+        return top + ((maximum - value) * chart_height / value_range)
+
     ticks = []
     for tick in range(5):
         ratio = Decimal(tick) / Decimal("4")
         value = maximum - (value_range * ratio)
-        y = top + (chart_height * ratio)
-        ticks.append({"y": float(y), "label": _money(value)})
+        ticks.append({"y": float(top + (chart_height * ratio)), "label": _money(value), "is_zero": value == 0})
+    if not any(tick["is_zero"] for tick in ticks):
+        ticks.append({"y": float(tick_y(Decimal("0"))), "label": _money(0), "is_zero": True})
+        ticks.sort(key=lambda tick: tick["y"])
 
     return {"points": " ".join(points), "area_points": area_points, "ticks": ticks}
 
@@ -1125,7 +1175,6 @@ def create_app() -> Flask:
         user_id = current_user_id()
         _ensure_user_category_catalog(user_id)
         month_start, month_end, selected_month = _selected_month_bounds()
-        previous_start, previous_end = _previous_month_bounds(month_start)
         summary = _query_one(
             """
             SELECT
@@ -1146,24 +1195,6 @@ def create_app() -> Flask:
             user_id=user_id,
             month_start=month_start,
             month_end=month_end,
-        ) or {}
-        previous = _query_one(
-            """
-            SELECT SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) AS spend_total
-            FROM BUDGET_TRANSACTIONS t
-            LEFT JOIN BUDGET_TRANSACTION_EDITS e
-              ON e.USER_ID = t.USER_ID
-             AND e.PROVIDER = t.PROVIDER
-             AND e.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
-            WHERE t.PROVIDER = 'teller'
-              AND t.USER_ID = :user_id
-              AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) >= :month_start
-              AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) < :month_end
-              AND NVL(e.EXCLUDED_FROM_BUDGET, 0) = 0
-            """,
-            user_id=user_id,
-            month_start=previous_start,
-            month_end=previous_end,
         ) or {}
         accounts = _query_one(
             """
@@ -1405,7 +1436,6 @@ def create_app() -> Flask:
         return render_template(
             "dashboard.html",
             summary=summary,
-            previous=previous,
             accounts=accounts,
             account_groups=account_groups,
             recent_transactions=recent_transactions,
@@ -1554,14 +1584,22 @@ def create_app() -> Flask:
         )
         categories = _query_all(
             """
-            SELECT CATEGORY_ID, NAME AS CATEGORY_NAME
-            FROM BUDGET_CATEGORIES
-            WHERE USER_ID = :user_id
-              AND STATUS = 'ACTIVE'
-            ORDER BY LOWER(NAME)
+            SELECT
+                c.CATEGORY_ID,
+                c.NAME AS CATEGORY_NAME,
+                p.NAME AS PARENT_NAME
+            FROM BUDGET_CATEGORIES c
+            LEFT JOIN BUDGET_CATEGORIES p
+              ON p.USER_ID = c.USER_ID
+             AND p.CATEGORY_ID = c.PARENT_CATEGORY_ID
+            WHERE c.USER_ID = :user_id
+              AND c.STATUS = 'ACTIVE'
+            ORDER BY LOWER(NVL(p.NAME, c.NAME)), c.PARENT_CATEGORY_ID NULLS FIRST, LOWER(c.NAME)
             """,
             user_id=user_id,
         )
+        for category in categories:
+            category["category_display"] = _category_display(category)
         merchants = _query_all(
             """
             SELECT DISTINCT MERCHANT_NAME
@@ -1637,7 +1675,7 @@ def create_app() -> Flask:
             merchant_name = request.form.get("merchant_name", "").strip()
             category_name = request.form.get("category_name", "").strip()
             merchant_id = store.ensure_merchant(user_id=user_id, display_name=merchant_name)
-            category_id = store.ensure_category(user_id=user_id, name=category_name)
+            category_id = _ensure_category_from_input(store, user_id=user_id, value=category_name)
             store.save_transaction_edit(
                 user_id=user_id,
                 provider_transaction_id=provider_transaction_id,
@@ -1722,15 +1760,24 @@ def create_app() -> Flask:
             """
             SELECT
                 c.CATEGORY_ID,
+                c.PARENT_CATEGORY_ID,
                 c.NAME,
+                p.NAME AS PARENT_NAME,
                 c.CATEGORY_TYPE,
                 c.STATUS,
                 c.CREATED_AT,
                 c.UPDATED_AT,
+                COUNT(DISTINCT child.CATEGORY_ID) AS SUBCATEGORY_COUNT,
                 COUNT(DISTINCT e.PROVIDER_TRANSACTION_ID) AS EDITED_TRANSACTION_COUNT,
                 COUNT(DISTINCT b.MONTH_KEY) AS BUDGET_MONTH_COUNT,
                 COUNT(DISTINCT t.PROVIDER_TRANSACTION_ID) AS RAW_TRANSACTION_COUNT
             FROM BUDGET_CATEGORIES c
+            LEFT JOIN BUDGET_CATEGORIES p
+              ON p.USER_ID = c.USER_ID
+             AND p.CATEGORY_ID = c.PARENT_CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORIES child
+              ON child.USER_ID = c.USER_ID
+             AND child.PARENT_CATEGORY_ID = c.CATEGORY_ID
             LEFT JOIN BUDGET_TRANSACTION_EDITS e
               ON e.USER_ID = c.USER_ID
              AND e.CATEGORY_ID = c.CATEGORY_ID
@@ -1747,11 +1794,17 @@ def create_app() -> Flask:
              AND LOWER(NVL(NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized')) = LOWER(a.RAW_NAME)
             WHERE c.USER_ID = :user_id
             GROUP BY
-                c.CATEGORY_ID, c.NAME, c.CATEGORY_TYPE, c.STATUS, c.CREATED_AT, c.UPDATED_AT
-            ORDER BY c.STATUS, LOWER(c.NAME)
+                c.CATEGORY_ID, c.PARENT_CATEGORY_ID, c.NAME, p.NAME, c.CATEGORY_TYPE, c.STATUS, c.CREATED_AT, c.UPDATED_AT
+            ORDER BY c.STATUS, LOWER(NVL(p.NAME, c.NAME)), c.PARENT_CATEGORY_ID NULLS FIRST, LOWER(c.NAME)
             """,
             user_id=user_id,
         )
+        for row in rows:
+            row["display_name"] = _category_display(row)
+        parent_options = [
+            row for row in rows
+            if not row.get("parent_category_id") and row.get("status") == "ACTIVE"
+        ]
         overlay_summary = _query_one(
             """
             SELECT
@@ -1764,6 +1817,7 @@ def create_app() -> Flask:
         return render_template(
             "categories.html",
             categories=rows,
+            parent_options=parent_options,
             overlay_summary=overlay_summary,
         )
 
@@ -1773,13 +1827,19 @@ def create_app() -> Flask:
         require_csrf()
         name = request.form.get("name", "").strip()
         category_type = request.form.get("category_type", "expense").strip()
+        parent_category_id = request.form.get("parent_category_id", "").strip() or None
         if not name:
             flash("Enter a category name.", "error")
             return redirect(url_for("budget.categories"))
         conn = connect(app_config.oracle)
         try:
             store = BudgetStore(conn)
-            category_id = store.ensure_category(user_id=current_user_id(), name=name)
+            category_id = store.ensure_category(
+                user_id=current_user_id(),
+                name=name,
+                category_type=category_type,
+                parent_category_id=parent_category_id,
+            )
             if category_id:
                 store.update_category(
                     user_id=current_user_id(),
@@ -1787,6 +1847,7 @@ def create_app() -> Flask:
                     name=name,
                     category_type=category_type,
                     status="ACTIVE",
+                    parent_category_id=parent_category_id,
                 )
             conn.commit()
         finally:
@@ -1807,6 +1868,7 @@ def create_app() -> Flask:
                 name=request.form.get("name", ""),
                 category_type=request.form.get("category_type", "expense"),
                 status=request.form.get("status", "ACTIVE"),
+                parent_category_id=request.form.get("parent_category_id", "").strip() or None,
             )
             conn.commit()
         finally:
@@ -1908,6 +1970,7 @@ def create_app() -> Flask:
             """
             WITH monthly_spend AS (
                 SELECT
+                    COALESCE(e.CATEGORY_ID, raw_c.CATEGORY_ID) AS CATEGORY_ID,
                     COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized') AS CATEGORY,
                     TO_CHAR(NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE), 'YYYY-MM') AS MONTH_KEY,
                     SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) AS SPEND_TOTAL
@@ -1933,12 +1996,13 @@ def create_app() -> Flask:
                   AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) < :month_start
                   AND NVL(e.EXCLUDED_FROM_BUDGET, 0) = 0
                 GROUP BY
+                    COALESCE(e.CATEGORY_ID, raw_c.CATEGORY_ID),
                     COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized'),
                     TO_CHAR(NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE), 'YYYY-MM')
             )
-            SELECT CATEGORY, AVG(SPEND_TOTAL) AS RECOMMENDED_AMOUNT
+            SELECT CATEGORY_ID, CATEGORY, AVG(SPEND_TOTAL) AS RECOMMENDED_AMOUNT
             FROM monthly_spend
-            GROUP BY CATEGORY
+            GROUP BY CATEGORY_ID, CATEGORY
             """,
             user_id=user_id,
             lookback_start=lookback_start,
@@ -2006,14 +2070,23 @@ def create_app() -> Flask:
             )
         managed_categories = _query_all(
             """
-            SELECT CATEGORY_ID, NAME, CATEGORY_TYPE
-            FROM BUDGET_CATEGORIES
-            WHERE USER_ID = :user_id
-              AND STATUS = 'ACTIVE'
-            ORDER BY LOWER(NAME)
+            SELECT
+                c.CATEGORY_ID,
+                c.NAME,
+                p.NAME AS PARENT_NAME,
+                c.CATEGORY_TYPE
+            FROM BUDGET_CATEGORIES c
+            LEFT JOIN BUDGET_CATEGORIES p
+              ON p.USER_ID = c.USER_ID
+             AND p.CATEGORY_ID = c.PARENT_CATEGORY_ID
+            WHERE c.USER_ID = :user_id
+              AND c.STATUS = 'ACTIVE'
+            ORDER BY LOWER(NVL(p.NAME, c.NAME)), c.PARENT_CATEGORY_ID NULLS FIRST, LOWER(c.NAME)
             """,
             user_id=user_id,
         )
+        for category in managed_categories:
+            category["display_name"] = _category_display(category)
         income = _query_one(
             """
             SELECT SUM(CASE WHEN t.AMOUNT < 0 THEN ABS(t.AMOUNT) ELSE 0 END) AS ACTUAL_INCOME
@@ -2035,10 +2108,10 @@ def create_app() -> Flask:
 
         category_map: dict[str, dict[str, Any]] = {}
         for category in managed_categories:
-            key = str(category.get("name") or "").lower()
+            key = f"id:{category.get('category_id')}"
             category_map[key] = {
                 "category_id": category.get("category_id"),
-                "category": category.get("name"),
+                "category": category.get("display_name") or category.get("name"),
                 "category_type": category.get("category_type"),
                 "spend_total": Decimal("0"),
                 "transaction_count": 0,
@@ -2047,7 +2120,7 @@ def create_app() -> Flask:
                 "alert_threshold": Decimal("1"),
             }
         for row in actual_rows:
-            key = str(row.get("category") or "uncategorized").lower()
+            key = f"id:{row.get('category_id')}" if row.get("category_id") else str(row.get("category") or "uncategorized").lower()
             item = category_map.setdefault(
                 key,
                 {
@@ -2065,7 +2138,7 @@ def create_app() -> Flask:
             item["spend_total"] = _decimal(row.get("spend_total"))
             item["transaction_count"] = row.get("transaction_count") or 0
         for row in budget_rows:
-            key = str(row.get("category") or "").lower()
+            key = f"id:{row.get('category_id')}" if row.get("category_id") else str(row.get("category") or "").lower()
             item = category_map.setdefault(
                 key,
                 {
@@ -2086,7 +2159,7 @@ def create_app() -> Flask:
             item["budget_source_month"] = row.get("source_month") or selected_month
             item["is_inherited"] = bool(row.get("is_inherited"))
         for row in recommended_rows:
-            key = str(row.get("category") or "").lower()
+            key = f"id:{row.get('category_id')}" if row.get("category_id") else str(row.get("category") or "").lower()
             item = category_map.setdefault(
                 key,
                 {
@@ -2250,7 +2323,7 @@ def create_app() -> Flask:
         conn = connect(app_config.oracle)
         try:
             store = BudgetStore(conn)
-            category_id = store.ensure_category(user_id=current_user_id(), name=category_name)
+            category_id = _ensure_category_from_input(store, user_id=current_user_id(), value=category_name)
             if not category_id:
                 flash("Category could not be created.", "error")
                 return redirect(url_for("budget.budgets", month=selected_month))
@@ -2264,7 +2337,7 @@ def create_app() -> Flask:
         finally:
             conn.close()
         data_version = mark_budget_data_changed()
-        flash("Category budget saved for this month only.", "success")
+        flash("Category budget saved for this month and future months until changed.", "success")
         return redirect(url_for("budget.budgets", month=selected_month, data_version=data_version))
 
     @budget.route("/net-worth")
@@ -2448,6 +2521,7 @@ def create_app() -> Flask:
         )
         for connection in connections:
             connection["warning_label"] = _connection_warning_label(connection)
+            connection["last_sync_label"] = _datetime_label(connection.get("last_sync_at")) or "Not synced yet"
         repair_connection: dict[str, Any] | None = None
         try:
             connection_id = _selected_connection_id()

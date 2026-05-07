@@ -106,7 +106,9 @@
             {% set budgeted = row.budgeted_amount or 0 %}
             <div class="budget-row budget-row-plan {{ 'is-over' if row.budget_state == 'Over budget' or row.budget_state == 'Unbudgeted' else '' }}">
               <div class="budget-meta">
-                <strong>{{ row.category|title }}</strong>
+                <a class="budget-category-link" href="{{ url_for('budget.transactions', month=selected_month, category=row.category_id) if row.category_id else url_for('budget.transactions', month=selected_month, q=row.category) }}">
+                  <strong>{{ row.category|title }}</strong>
+                </a>
                 <span>
                   {{ row.transaction_count }} transactions / {{ row.budget_state }}
                   {% if row.is_inherited %} / inherited from {{ row.budget_source_label }}{% endif %}
@@ -149,7 +151,7 @@
 
 <datalist id="budget-category-options">
   {% for category in managed_categories %}
-    <option value="{{ category.name }}"></option>
+    <option value="{{ category.display_name }}"></option>
   {% endfor %}
 </datalist>
 {% endblock %}

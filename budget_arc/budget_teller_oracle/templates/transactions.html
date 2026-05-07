@@ -20,7 +20,7 @@
           <option value="">All categories</option>
           {% for category in categories %}
             <option value="{{ category.category_id }}" {{ 'selected' if filters.category == category.category_id else '' }}>
-              {{ category.category_name }}
+              {{ category.category_display }}
             </option>
           {% endfor %}
         </select>
@@ -86,19 +86,72 @@
             <th>Account</th>
             <th>Status</th>
             <th>Review</th>
+            <th>Exclude</th>
+            <th>Notes</th>
             <th class="right">Amount</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {% for txn in transactions %}
-            <tr>
-              <td>{{ iso_date(txn.transaction_date) }}</td>
-              <td>
-                <strong>{{ txn.merchant_name or txn.description }}</strong>
+            {% set edit_form_id = 'transaction-edit-' ~ loop.index %}
+            {% set reset_form_id = 'transaction-reset-' ~ loop.index %}
+            {% set review_status = txn.reviewed_status or 'new' %}
+            <tr class="{{ 'has-user-edit' if txn.has_user_edit else '' }}">
+              <td class="editable-cell">
+                <form id="{{ edit_form_id }}" method="post" action="{{ url_for('budget.edit_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="month" value="{{ filters.month }}">
+                  <input type="hidden" name="q" value="{{ filters.q }}">
+                  <input type="hidden" name="status" value="{{ filters.status }}">
+                  <input type="hidden" name="review" value="{{ filters.review }}">
+                  <input type="hidden" name="category" value="{{ filters.category }}">
+                  <input type="hidden" name="account" value="{{ filters.account }}">
+                  <input type="hidden" name="institution" value="{{ filters.institution }}">
+                </form>
+                <input class="cell-control date-control" form="{{ edit_form_id }}" name="transaction_date" type="date" value="{{ iso_date(txn.transaction_date) }}" aria-label="Transaction date">
+              </td>
+              <td class="editable-cell merchant-cell">
+                <input class="cell-control merchant-control" form="{{ edit_form_id }}" name="merchant_name" list="merchant-options" value="{{ txn.merchant_name or '' }}" placeholder="Merchant name" aria-label="Merchant name">
                 <span>{{ txn.description }}</span>
-                <details class="transaction-edit">
-                  <summary>Edit</summary>
-                  <form class="transaction-edit-form" method="post" action="{{ url_for('budget.edit_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
+                <span class="original-transaction">Original: {{ iso_date(txn.original_transaction_date) }} / {{ txn.original_counterparty_name or txn.description }} / {{ txn.original_category or "Uncategorized" }}</span>
+              </td>
+              <td class="editable-cell">
+                <input class="cell-control category-control" form="{{ edit_form_id }}" name="category_name" list="category-options" value="{{ txn.category if txn.category and txn.category != 'Uncategorized' else '' }}" placeholder="Uncategorized" aria-label="Category">
+              </td>
+              <td>
+                {{ txn.account_name or "Account" }}
+                <span>{{ txn.institution_name or "Institution" }}</span>
+              </td>
+              <td><span class="status {{ txn.status }}">{{ txn.status }}</span></td>
+              <td class="editable-cell">
+                <select class="cell-control review-control" form="{{ edit_form_id }}" name="reviewed_status" aria-label="Review status">
+                  <option value="new" {{ 'selected' if review_status == 'new' else '' }}>New</option>
+                  <option value="reviewed" {{ 'selected' if review_status == 'reviewed' else '' }}>Reviewed</option>
+                  <option value="ignored" {{ 'selected' if review_status == 'ignored' else '' }}>Ignored</option>
+                </select>
+                {% if txn.has_user_edit %}
+                  <span class="pill edited-pill">edited</span>
+                {% endif %}
+              </td>
+              <td class="ledger-flags editable-cell">
+                <label class="inline-check">
+                  <input form="{{ edit_form_id }}" name="excluded_from_budget" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_budget else '' }}>
+                  Budget
+                </label>
+                <label class="inline-check">
+                  <input form="{{ edit_form_id }}" name="excluded_from_cash_flow" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_cash_flow else '' }}>
+                  Cash flow
+                </label>
+              </td>
+              <td class="editable-cell">
+                <input class="cell-control notes-control" form="{{ edit_form_id }}" name="notes" value="{{ txn.notes or '' }}" placeholder="Memo" aria-label="Notes">
+              </td>
+              <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
+              <td class="ledger-actions">
+                <button class="ghost-button small-button" form="{{ edit_form_id }}" type="submit">Save</button>
+                {% if txn.has_user_edit %}
+                  <form id="{{ reset_form_id }}" method="post" action="{{ url_for('budget.reset_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="month" value="{{ filters.month }}">
                     <input type="hidden" name="q" value="{{ filters.q }}">
@@ -107,78 +160,13 @@
                     <input type="hidden" name="category" value="{{ filters.category }}">
                     <input type="hidden" name="account" value="{{ filters.account }}">
                     <input type="hidden" name="institution" value="{{ filters.institution }}">
-                    <label>
-                      Date
-                      <input name="transaction_date" type="date" value="{{ iso_date(txn.transaction_date) }}">
-                    </label>
-                    <label>
-                      Merchant
-                      <input name="merchant_name" list="merchant-options" value="{{ txn.merchant_name or '' }}" placeholder="Merchant name">
-                    </label>
-                    <label>
-                      Category
-                      <input name="category_name" list="category-options" value="{{ txn.category if txn.category and txn.category != 'Uncategorized' else '' }}" placeholder="Category">
-                    </label>
-                    <label>
-                      Review
-                      <select name="reviewed_status">
-                        {% set review_status = txn.reviewed_status or 'new' %}
-                        <option value="new" {{ 'selected' if review_status == 'new' else '' }}>New</option>
-                        <option value="reviewed" {{ 'selected' if review_status == 'reviewed' else '' }}>Reviewed</option>
-                        <option value="ignored" {{ 'selected' if review_status == 'ignored' else '' }}>Ignored</option>
-                      </select>
-                    </label>
-                    <label class="wide">
-                      Notes
-                      <input name="notes" value="{{ txn.notes or '' }}" placeholder="Memo">
-                    </label>
-                    <label class="checkline">
-                      <input name="excluded_from_budget" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_budget else '' }}>
-                      Exclude from budget
-                    </label>
-                    <label class="checkline">
-                      <input name="excluded_from_cash_flow" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_cash_flow else '' }}>
-                      Exclude from cash flow
-                    </label>
-                    <div class="original-transaction wide">
-                      Original: {{ iso_date(txn.original_transaction_date) }} / {{ txn.original_counterparty_name or txn.description }} / {{ txn.original_category or "Uncategorized" }}
-                    </div>
-                    <button class="primary-button small-button" type="submit">Save</button>
                   </form>
-                  {% if txn.has_user_edit %}
-                    <form class="transaction-reset-form" method="post" action="{{ url_for('budget.reset_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="month" value="{{ filters.month }}">
-                      <input type="hidden" name="q" value="{{ filters.q }}">
-                      <input type="hidden" name="status" value="{{ filters.status }}">
-                      <input type="hidden" name="review" value="{{ filters.review }}">
-                      <input type="hidden" name="category" value="{{ filters.category }}">
-                      <input type="hidden" name="account" value="{{ filters.account }}">
-                      <input type="hidden" name="institution" value="{{ filters.institution }}">
-                      <button class="ghost-button small-button" type="submit">Restore original</button>
-                    </form>
-                  {% endif %}
-                </details>
-              </td>
-              <td><span class="pill">{{ txn.category or "Uncategorized" }}</span></td>
-              <td>
-                {{ txn.account_name or "Account" }}
-                <span>{{ txn.institution_name or "Institution" }}</span>
-              </td>
-              <td><span class="status {{ txn.status }}">{{ txn.status }}</span></td>
-              <td>
-                <span class="status {{ txn.reviewed_status or 'new' }}">{{ txn.reviewed_status or "new" }}</span>
-                {% if txn.has_user_edit %}
-                  <span class="pill edited-pill">edited</span>
-                {% endif %}
-                {% if txn.excluded_from_budget %}
-                  <span class="pill excluded-pill">budget off</span>
+                  <button class="ghost-button small-button" form="{{ reset_form_id }}" type="submit">Restore</button>
                 {% endif %}
               </td>
-              <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="7" class="empty">No transactions match this filter.</td></tr>
+            <tr><td colspan="10" class="empty">No transactions match this filter.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -187,7 +175,7 @@
 </section>
 <datalist id="category-options">
   {% for category in categories %}
-    <option value="{{ category.category_name }}"></option>
+    <option value="{{ category.category_display }}"></option>
   {% endfor %}
 </datalist>
 <datalist id="merchant-options">

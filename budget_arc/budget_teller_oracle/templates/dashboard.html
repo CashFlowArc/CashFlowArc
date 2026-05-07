@@ -20,13 +20,13 @@
     </div>
 
     {% for group in account_groups %}
-      <section class="account-group">
-        <div class="account-group-summary">
+      <details class="account-group" open>
+        <summary class="account-group-summary">
           <span class="group-caret" aria-hidden="true"></span>
           <span class="account-type-icon type-{{ group.label|lower|replace(' ', '-') }}"></span>
           <strong>{{ group.label }}</strong>
           <b>{{ format_money(group.total) }}</b>
-        </div>
+        </summary>
         <div class="account-items">
           {% for account in group.accounts[:5] %}
             <a class="account-line" href="{{ url_for('budget.transactions', month=selected_month, account=account.provider_account_id) }}">
@@ -38,7 +38,7 @@
             </a>
           {% endfor %}
         </div>
-      </section>
+      </details>
     {% else %}
       <p class="empty compact-empty">No accounts have been synced yet.</p>
     {% endfor %}
@@ -57,10 +57,6 @@
       <article>
         <span>Accounts</span>
         <strong>{{ accounts.account_count or 0 }}</strong>
-      </article>
-      <article>
-        <span>Prior Month</span>
-        <strong>{{ format_money(previous.spend_total) }}</strong>
       </article>
     </section>
 

@@ -15,6 +15,15 @@
         <input name="name" maxlength="256" placeholder="Dining, Groceries, Travel">
       </label>
       <label>
+        Parent
+        <select name="parent_category_id">
+          <option value="">Top-level category</option>
+          {% for parent in parent_options %}
+            <option value="{{ parent.category_id }}">{{ parent.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
         Type
         <select name="category_type">
           <option value="expense">Expense</option>
@@ -42,32 +51,42 @@
       Removes {{ overlay_summary.edit_count or 0 }} transaction edits and {{ overlay_summary.split_count or 0 }} splits. Teller originals, categories, and budgets stay intact.
     </p>
     <div class="category-list">
+      <div class="category-list-heading" aria-hidden="true">
+        <span>Name</span>
+        <span>Parent</span>
+        <span>Type</span>
+        <span>Status</span>
+        <span>Usage</span>
+        <span></span>
+      </div>
       {% for category in categories %}
         <div class="category-row-shell">
           <form class="category-row" method="post" action="{{ url_for('budget.update_category_action', category_id=category.category_id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label>
-              Name
-              <input name="name" value="{{ category.name }}" maxlength="256">
-            </label>
-            <label>
-              Type
-              <select name="category_type">
-                {% for value in ["expense", "income", "transfer", "other"] %}
-                  <option value="{{ value }}" {{ 'selected' if category.category_type == value else '' }}>{{ value|title }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>
-              Status
-              <select name="status">
-                <option value="ACTIVE" {{ 'selected' if category.status == 'ACTIVE' else '' }}>Active</option>
-                <option value="INACTIVE" {{ 'selected' if category.status == 'INACTIVE' else '' }}>Inactive</option>
-              </select>
-            </label>
+            <input name="name" value="{{ category.name }}" maxlength="256" aria-label="Category name">
+            <select name="parent_category_id" aria-label="Parent category" {{ 'disabled' if category.subcategory_count else '' }}>
+              <option value="">Top level</option>
+              {% for parent in parent_options %}
+                {% if parent.category_id != category.category_id %}
+                  <option value="{{ parent.category_id }}" {{ 'selected' if category.parent_category_id == parent.category_id else '' }}>{{ parent.name }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <select name="category_type" aria-label="Category type">
+              {% for value in ["expense", "income", "transfer", "other"] %}
+                <option value="{{ value }}" {{ 'selected' if category.category_type == value else '' }}>{{ value|title }}</option>
+              {% endfor %}
+            </select>
+            <select name="status" aria-label="Category status">
+              <option value="ACTIVE" {{ 'selected' if category.status == 'ACTIVE' else '' }}>Active</option>
+              <option value="INACTIVE" {{ 'selected' if category.status == 'INACTIVE' else '' }}>Inactive</option>
+            </select>
             <div class="category-usage">
               <span>{{ category.raw_transaction_count or 0 }} synced txns</span>
               <span>{{ category.edited_transaction_count or 0 }} edited txns</span>
+              {% if category.subcategory_count %}
+                <span>{{ category.subcategory_count }} subcategories</span>
+              {% endif %}
               <span>{{ category.budget_month_count or 0 }} budget months</span>
             </div>
             <div class="category-actions">
@@ -88,7 +107,7 @@
                   <option value="">Choose category</option>
                   {% for target in categories %}
                     {% if target.category_id != category.category_id and target.status == 'ACTIVE' %}
-                      <option value="{{ target.category_id }}">{{ target.name }}</option>
+                      <option value="{{ target.category_id }}">{{ target.display_name }}</option>
                     {% endif %}
                   {% endfor %}
                 </select>

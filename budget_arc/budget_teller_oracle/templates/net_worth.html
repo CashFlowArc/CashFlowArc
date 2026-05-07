@@ -51,8 +51,8 @@
           </linearGradient>
         </defs>
         {% for tick in chart.ticks %}
-          <line x1="96" x2="706" y1="{{ tick.y }}" y2="{{ tick.y }}"></line>
-          <text x="0" y="{{ tick.y + 4 }}">{{ tick.label }}</text>
+          <line x1="96" x2="706" y1="{{ tick.y }}" y2="{{ tick.y }}"{% if tick.is_zero %} class="zero-line"{% endif %}></line>
+          <text x="0" y="{{ tick.y + 4 }}"{% if tick.is_zero %} class="zero-line"{% endif %}>{{ tick.label }}</text>
         {% endfor %}
         <polygon points="{{ chart.area_points }}"></polygon>
         <polyline points="{{ chart.points }}"></polyline>

@@ -16,7 +16,7 @@
         <div class="connection-line-main">
           <strong>{{ connection.institution_name or "Financial institution" }}</strong>
           <span class="status {{ connection.status|lower }}">{{ connection.status }}</span>
-          <span>Last sync: {{ format_date(connection.last_sync_at) if connection.last_sync_at else "Not synced yet" }}</span>
+          <span>Last sync: {{ connection.last_sync_label }}</span>
           {% if connection.status == 'RECONNECT_REQUIRED' %}
             <span class="connection-warning" title="{{ connection.last_error_message or '' }}">{{ connection.warning_label or "Repair required" }}</span>
           {% endif %}
