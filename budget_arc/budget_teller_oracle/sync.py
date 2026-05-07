@@ -120,6 +120,7 @@ def sync_connection(
             store.conn.commit()
             raise
 
+    store.sync_user_categories_from_transactions(user_id=user_id)
     store.mark_connection_synced(connection_id, user_id=user_id)
     return SyncSummary(
         connection_id=connection_id,

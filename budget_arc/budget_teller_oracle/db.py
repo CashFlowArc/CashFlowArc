@@ -239,6 +239,26 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
             """,
         ),
         (
+            "BUDGET_CATEGORY_ALIASES",
+            """
+            CREATE TABLE BUDGET_CATEGORY_ALIASES (
+                ALIAS_ID VARCHAR2(64) PRIMARY KEY,
+                USER_ID VARCHAR2(64) NOT NULL,
+                CATEGORY_ID VARCHAR2(64) NOT NULL,
+                SOURCE_PROVIDER VARCHAR2(32) DEFAULT 'teller' NOT NULL,
+                RAW_NAME VARCHAR2(256) NOT NULL,
+                STATUS VARCHAR2(32) DEFAULT 'ACTIVE' NOT NULL,
+                CREATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                UPDATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                CONSTRAINT BUDGET_CAT_ALIASES_USER_FK FOREIGN KEY (USER_ID)
+                    REFERENCES BUDGET_USERS (USER_ID),
+                CONSTRAINT BUDGET_CAT_ALIASES_CAT_FK FOREIGN KEY (CATEGORY_ID)
+                    REFERENCES BUDGET_CATEGORIES (CATEGORY_ID),
+                CONSTRAINT BUDGET_CAT_ALIASES_UK UNIQUE (USER_ID, SOURCE_PROVIDER, RAW_NAME)
+            )
+            """,
+        ),
+        (
             "BUDGET_MERCHANTS",
             """
             CREATE TABLE BUDGET_MERCHANTS (
@@ -555,6 +575,7 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
             "CREATE INDEX BUDGET_RAW_TXN_USER_IDX ON BUDGET_RAW_TELLER_TRANSACTIONS (USER_ID, TRANSACTION_DATE)",
             "CREATE INDEX BUDGET_RAW_TXN_SRC_IDX ON BUDGET_RAW_TELLER_TRANSACTIONS (USER_ID, PROVIDER_TRANSACTION_ID)",
             "CREATE INDEX BUDGET_CATEGORIES_USER_IDX ON BUDGET_CATEGORIES (USER_ID, STATUS)",
+            "CREATE INDEX BUDGET_CAT_ALIASES_USER_IDX ON BUDGET_CATEGORY_ALIASES (USER_ID, SOURCE_PROVIDER, STATUS)",
             "CREATE INDEX BUDGET_MERCHANTS_USER_IDX ON BUDGET_MERCHANTS (USER_ID, STATUS)",
             "CREATE INDEX BUDGET_RULES_USER_IDX ON BUDGET_TRANSACTION_RULES (USER_ID, STATUS, PRIORITY)",
             "CREATE INDEX BUDGET_EDITS_USER_IDX ON BUDGET_TRANSACTION_EDITS (USER_ID, PROVIDER_TRANSACTION_ID)",
@@ -1185,10 +1206,21 @@ class BudgetStore:
             )
             return bool(cur.fetchone()[0])
 
-    def ensure_category(self, *, user_id: str, name: str | None) -> str | None:
+    def ensure_category(
+        self,
+        *,
+        user_id: str,
+        name: str | None,
+        category_type: str = "expense",
+        is_system: int = 0,
+        activate_existing: bool = True,
+    ) -> str | None:
         clean_name = (name or "").strip()
         if not clean_name:
             return None
+        clean_name = clean_name[:256]
+        if category_type not in {"expense", "income", "transfer", "other"}:
+            category_type = "expense"
         with self.conn.cursor() as cur:
             cur.execute(
                 """
@@ -1204,17 +1236,18 @@ class BudgetStore:
             )
             row = cur.fetchone()
             if row:
-                cur.execute(
-                    """
-                    UPDATE BUDGET_CATEGORIES
-                    SET STATUS = 'ACTIVE',
-                        UPDATED_AT = SYSTIMESTAMP
-                    WHERE USER_ID = :user_id
-                      AND CATEGORY_ID = :category_id
-                    """,
-                    user_id=user_id,
-                    category_id=row[0],
-                )
+                if activate_existing:
+                    cur.execute(
+                        """
+                        UPDATE BUDGET_CATEGORIES
+                        SET STATUS = 'ACTIVE',
+                            UPDATED_AT = SYSTIMESTAMP
+                        WHERE USER_ID = :user_id
+                          AND CATEGORY_ID = :category_id
+                        """,
+                        user_id=user_id,
+                        category_id=row[0],
+                    )
                 return row[0]
 
             category_id = uuid.uuid4().hex
@@ -1223,14 +1256,125 @@ class BudgetStore:
                 INSERT INTO BUDGET_CATEGORIES (
                     CATEGORY_ID, USER_ID, NAME, CATEGORY_TYPE, IS_SYSTEM, STATUS
                 ) VALUES (
-                    :category_id, :user_id, :name, 'expense', 0, 'ACTIVE'
+                    :category_id, :user_id, :name, :category_type, :is_system, 'ACTIVE'
                 )
                 """,
                 category_id=category_id,
                 user_id=user_id,
                 name=clean_name,
+                category_type=category_type,
+                is_system=1 if is_system else 0,
             )
             return category_id
+
+    def ensure_category_alias(
+        self,
+        *,
+        user_id: str,
+        category_id: str,
+        raw_name: str | None,
+        source_provider: str = "teller",
+    ) -> str | None:
+        clean_name = (raw_name or "").strip()[:256]
+        if not clean_name:
+            return None
+        clean_provider = (source_provider or "teller").strip().lower()[:32] or "teller"
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT ALIAS_ID
+                FROM BUDGET_CATEGORY_ALIASES
+                WHERE USER_ID = :user_id
+                  AND SOURCE_PROVIDER = :source_provider
+                  AND LOWER(RAW_NAME) = LOWER(:raw_name)
+                FETCH FIRST 1 ROWS ONLY
+                """,
+                user_id=user_id,
+                source_provider=clean_provider,
+                raw_name=clean_name,
+            )
+            row = cur.fetchone()
+            if row:
+                cur.execute(
+                    """
+                    UPDATE BUDGET_CATEGORY_ALIASES
+                    SET CATEGORY_ID = :category_id,
+                        STATUS = 'ACTIVE',
+                        UPDATED_AT = SYSTIMESTAMP
+                    WHERE USER_ID = :user_id
+                      AND ALIAS_ID = :alias_id
+                    """,
+                    user_id=user_id,
+                    alias_id=row[0],
+                    category_id=category_id,
+                )
+                return row[0]
+
+            alias_id = uuid.uuid4().hex
+            cur.execute(
+                """
+                INSERT INTO BUDGET_CATEGORY_ALIASES (
+                    ALIAS_ID, USER_ID, CATEGORY_ID, SOURCE_PROVIDER, RAW_NAME, STATUS
+                ) VALUES (
+                    :alias_id, :user_id, :category_id, :source_provider, :raw_name, 'ACTIVE'
+                )
+                """,
+                alias_id=alias_id,
+                user_id=user_id,
+                category_id=category_id,
+                source_provider=clean_provider,
+                raw_name=clean_name,
+            )
+            return alias_id
+
+    def sync_user_categories_from_transactions(self, *, user_id: str) -> int:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT NVL(NULLIF(TRIM(CATEGORY), ''), 'Uncategorized') AS RAW_NAME
+                FROM BUDGET_TRANSACTIONS
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                ORDER BY RAW_NAME
+                """,
+                user_id=user_id,
+            )
+            raw_names = [row[0] for row in cur.fetchall()]
+
+        created_or_linked = 0
+        seen: set[str] = set()
+        for raw_name in raw_names:
+            clean_name = (raw_name or "").strip()[:256] or "Uncategorized"
+            key = clean_name.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT a.ALIAS_ID
+                    FROM BUDGET_CATEGORY_ALIASES a
+                    WHERE a.USER_ID = :user_id
+                      AND a.SOURCE_PROVIDER = 'teller'
+                      AND LOWER(a.RAW_NAME) = LOWER(:raw_name)
+                      AND a.STATUS = 'ACTIVE'
+                    FETCH FIRST 1 ROWS ONLY
+                    """,
+                    user_id=user_id,
+                    raw_name=clean_name,
+                )
+                if cur.fetchone():
+                    continue
+            category_id = self.ensure_category(
+                user_id=user_id,
+                name=clean_name,
+                category_type="expense",
+                is_system=1,
+                activate_existing=False,
+            )
+            if category_id and self.ensure_category_alias(user_id=user_id, category_id=category_id, raw_name=clean_name):
+                created_or_linked += 1
+        return created_or_linked
 
     def update_category(
         self,

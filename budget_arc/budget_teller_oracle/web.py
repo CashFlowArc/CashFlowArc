@@ -603,6 +603,19 @@ def _query_one(sql: str, **params: Any) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
+def _ensure_user_category_catalog(user_id: str) -> int:
+    cfg = load_config()
+    conn = connect(cfg.oracle)
+    try:
+        store = BudgetStore(conn)
+        count = store.sync_user_categories_from_transactions(user_id=user_id)
+        if count:
+            conn.commit()
+        return count
+    finally:
+        conn.close()
+
+
 def _dashboard_alert_id(user_id: str, alert_key: str) -> str:
     return hashlib.sha256(f"{user_id}:dashboard-alert:{alert_key}".encode("utf-8")).hexdigest()
 
@@ -1110,6 +1123,7 @@ def create_app() -> Flask:
     @user_required
     def dashboard() -> Any:
         user_id = current_user_id()
+        _ensure_user_category_catalog(user_id)
         month_start, month_end, selected_month = _selected_month_bounds()
         previous_start, previous_end = _previous_month_bounds(month_start)
         summary = _query_one(
@@ -1224,7 +1238,7 @@ def create_app() -> Flask:
                 NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) AS TRANSACTION_DATE,
                 t.AMOUNT,
                 t.STATUS,
-                COALESCE(c.NAME, t.CATEGORY, 'Uncategorized') AS CATEGORY,
+                COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized') AS CATEGORY,
                 t.DESCRIPTION,
                 COALESCE(e.EDITED_MERCHANT_NAME, m.DISPLAY_NAME, t.COUNTERPARTY_NAME, t.DESCRIPTION) AS COUNTERPARTY_NAME,
                 t.TRANSACTION_TYPE
@@ -1233,9 +1247,17 @@ def create_app() -> Flask:
               ON e.USER_ID = t.USER_ID
              AND e.PROVIDER = t.PROVIDER
              AND e.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
-            LEFT JOIN BUDGET_CATEGORIES c
-              ON c.USER_ID = t.USER_ID
-             AND c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORIES edited_c
+              ON edited_c.USER_ID = t.USER_ID
+             AND edited_c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORY_ALIASES raw_alias
+              ON raw_alias.USER_ID = t.USER_ID
+             AND raw_alias.SOURCE_PROVIDER = t.PROVIDER
+             AND raw_alias.STATUS = 'ACTIVE'
+             AND LOWER(raw_alias.RAW_NAME) = LOWER(NVL(NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized'))
+            LEFT JOIN BUDGET_CATEGORIES raw_c
+              ON raw_c.USER_ID = t.USER_ID
+             AND raw_c.CATEGORY_ID = raw_alias.CATEGORY_ID
             LEFT JOIN BUDGET_MERCHANTS m
               ON m.USER_ID = t.USER_ID
              AND m.MERCHANT_ID = e.MERCHANT_ID
@@ -1252,7 +1274,7 @@ def create_app() -> Flask:
         )
         categories = _query_all(
             """
-            SELECT COALESCE(c.NAME, t.CATEGORY, 'uncategorized') AS CATEGORY,
+            SELECT COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized') AS CATEGORY,
                    SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) AS SPEND_TOTAL,
                    COUNT(*) AS TRANSACTION_COUNT
             FROM BUDGET_TRANSACTIONS t
@@ -1260,15 +1282,23 @@ def create_app() -> Flask:
               ON e.USER_ID = t.USER_ID
              AND e.PROVIDER = t.PROVIDER
              AND e.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
-            LEFT JOIN BUDGET_CATEGORIES c
-              ON c.USER_ID = t.USER_ID
-             AND c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORIES edited_c
+              ON edited_c.USER_ID = t.USER_ID
+             AND edited_c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORY_ALIASES raw_alias
+              ON raw_alias.USER_ID = t.USER_ID
+             AND raw_alias.SOURCE_PROVIDER = t.PROVIDER
+             AND raw_alias.STATUS = 'ACTIVE'
+             AND LOWER(raw_alias.RAW_NAME) = LOWER(NVL(NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized'))
+            LEFT JOIN BUDGET_CATEGORIES raw_c
+              ON raw_c.USER_ID = t.USER_ID
+             AND raw_c.CATEGORY_ID = raw_alias.CATEGORY_ID
             WHERE t.PROVIDER = 'teller'
               AND t.USER_ID = :user_id
               AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) >= :month_start
               AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) < :month_end
               AND NVL(e.EXCLUDED_FROM_BUDGET, 0) = 0
-            GROUP BY COALESCE(c.NAME, t.CATEGORY, 'uncategorized')
+            GROUP BY COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized')
             ORDER BY SPEND_TOTAL DESC NULLS LAST
             FETCH FIRST 8 ROWS ONLY
             """,
@@ -1293,7 +1323,7 @@ def create_app() -> Flask:
         ) or {}
         all_time_categories = _query_all(
             """
-            SELECT COALESCE(c.NAME, t.CATEGORY, 'uncategorized') AS CATEGORY,
+            SELECT COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized') AS CATEGORY,
                    SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) AS SPEND_TOTAL,
                    COUNT(*) AS TRANSACTION_COUNT
             FROM BUDGET_TRANSACTIONS t
@@ -1301,13 +1331,21 @@ def create_app() -> Flask:
               ON e.USER_ID = t.USER_ID
              AND e.PROVIDER = t.PROVIDER
              AND e.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
-            LEFT JOIN BUDGET_CATEGORIES c
-              ON c.USER_ID = t.USER_ID
-             AND c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORIES edited_c
+              ON edited_c.USER_ID = t.USER_ID
+             AND edited_c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORY_ALIASES raw_alias
+              ON raw_alias.USER_ID = t.USER_ID
+             AND raw_alias.SOURCE_PROVIDER = t.PROVIDER
+             AND raw_alias.STATUS = 'ACTIVE'
+             AND LOWER(raw_alias.RAW_NAME) = LOWER(NVL(NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized'))
+            LEFT JOIN BUDGET_CATEGORIES raw_c
+              ON raw_c.USER_ID = t.USER_ID
+             AND raw_c.CATEGORY_ID = raw_alias.CATEGORY_ID
             WHERE t.PROVIDER = 'teller'
               AND t.USER_ID = :user_id
               AND NVL(e.EXCLUDED_FROM_BUDGET, 0) = 0
-            GROUP BY COALESCE(c.NAME, t.CATEGORY, 'uncategorized')
+            GROUP BY COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized')
             HAVING SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) > 0
             ORDER BY SPEND_TOTAL DESC NULLS LAST
             FETCH FIRST 1 ROWS ONLY
@@ -1396,6 +1434,7 @@ def create_app() -> Flask:
     @user_required
     def transactions() -> Any:
         user_id = current_user_id()
+        _ensure_user_category_catalog(user_id)
         month_start, month_end, selected_month = _selected_month_bounds()
         search = request.args.get("q", "").strip()
         status = request.args.get("status", "").strip()
@@ -1405,7 +1444,7 @@ def create_app() -> Flask:
         params: dict[str, Any] = {"user_id": user_id, "month_start": month_start, "month_end": month_end}
         effective_date = "NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE)"
         effective_merchant = "COALESCE(e.EDITED_MERCHANT_NAME, m.DISPLAY_NAME, t.COUNTERPARTY_NAME, t.DESCRIPTION)"
-        effective_category = "COALESCE(c.NAME, t.CATEGORY, 'Uncategorized')"
+        effective_category = "COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized')"
         effective_review = "NVL(e.REVIEWED_STATUS, 'new')"
         clauses = [
             "t.PROVIDER = 'teller'",
@@ -1467,9 +1506,17 @@ def create_app() -> Flask:
               ON e.USER_ID = t.USER_ID
              AND e.PROVIDER = t.PROVIDER
              AND e.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
-            LEFT JOIN BUDGET_CATEGORIES c
-              ON c.USER_ID = t.USER_ID
-             AND c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORIES edited_c
+              ON edited_c.USER_ID = t.USER_ID
+             AND edited_c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORY_ALIASES raw_alias
+              ON raw_alias.USER_ID = t.USER_ID
+             AND raw_alias.SOURCE_PROVIDER = t.PROVIDER
+             AND raw_alias.STATUS = 'ACTIVE'
+             AND LOWER(raw_alias.RAW_NAME) = LOWER(NVL(NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized'))
+            LEFT JOIN BUDGET_CATEGORIES raw_c
+              ON raw_c.USER_ID = t.USER_ID
+             AND raw_c.CATEGORY_ID = raw_alias.CATEGORY_ID
             LEFT JOIN BUDGET_MERCHANTS m
               ON m.USER_ID = t.USER_ID
              AND m.MERCHANT_ID = e.MERCHANT_ID
@@ -1502,21 +1549,11 @@ def create_app() -> Flask:
         )
         categories = _query_all(
             """
-            SELECT DISTINCT CATEGORY_NAME
-            FROM (
-                SELECT NAME AS CATEGORY_NAME
-                FROM BUDGET_CATEGORIES
-                WHERE USER_ID = :user_id
-                  AND STATUS = 'ACTIVE'
-                UNION ALL
-                SELECT CATEGORY AS CATEGORY_NAME
-                FROM BUDGET_TRANSACTIONS
-                WHERE PROVIDER = 'teller'
-                  AND USER_ID = :user_id
-                  AND CATEGORY IS NOT NULL
-            )
-            WHERE CATEGORY_NAME IS NOT NULL
-            ORDER BY CATEGORY_NAME
+            SELECT NAME AS CATEGORY_NAME
+            FROM BUDGET_CATEGORIES
+            WHERE USER_ID = :user_id
+              AND STATUS = 'ACTIVE'
+            ORDER BY LOWER(NAME)
             """,
             user_id=user_id,
         )
@@ -1672,6 +1709,7 @@ def create_app() -> Flask:
     @user_required
     def categories() -> Any:
         user_id = current_user_id()
+        _ensure_user_category_catalog(user_id)
         rows = _query_all(
             """
             SELECT
@@ -1682,7 +1720,8 @@ def create_app() -> Flask:
                 c.CREATED_AT,
                 c.UPDATED_AT,
                 COUNT(DISTINCT e.PROVIDER_TRANSACTION_ID) AS EDITED_TRANSACTION_COUNT,
-                COUNT(DISTINCT b.MONTH_KEY) AS BUDGET_MONTH_COUNT
+                COUNT(DISTINCT b.MONTH_KEY) AS BUDGET_MONTH_COUNT,
+                COUNT(DISTINCT t.PROVIDER_TRANSACTION_ID) AS RAW_TRANSACTION_COUNT
             FROM BUDGET_CATEGORIES c
             LEFT JOIN BUDGET_TRANSACTION_EDITS e
               ON e.USER_ID = c.USER_ID
@@ -1690,6 +1729,14 @@ def create_app() -> Flask:
             LEFT JOIN BUDGET_CATEGORY_BUDGETS b
               ON b.USER_ID = c.USER_ID
              AND b.CATEGORY_ID = c.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORY_ALIASES a
+              ON a.USER_ID = c.USER_ID
+             AND a.CATEGORY_ID = c.CATEGORY_ID
+             AND a.STATUS = 'ACTIVE'
+            LEFT JOIN BUDGET_TRANSACTIONS t
+              ON t.USER_ID = c.USER_ID
+             AND t.PROVIDER = a.SOURCE_PROVIDER
+             AND LOWER(NVL(NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized')) = LOWER(a.RAW_NAME)
             WHERE c.USER_ID = :user_id
             GROUP BY
                 c.CATEGORY_ID, c.NAME, c.CATEGORY_TYPE, c.STATUS, c.CREATED_AT, c.UPDATED_AT
@@ -1764,6 +1811,7 @@ def create_app() -> Flask:
     @user_required
     def budgets() -> Any:
         user_id = current_user_id()
+        _ensure_user_category_catalog(user_id)
         month_start, month_end, selected_month = _selected_month_bounds()
         lookback_start = month_start
         for _ in range(3):
@@ -1772,8 +1820,8 @@ def create_app() -> Flask:
         actual_rows = _query_all(
             """
             SELECT
-                   COALESCE(e.CATEGORY_ID, original_c.CATEGORY_ID) AS CATEGORY_ID,
-                   COALESCE(edited_c.NAME, original_c.NAME, t.CATEGORY, 'uncategorized') AS CATEGORY,
+                   COALESCE(e.CATEGORY_ID, raw_c.CATEGORY_ID) AS CATEGORY_ID,
+                   COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized') AS CATEGORY,
                    SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) AS SPEND_TOTAL,
                    COUNT(*) AS TRANSACTION_COUNT
             FROM BUDGET_TRANSACTIONS t
@@ -1784,18 +1832,22 @@ def create_app() -> Flask:
             LEFT JOIN BUDGET_CATEGORIES edited_c
               ON edited_c.USER_ID = t.USER_ID
              AND edited_c.CATEGORY_ID = e.CATEGORY_ID
-            LEFT JOIN BUDGET_CATEGORIES original_c
-              ON original_c.USER_ID = t.USER_ID
-             AND original_c.PARENT_CATEGORY_ID IS NULL
-             AND LOWER(original_c.NAME) = LOWER(t.CATEGORY)
+            LEFT JOIN BUDGET_CATEGORY_ALIASES raw_alias
+              ON raw_alias.USER_ID = t.USER_ID
+             AND raw_alias.SOURCE_PROVIDER = t.PROVIDER
+             AND raw_alias.STATUS = 'ACTIVE'
+             AND LOWER(raw_alias.RAW_NAME) = LOWER(NVL(NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized'))
+            LEFT JOIN BUDGET_CATEGORIES raw_c
+              ON raw_c.USER_ID = t.USER_ID
+             AND raw_c.CATEGORY_ID = raw_alias.CATEGORY_ID
             WHERE t.PROVIDER = 'teller'
               AND t.USER_ID = :user_id
               AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) >= :month_start
               AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) < :month_end
               AND NVL(e.EXCLUDED_FROM_BUDGET, 0) = 0
             GROUP BY
-                COALESCE(e.CATEGORY_ID, original_c.CATEGORY_ID),
-                COALESCE(edited_c.NAME, original_c.NAME, t.CATEGORY, 'uncategorized')
+                COALESCE(e.CATEGORY_ID, raw_c.CATEGORY_ID),
+                COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized')
             ORDER BY SPEND_TOTAL DESC NULLS LAST
             """,
             user_id=user_id,
@@ -1806,7 +1858,7 @@ def create_app() -> Flask:
             """
             WITH monthly_spend AS (
                 SELECT
-                    COALESCE(edited_c.NAME, original_c.NAME, t.CATEGORY, 'uncategorized') AS CATEGORY,
+                    COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized') AS CATEGORY,
                     TO_CHAR(NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE), 'YYYY-MM') AS MONTH_KEY,
                     SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) AS SPEND_TOTAL
                 FROM BUDGET_TRANSACTIONS t
@@ -1817,17 +1869,21 @@ def create_app() -> Flask:
                 LEFT JOIN BUDGET_CATEGORIES edited_c
                   ON edited_c.USER_ID = t.USER_ID
                  AND edited_c.CATEGORY_ID = e.CATEGORY_ID
-                LEFT JOIN BUDGET_CATEGORIES original_c
-                  ON original_c.USER_ID = t.USER_ID
-                 AND original_c.PARENT_CATEGORY_ID IS NULL
-                 AND LOWER(original_c.NAME) = LOWER(t.CATEGORY)
+                LEFT JOIN BUDGET_CATEGORY_ALIASES raw_alias
+                  ON raw_alias.USER_ID = t.USER_ID
+                 AND raw_alias.SOURCE_PROVIDER = t.PROVIDER
+                 AND raw_alias.STATUS = 'ACTIVE'
+                 AND LOWER(raw_alias.RAW_NAME) = LOWER(NVL(NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized'))
+                LEFT JOIN BUDGET_CATEGORIES raw_c
+                  ON raw_c.USER_ID = t.USER_ID
+                 AND raw_c.CATEGORY_ID = raw_alias.CATEGORY_ID
                 WHERE t.PROVIDER = 'teller'
                   AND t.USER_ID = :user_id
                   AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) >= :lookback_start
                   AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) < :month_start
                   AND NVL(e.EXCLUDED_FROM_BUDGET, 0) = 0
                 GROUP BY
-                    COALESCE(edited_c.NAME, original_c.NAME, t.CATEGORY, 'uncategorized'),
+                    COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized'),
                     TO_CHAR(NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE), 'YYYY-MM')
             )
             SELECT CATEGORY, AVG(SPEND_TOTAL) AS RECOMMENDED_AMOUNT

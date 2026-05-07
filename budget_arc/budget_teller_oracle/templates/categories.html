@@ -65,6 +65,7 @@
             </select>
           </label>
           <div class="category-usage">
+            <span>{{ category.raw_transaction_count or 0 }} synced txns</span>
             <span>{{ category.edited_transaction_count or 0 }} edited txns</span>
             <span>{{ category.budget_month_count or 0 }} budget months</span>
           </div>
