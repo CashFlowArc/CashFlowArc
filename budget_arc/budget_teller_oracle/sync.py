@@ -69,6 +69,7 @@ def sync_connection(
                 if _requires_reconnect(exc):
                     store.conn.commit()
                     raise
+        store.record_raw_teller_account(user_id=user_id, connection_id=connection_id, account=account)
         store.upsert_account(user_id=user_id, connection_id=connection_id, account=account)
     store.conn.commit()
 
@@ -85,6 +86,12 @@ def sync_connection(
                 end_date=end_date,
             )
             for transaction in transactions:
+                store.record_raw_teller_transaction(
+                    user_id=user_id,
+                    connection_id=connection_id,
+                    account=account,
+                    transaction=transaction,
+                )
                 store.upsert_transaction(
                     user_id=user_id,
                     connection_id=connection_id,
