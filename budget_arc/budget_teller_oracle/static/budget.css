@@ -482,7 +482,7 @@ td span {
   text-transform: uppercase;
 }
 
-.alert-delete-form { margin: 0; }
+.notification-delete-form { margin: 0; }
 
 .alert-icon,
 .advice-icon {
@@ -557,13 +557,30 @@ td span {
 
 .advice-module .module-heading { border-bottom: 0; padding-top: 10px; }
 
+.advice-list {
+  display: grid;
+}
+
 .advice-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  min-height: 56px;
+  padding: 0 0 12px;
+}
+
+.advice-row + .advice-row {
+  border-top: 1px dotted #e5e3c6;
+  padding-top: 8px;
+}
+
+.advice-link {
   align-items: center;
   display: grid;
   gap: 12px;
   grid-template-columns: 32px minmax(0, 1fr) auto;
   min-height: 56px;
-  padding: 0 0 12px;
 }
 
 .advice-icon {
@@ -718,20 +735,20 @@ select {
   width: 28px;
 }
 
-.alert-delete-button {
+.notification-delete-button {
   color: #7a8580;
   position: relative;
 }
 
-.alert-delete-button:hover,
-.alert-delete-button:focus-visible {
+.notification-delete-button:hover,
+.notification-delete-button:focus-visible {
   background: #fff4f2;
   border-color: #d9aaa4;
   color: var(--red);
   outline: 0;
 }
 
-.alert-delete-button::before {
+.notification-delete-button::before {
   border: 2px solid currentColor;
   border-top: 0;
   bottom: 7px;
@@ -742,7 +759,7 @@ select {
   width: 8px;
 }
 
-.alert-delete-button::after {
+.notification-delete-button::after {
   background: currentColor;
   box-shadow: 2px -3px 0 -1px currentColor;
   content: "";
@@ -1175,19 +1192,24 @@ pre {
     grid-template-columns: 1fr;
   }
   .budget-row,
-  .activity-row,
-  .advice-row {
+  .activity-row {
     grid-template-columns: 1fr;
   }
-  .alert-row {
+  .alert-row,
+  .advice-row {
     grid-template-columns: minmax(0, 1fr) 30px;
   }
-  .alert-link {
+  .alert-link,
+  .advice-link {
     grid-template-columns: 28px minmax(0, 1fr);
   }
   .alert-link time {
     grid-column: 2;
     text-align: left;
+  }
+  .advice-link .primary-button {
+    grid-column: 2;
+    justify-self: start;
   }
   .budget-amount,
   .right,

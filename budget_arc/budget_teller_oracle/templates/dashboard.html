@@ -74,16 +74,16 @@
             <a class="alert-link" href="{{ alert.target_path }}">
               <span class="alert-icon {{ alert.icon_type }}" aria-hidden="true"></span>
               <span>{{ alert.message }}</span>
-              <time>{{ month_start.strftime('%b') }}</time>
+              <time>{{ "All" if alert.month_key == "ALL" else alert.month_key }}</time>
             </a>
-            <form class="alert-delete-form" method="post" action="{{ url_for('budget.delete_alert_action', alert_id=alert.alert_id) }}">
+            <form class="notification-delete-form" method="post" action="{{ url_for('budget.delete_alert_action', alert_id=alert.alert_id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="month" value="{{ selected_month }}">
-              <button class="icon-button alert-delete-button" type="submit" aria-label="Delete alert" title="Delete alert"></button>
+              <button class="icon-button notification-delete-button" type="submit" aria-label="Delete alert" title="Delete alert"></button>
             </form>
           </div>
         {% else %}
-          <p class="empty">No alerts for this month.</p>
+          <p class="empty">No alerts yet.</p>
         {% endfor %}
       </div>
     </section>
@@ -92,10 +92,23 @@
       <div class="module-heading">
         <h2>Advice</h2>
       </div>
-      <div class="advice-row">
-        <span class="advice-icon" aria-hidden="true"></span>
-        <span>Check the largest categories before the month closes.</span>
-        <a class="primary-button small-button" href="{{ url_for('budget.budgets', month=selected_month) }}">Show details</a>
+      <div class="advice-list">
+        {% for item in advice_items %}
+          <div class="advice-row">
+            <a class="advice-link" href="{{ item.target_path }}">
+              <span class="advice-icon" aria-hidden="true"></span>
+              <span>{{ item.message }}</span>
+              <span class="primary-button small-button">Show details</span>
+            </a>
+            <form class="notification-delete-form" method="post" action="{{ url_for('budget.delete_alert_action', alert_id=item.alert_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="month" value="{{ selected_month }}">
+              <button class="icon-button notification-delete-button" type="submit" aria-label="Delete advice" title="Delete advice"></button>
+            </form>
+          </div>
+        {% else %}
+          <p class="empty">No advice right now.</p>
+        {% endfor %}
       </div>
     </section>
 

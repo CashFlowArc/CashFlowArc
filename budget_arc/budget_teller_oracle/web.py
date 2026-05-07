@@ -569,19 +569,20 @@ def _dashboard_alert_id(user_id: str, alert_key: str) -> str:
     return hashlib.sha256(f"{user_id}:dashboard-alert:{alert_key}".encode("utf-8")).hexdigest()
 
 
-def _sync_dashboard_alerts(
+def _sync_dashboard_notifications(
     *,
     user_id: str,
     month_key: str,
-    generated_alerts: list[dict[str, str]],
+    key_prefix: str,
+    generated_items: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     cfg = load_config()
     conn = connect(cfg.oracle)
     try:
         rows: list[dict[str, Any]] = []
         with conn.cursor() as cur:
-            for alert in generated_alerts:
-                alert_key = alert["alert_key"]
+            for item in generated_items:
+                alert_key = f"{key_prefix}:{item['key']}"
                 cur.execute(
                     """
                     MERGE INTO BUDGET_ALERTS target
@@ -614,22 +615,24 @@ def _sync_dashboard_alerts(
                     user_id=user_id,
                     month_key=month_key,
                     alert_key=alert_key,
-                    icon_type=alert["icon_type"],
-                    message=alert["message"][:1024],
-                    target_path=alert["target_path"][:1024],
+                    icon_type=item["icon_type"],
+                    message=item["message"][:1024],
+                    target_path=item["target_path"][:1024],
                 )
 
             cur.execute(
                 """
-                SELECT ALERT_ID, ALERT_KEY, ICON_TYPE, MESSAGE, TARGET_PATH, CREATED_AT
+                SELECT ALERT_ID, ALERT_KEY, MONTH_KEY, ICON_TYPE, MESSAGE, TARGET_PATH, CREATED_AT
                 FROM BUDGET_ALERTS
                 WHERE USER_ID = :user_id
                   AND MONTH_KEY = :month_key
+                  AND ALERT_KEY LIKE :key_pattern
                   AND STATUS = 'ACTIVE'
                 ORDER BY CREATED_AT, ALERT_KEY
                 """,
                 user_id=user_id,
                 month_key=month_key,
+                key_pattern=f"{key_prefix}:%",
             )
             columns = [col[0].lower() for col in cur.description]
             rows = [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -1201,48 +1204,79 @@ def create_app() -> Flask:
             month_end=month_end,
         )
         categories = _attach_bar_percent(categories, "spend_total")
+        all_time_summary = _query_one(
+            """
+            SELECT COUNT(*) AS transaction_count
+            FROM BUDGET_TRANSACTIONS
+            WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
+            """,
+            user_id=user_id,
+        ) or {}
+        all_time_categories = _query_all(
+            """
+            SELECT NVL(CATEGORY, 'uncategorized') AS CATEGORY,
+                   SUM(CASE WHEN AMOUNT > 0 THEN AMOUNT ELSE 0 END) AS SPEND_TOTAL,
+                   COUNT(*) AS TRANSACTION_COUNT
+            FROM BUDGET_TRANSACTIONS
+            WHERE PROVIDER = 'teller'
+              AND USER_ID = :user_id
+            GROUP BY NVL(CATEGORY, 'uncategorized')
+            HAVING SUM(CASE WHEN AMOUNT > 0 THEN AMOUNT ELSE 0 END) > 0
+            ORDER BY SPEND_TOTAL DESC NULLS LAST
+            FETCH FIRST 1 ROWS ONLY
+            """,
+            user_id=user_id,
+        )
         generated_alerts = [
             {
-                "alert_key": f"{selected_month}:connected-accounts",
+                "key": "connected-accounts",
                 "icon_type": "notice",
                 "message": f"You have {accounts.get('account_count') or 0} connected accounts in BudgetArc.",
                 "target_path": url_for("budget.accounts"),
             },
         ]
-        if categories:
-            top_category = categories[0]
+        if all_time_categories:
+            top_category = all_time_categories[0]
             generated_alerts.append(
                 {
-                    "alert_key": f"{selected_month}:largest-category",
+                    "key": "largest-category",
                     "icon_type": "warning",
                     "message": (
-                        f"Your largest {month_start.strftime('%B')} category is "
+                        "Your largest overall category is "
                         f"{str(top_category['category']).title()} at {_money(top_category.get('spend_total'))}."
                     ),
                     "target_path": url_for("budget.budgets", month=selected_month),
                 }
             )
-        if summary.get("spend_total") and previous.get("spend_total") and summary["spend_total"] > previous["spend_total"]:
+        if all_time_summary.get("transaction_count"):
             generated_alerts.append(
                 {
-                    "alert_key": f"{selected_month}:spending-above-previous",
-                    "icon_type": "warning",
-                    "message": "Monthly spending is running above the previous month.",
-                    "target_path": url_for("budget.budgets", month=selected_month),
+                    "key": "transactions-review",
+                    "icon_type": "ledger",
+                    "message": f"{all_time_summary.get('transaction_count') or 0} transactions are available for review.",
+                    "target_path": url_for("budget.transactions", month=selected_month),
                 }
             )
-        generated_alerts.append(
+        generated_advice = [
             {
-                "alert_key": f"{selected_month}:transactions-review",
-                "icon_type": "ledger",
-                "message": f"{summary.get('transaction_count') or 0} transactions are available for review.",
-                "target_path": url_for("budget.transactions", month=selected_month),
+                "key": "check-largest-categories",
+                "icon_type": "advice",
+                "message": "Check the largest categories before the month closes.",
+                "target_path": url_for("budget.budgets", month=selected_month),
             }
-        )
-        alerts = _sync_dashboard_alerts(
+        ]
+        alerts = _sync_dashboard_notifications(
             user_id=user_id,
-            month_key=selected_month,
-            generated_alerts=generated_alerts,
+            month_key="ALL",
+            key_prefix="alert",
+            generated_items=generated_alerts,
+        )
+        advice_items = _sync_dashboard_notifications(
+            user_id=user_id,
+            month_key="ALL",
+            key_prefix="advice",
+            generated_items=generated_advice,
         )
         return render_template(
             "dashboard.html",
@@ -1253,6 +1287,7 @@ def create_app() -> Flask:
             recent_transactions=recent_transactions,
             categories=categories,
             alerts=alerts,
+            advice_items=advice_items,
             month_start=month_start,
             selected_month=selected_month,
         )
