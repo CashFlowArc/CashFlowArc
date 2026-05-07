@@ -1132,6 +1132,167 @@ class BudgetStore:
                 raw_json=raw_json,
             )
 
+    def transaction_belongs_to_user(self, *, user_id: str, provider_transaction_id: str) -> bool:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM BUDGET_TRANSACTIONS
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                  AND PROVIDER_TRANSACTION_ID = :provider_transaction_id
+                """,
+                user_id=user_id,
+                provider_transaction_id=provider_transaction_id,
+            )
+            return bool(cur.fetchone()[0])
+
+    def ensure_category(self, *, user_id: str, name: str | None) -> str | None:
+        clean_name = (name or "").strip()
+        if not clean_name:
+            return None
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT CATEGORY_ID
+                FROM BUDGET_CATEGORIES
+                WHERE USER_ID = :user_id
+                  AND PARENT_CATEGORY_ID IS NULL
+                  AND LOWER(NAME) = LOWER(:name)
+                FETCH FIRST 1 ROWS ONLY
+                """,
+                user_id=user_id,
+                name=clean_name,
+            )
+            row = cur.fetchone()
+            if row:
+                return row[0]
+
+            category_id = uuid.uuid4().hex
+            cur.execute(
+                """
+                INSERT INTO BUDGET_CATEGORIES (
+                    CATEGORY_ID, USER_ID, NAME, CATEGORY_TYPE, IS_SYSTEM, STATUS
+                ) VALUES (
+                    :category_id, :user_id, :name, 'expense', 0, 'ACTIVE'
+                )
+                """,
+                category_id=category_id,
+                user_id=user_id,
+                name=clean_name,
+            )
+            return category_id
+
+    def ensure_merchant(self, *, user_id: str, display_name: str | None) -> str | None:
+        clean_name = (display_name or "").strip()
+        if not clean_name:
+            return None
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT MERCHANT_ID
+                FROM BUDGET_MERCHANTS
+                WHERE USER_ID = :user_id
+                  AND LOWER(DISPLAY_NAME) = LOWER(:display_name)
+                FETCH FIRST 1 ROWS ONLY
+                """,
+                user_id=user_id,
+                display_name=clean_name,
+            )
+            row = cur.fetchone()
+            if row:
+                return row[0]
+
+            merchant_id = uuid.uuid4().hex
+            cur.execute(
+                """
+                INSERT INTO BUDGET_MERCHANTS (
+                    MERCHANT_ID, USER_ID, DISPLAY_NAME, STATUS
+                ) VALUES (
+                    :merchant_id, :user_id, :display_name, 'ACTIVE'
+                )
+                """,
+                merchant_id=merchant_id,
+                user_id=user_id,
+                display_name=clean_name,
+            )
+            return merchant_id
+
+    def save_transaction_edit(
+        self,
+        *,
+        user_id: str,
+        provider_transaction_id: str,
+        edited_transaction_date: date | None,
+        merchant_id: str | None,
+        edited_merchant_name: str | None,
+        category_id: str | None,
+        reviewed_status: str | None,
+        excluded_from_budget: int,
+        excluded_from_cash_flow: int,
+        notes: str | None,
+    ) -> None:
+        edit_id = uuid.uuid4().hex
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                MERGE INTO BUDGET_TRANSACTION_EDITS target
+                USING (
+                    SELECT
+                        :edit_id AS EDIT_ID,
+                        :user_id AS USER_ID,
+                        'teller' AS PROVIDER,
+                        :provider_transaction_id AS PROVIDER_TRANSACTION_ID,
+                        :edited_transaction_date AS EDITED_TRANSACTION_DATE,
+                        :merchant_id AS MERCHANT_ID,
+                        :edited_merchant_name AS EDITED_MERCHANT_NAME,
+                        :category_id AS CATEGORY_ID,
+                        :reviewed_status AS REVIEWED_STATUS,
+                        :excluded_from_budget AS EXCLUDED_FROM_BUDGET,
+                        :excluded_from_cash_flow AS EXCLUDED_FROM_CASH_FLOW,
+                        :notes AS NOTES
+                    FROM dual
+                ) source
+                ON (
+                    target.USER_ID = source.USER_ID
+                    AND target.PROVIDER = source.PROVIDER
+                    AND target.PROVIDER_TRANSACTION_ID = source.PROVIDER_TRANSACTION_ID
+                )
+                WHEN MATCHED THEN UPDATE SET
+                    target.EDITED_TRANSACTION_DATE = source.EDITED_TRANSACTION_DATE,
+                    target.MERCHANT_ID = source.MERCHANT_ID,
+                    target.EDITED_MERCHANT_NAME = source.EDITED_MERCHANT_NAME,
+                    target.CATEGORY_ID = source.CATEGORY_ID,
+                    target.REVIEWED_STATUS = source.REVIEWED_STATUS,
+                    target.EXCLUDED_FROM_BUDGET = source.EXCLUDED_FROM_BUDGET,
+                    target.EXCLUDED_FROM_CASH_FLOW = source.EXCLUDED_FROM_CASH_FLOW,
+                    target.NOTES = source.NOTES,
+                    target.UPDATED_AT = SYSTIMESTAMP
+                WHEN NOT MATCHED THEN INSERT (
+                    EDIT_ID, USER_ID, PROVIDER, PROVIDER_TRANSACTION_ID,
+                    EDITED_TRANSACTION_DATE, MERCHANT_ID, EDITED_MERCHANT_NAME,
+                    CATEGORY_ID, REVIEWED_STATUS, EXCLUDED_FROM_BUDGET,
+                    EXCLUDED_FROM_CASH_FLOW, NOTES
+                ) VALUES (
+                    source.EDIT_ID, source.USER_ID, source.PROVIDER, source.PROVIDER_TRANSACTION_ID,
+                    source.EDITED_TRANSACTION_DATE, source.MERCHANT_ID, source.EDITED_MERCHANT_NAME,
+                    source.CATEGORY_ID, source.REVIEWED_STATUS, source.EXCLUDED_FROM_BUDGET,
+                    source.EXCLUDED_FROM_CASH_FLOW, source.NOTES
+                )
+                """,
+                edit_id=edit_id,
+                user_id=user_id,
+                provider_transaction_id=provider_transaction_id,
+                edited_transaction_date=edited_transaction_date,
+                merchant_id=merchant_id,
+                edited_merchant_name=(edited_merchant_name or "").strip()[:512] or None,
+                category_id=category_id,
+                reviewed_status=reviewed_status,
+                excluded_from_budget=excluded_from_budget,
+                excluded_from_cash_flow=excluded_from_cash_flow,
+                notes=(notes or "").strip()[:1024] or None,
+            )
+
     def upsert_transaction(
         self,
         *,

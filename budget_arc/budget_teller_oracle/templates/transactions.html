@@ -44,6 +44,15 @@
           <option value="pending" {{ 'selected' if filters.status == 'pending' else '' }}>Pending</option>
         </select>
       </label>
+      <label>
+        Review
+        <select name="review">
+          <option value="">All</option>
+          <option value="new" {{ 'selected' if filters.review == 'new' else '' }}>New</option>
+          <option value="reviewed" {{ 'selected' if filters.review == 'reviewed' else '' }}>Reviewed</option>
+          <option value="ignored" {{ 'selected' if filters.review == 'ignored' else '' }}>Ignored</option>
+        </select>
+      </label>
       <button class="primary-button" type="submit">Search</button>
     </form>
   </aside>
@@ -65,6 +74,7 @@
             <th>Category</th>
             <th>Account</th>
             <th>Status</th>
+            <th>Review</th>
             <th class="right">Amount</th>
           </tr>
         </thead>
@@ -73,23 +83,91 @@
             <tr>
               <td>{{ iso_date(txn.transaction_date) }}</td>
               <td>
-                <strong>{{ txn.counterparty_name or txn.description }}</strong>
-                <span>{{ txn.institution_name or "Institution" }}</span>
+                <strong>{{ txn.merchant_name or txn.description }}</strong>
+                <span>{{ txn.description }}</span>
+                <details class="transaction-edit">
+                  <summary>Edit</summary>
+                  <form class="transaction-edit-form" method="post" action="{{ url_for('budget.edit_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="month" value="{{ filters.month }}">
+                    <input type="hidden" name="q" value="{{ filters.q }}">
+                    <input type="hidden" name="status" value="{{ filters.status }}">
+                    <input type="hidden" name="review" value="{{ filters.review }}">
+                    <input type="hidden" name="account" value="{{ filters.account }}">
+                    <input type="hidden" name="institution" value="{{ filters.institution }}">
+                    <label>
+                      Date
+                      <input name="transaction_date" type="date" value="{{ iso_date(txn.transaction_date) }}">
+                    </label>
+                    <label>
+                      Merchant
+                      <input name="merchant_name" list="merchant-options" value="{{ txn.merchant_name or '' }}" placeholder="Merchant name">
+                    </label>
+                    <label>
+                      Category
+                      <input name="category_name" list="category-options" value="{{ txn.category if txn.category and txn.category != 'Uncategorized' else '' }}" placeholder="Category">
+                    </label>
+                    <label>
+                      Review
+                      <select name="reviewed_status">
+                        {% set review_status = txn.reviewed_status or 'new' %}
+                        <option value="new" {{ 'selected' if review_status == 'new' else '' }}>New</option>
+                        <option value="reviewed" {{ 'selected' if review_status == 'reviewed' else '' }}>Reviewed</option>
+                        <option value="ignored" {{ 'selected' if review_status == 'ignored' else '' }}>Ignored</option>
+                      </select>
+                    </label>
+                    <label class="wide">
+                      Notes
+                      <input name="notes" value="{{ txn.notes or '' }}" placeholder="Memo">
+                    </label>
+                    <label class="checkline">
+                      <input name="excluded_from_budget" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_budget else '' }}>
+                      Exclude from budget
+                    </label>
+                    <label class="checkline">
+                      <input name="excluded_from_cash_flow" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_cash_flow else '' }}>
+                      Exclude from cash flow
+                    </label>
+                    <div class="original-transaction wide">
+                      Original: {{ iso_date(txn.original_transaction_date) }} / {{ txn.original_counterparty_name or txn.description }} / {{ txn.original_category or "Uncategorized" }}
+                    </div>
+                    <button class="primary-button small-button" type="submit">Save</button>
+                  </form>
+                </details>
               </td>
               <td><span class="pill">{{ txn.category or "Uncategorized" }}</span></td>
               <td>
                 {{ txn.account_name or "Account" }}
-                <span>{{ txn.description }}</span>
+                <span>{{ txn.institution_name or "Institution" }}</span>
               </td>
               <td><span class="status {{ txn.status }}">{{ txn.status }}</span></td>
+              <td>
+                <span class="status {{ txn.reviewed_status or 'new' }}">{{ txn.reviewed_status or "new" }}</span>
+                {% if txn.has_user_edit %}
+                  <span class="pill edited-pill">edited</span>
+                {% endif %}
+                {% if txn.excluded_from_budget %}
+                  <span class="pill excluded-pill">budget off</span>
+                {% endif %}
+              </td>
               <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="6" class="empty">No transactions match this filter.</td></tr>
+            <tr><td colspan="7" class="empty">No transactions match this filter.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
 </section>
+<datalist id="category-options">
+  {% for category in categories %}
+    <option value="{{ category.category_name }}"></option>
+  {% endfor %}
+</datalist>
+<datalist id="merchant-options">
+  {% for merchant in merchants %}
+    <option value="{{ merchant.merchant_name }}"></option>
+  {% endfor %}
+</datalist>
 {% endblock %}
