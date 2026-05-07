@@ -943,6 +943,7 @@ class BudgetStore:
                 f"""
                 UPDATE BUDGET_CONNECTIONS
                 SET LAST_SYNC_AT = SYSTIMESTAMP,
+                    STATUS = 'ACTIVE',
                     UPDATED_AT = SYSTIMESTAMP
                 WHERE CONNECTION_ID = :connection_id
                   {user_clause}

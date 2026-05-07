@@ -242,7 +242,7 @@ def _teller_sync_error_message(exc: TellerAPIError) -> str:
     if exc.code and exc.code.startswith("enrollment.disconnected.user_action"):
         return (
             "Sync failed: Teller needs you to reconnect this institution or complete MFA. "
-            "Open Connect account, complete the Teller prompts for this institution, then try Sync again. "
+            "Open Accounts, choose Repair for this institution, complete the Teller prompts, then try Sync again. "
             f"Teller reported: {detail}"
         )
     return f"Sync failed: Teller API HTTP {exc.status}: {detail}"
@@ -250,6 +250,23 @@ def _teller_sync_error_message(exc: TellerAPIError) -> str:
 
 def _teller_requires_reconnect(exc: TellerAPIError) -> bool:
     return bool(exc.code and exc.code.startswith("enrollment.disconnected"))
+
+
+def _teller_error_code(exc: TellerAPIError) -> str:
+    return exc.code or type(exc).__name__
+
+
+def _connection_warning_label(connection: dict[str, Any]) -> str | None:
+    if connection.get("status") != "RECONNECT_REQUIRED":
+        return None
+    error_code = str(connection.get("last_error_code") or "")
+    error_message = str(connection.get("last_error_message") or "")
+    error_text = f"{error_code} {error_message}".lower()
+    if "mfa_required" in error_text:
+        return "MFA required"
+    if error_code.startswith("enrollment.disconnected"):
+        return "Reconnect required"
+    return "Repair required"
 
 
 def _net_worth_period(value: str | None) -> tuple[str, str, dt.date | None, dt.date]:
@@ -1569,22 +1586,45 @@ def create_app() -> Flask:
         )
         connections = _query_all(
             """
+            WITH latest_errors AS (
+                SELECT
+                    CONNECTION_ID,
+                    ERROR_CODE,
+                    ERROR_MESSAGE,
+                    FINISHED_AT,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY CONNECTION_ID
+                        ORDER BY FINISHED_AT DESC NULLS LAST, STARTED_AT DESC, SYNC_EVENT_ID DESC
+                    ) AS RN
+                FROM BUDGET_SYNC_EVENTS
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                  AND STATUS = 'failed'
+            )
             SELECT
-                CONNECTION_ID,
-                ENVIRONMENT,
-                INSTITUTION_ID,
-                INSTITUTION_NAME,
-                PROVIDER_ENROLLMENT_ID,
-                STATUS,
-                LAST_SYNC_AT,
-                CREATED_AT
-            FROM BUDGET_CONNECTIONS
-            WHERE PROVIDER = 'teller'
-              AND USER_ID = :user_id
-            ORDER BY UPDATED_AT DESC
+                c.CONNECTION_ID,
+                c.ENVIRONMENT,
+                c.INSTITUTION_ID,
+                c.INSTITUTION_NAME,
+                c.PROVIDER_ENROLLMENT_ID,
+                c.STATUS,
+                c.LAST_SYNC_AT,
+                c.CREATED_AT,
+                e.ERROR_CODE AS LAST_ERROR_CODE,
+                e.ERROR_MESSAGE AS LAST_ERROR_MESSAGE,
+                e.FINISHED_AT AS LAST_ERROR_AT
+            FROM BUDGET_CONNECTIONS c
+            LEFT JOIN latest_errors e
+              ON e.CONNECTION_ID = c.CONNECTION_ID
+             AND e.RN = 1
+            WHERE c.PROVIDER = 'teller'
+              AND c.USER_ID = :user_id
+            ORDER BY c.UPDATED_AT DESC
             """,
             user_id=user_id,
         )
+        for connection in connections:
+            connection["warning_label"] = _connection_warning_label(connection)
         repair_connection: dict[str, Any] | None = None
         try:
             connection_id = _selected_connection_id()
@@ -1621,6 +1661,40 @@ def create_app() -> Flask:
             flash("That Teller connection id is invalid.", "error")
             return redirect(url_for("budget.accounts"))
         return redirect(url_for("budget.accounts", connection_id=connection_id) if connection_id else url_for("budget.accounts"))
+
+    def _record_teller_sync_failure(connection_id: str | None, exc: TellerAPIError) -> None:
+        if not connection_id:
+            return
+        conn = connect(app_config.oracle)
+        try:
+            user_id = current_user_id()
+            store = BudgetStore(conn)
+            if _teller_requires_reconnect(exc):
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE BUDGET_CONNECTIONS
+                        SET STATUS = 'RECONNECT_REQUIRED',
+                            UPDATED_AT = SYSTIMESTAMP
+                        WHERE CONNECTION_ID = :connection_id
+                          AND USER_ID = :user_id
+                        """,
+                        connection_id=connection_id,
+                        user_id=user_id,
+                    )
+            store.record_sync_event(
+                user_id=user_id,
+                connection_id=connection_id,
+                account_id=None,
+                event_type="connection_sync",
+                status="failed",
+                error_code=_teller_error_code(exc),
+                error_message=str(exc),
+                details={"status": exc.status, "path": exc.path},
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     @budget.route("/settings")
     @admin_required
@@ -1664,24 +1738,7 @@ def create_app() -> Flask:
             )
             return redirect(url_for("budget.accounts", data_version=data_version))
         except TellerAPIError as exc:
-            if _teller_requires_reconnect(exc):
-                conn = connect(app_config.oracle)
-                try:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            """
-                            UPDATE BUDGET_CONNECTIONS
-                            SET STATUS = 'RECONNECT_REQUIRED',
-                                UPDATED_AT = SYSTIMESTAMP
-                            WHERE CONNECTION_ID = :connection_id
-                              AND USER_ID = :user_id
-                            """,
-                            connection_id=connection_id,
-                            user_id=current_user_id(),
-                        )
-                    conn.commit()
-                finally:
-                    conn.close()
+            _record_teller_sync_failure(connection_id, exc)
             flash(_teller_sync_error_message(exc), "error")
         except Exception as exc:
             flash(f"Sync failed: {type(exc).__name__}: {str(exc)[:220]}", "error")
@@ -1861,6 +1918,7 @@ def create_app() -> Flask:
     @budget.route("/api/teller/enrollment", methods=["POST"])
     @user_required
     def teller_enrollment() -> Any:
+        connection_id: str | None = None
         origin = request.headers.get("Origin")
         normalized_origin = _normalized_origin(origin)
         allowed_origins = {
@@ -2005,6 +2063,7 @@ def create_app() -> Flask:
                         "tellerMessage": exc.teller_message,
                     }
                 )
+                _record_teller_sync_failure(connection_id, exc)
             state.remember("sync_error", "Enrollment callback failed before sync completed", **details)
             message = _teller_sync_error_message(exc) if isinstance(exc, TellerAPIError) else str(exc)[:500]
             payload = {"ok": False, "error": type(exc).__name__, "message": message}

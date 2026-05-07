@@ -18,7 +18,7 @@
           <span class="status {{ connection.status|lower }}">{{ connection.status }}</span>
           <span>Last sync: {{ format_date(connection.last_sync_at) if connection.last_sync_at else "Not synced yet" }}</span>
           {% if connection.status == 'RECONNECT_REQUIRED' %}
-            <span class="connection-warning">Repair required</span>
+            <span class="connection-warning" title="{{ connection.last_error_message or '' }}">{{ connection.warning_label or "Repair required" }}</span>
           {% endif %}
         </div>
         <details class="connection-menu">

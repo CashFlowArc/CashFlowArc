@@ -960,6 +960,8 @@ tbody tr:hover { background: #f7faf8; }
   color: var(--red);
   font-size: 12px;
   margin: 6px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .account-inventory { padding-top: 4px; }

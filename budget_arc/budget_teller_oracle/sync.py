@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from .crypto import TokenCipher
 from .db import BudgetStore
-from .teller import TellerClient
+from .teller import TellerAPIError, TellerClient
 
 
 @dataclass(frozen=True)
@@ -13,6 +13,16 @@ class SyncSummary:
     connection_id: str
     accounts: int
     transactions: int
+
+
+def _sync_error_code(exc: Exception) -> str:
+    if isinstance(exc, TellerAPIError) and exc.code:
+        return exc.code
+    return type(exc).__name__
+
+
+def _requires_reconnect(exc: Exception) -> bool:
+    return isinstance(exc, TellerAPIError) and bool(exc.code and exc.code.startswith("enrollment.disconnected"))
 
 
 def sync_connection(
@@ -53,9 +63,12 @@ def sync_connection(
                     account_id=account.get("id"),
                     event_type="balances_sync",
                     status="failed",
-                    error_code=type(exc).__name__,
+                    error_code=_sync_error_code(exc),
                     error_message=str(exc),
                 )
+                if _requires_reconnect(exc):
+                    store.conn.commit()
+                    raise
         store.upsert_account(user_id=user_id, connection_id=connection_id, account=account)
     store.conn.commit()
 
@@ -94,9 +107,10 @@ def sync_connection(
                 account_id=account.get("id"),
                 event_type="transactions_sync",
                 status="failed",
-                error_code=type(exc).__name__,
+                error_code=_sync_error_code(exc),
                 error_message=str(exc),
             )
+            store.conn.commit()
             raise
 
     store.mark_connection_synced(connection_id, user_id=user_id)
