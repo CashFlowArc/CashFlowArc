@@ -466,20 +466,12 @@ td span {
   align-items: center;
   display: grid;
   gap: 12px;
-  grid-template-columns: 34px minmax(0, 1fr) 54px;
+  grid-template-columns: 34px minmax(0, 1fr);
   min-height: 42px;
 }
 
 .alert-link:hover span:not(.alert-icon) {
   color: #006da1;
-}
-
-.alert-row time {
-  color: #8d7660;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 12px;
-  text-align: right;
-  text-transform: uppercase;
 }
 
 .notification-delete-form { margin: 0; }
@@ -1202,10 +1194,6 @@ pre {
   .alert-link,
   .advice-link {
     grid-template-columns: 28px minmax(0, 1fr);
-  }
-  .alert-link time {
-    grid-column: 2;
-    text-align: left;
   }
   .advice-link .primary-button {
     grid-column: 2;

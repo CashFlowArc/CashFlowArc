@@ -74,7 +74,6 @@
             <a class="alert-link" href="{{ alert.target_path }}">
               <span class="alert-icon {{ alert.icon_type }}" aria-hidden="true"></span>
               <span>{{ alert.message }}</span>
-              <time>{{ "All" if alert.month_key == "ALL" else alert.month_key }}</time>
             </a>
             <form class="notification-delete-form" method="post" action="{{ url_for('budget.delete_alert_action', alert_id=alert.alert_id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
