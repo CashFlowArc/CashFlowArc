@@ -3,12 +3,6 @@
 {% block heading %}Overview{% endblock %}
 {% block eyebrow %}{{ month_start.strftime('%B %Y') }} account summary{% endblock %}
 {% block content %}
-<section class="status-strip">
-  <span class="sync-icon" aria-hidden="true"></span>
-  <span>Your accounts are ready for review.</span>
-  <a href="{{ url_for('budget.accounts') }}">Refresh account data</a>
-</section>
-
 <section class="month-band overview-month-band">
   <form class="month-selector" method="get">
     <label>

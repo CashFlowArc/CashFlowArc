@@ -6,7 +6,7 @@
     <title>{% block title %}BudgetArc{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('budget.static', filename='budget.css') }}">
   </head>
-  <body>
+  <body data-budget-endpoint="{{ request.endpoint or '' }}" data-budget-data-version="{{ budget_data_version or '' }}">
     {% set nav_month = request.args.get('month') %}
     <div class="shell">
       <header class="site-header">
@@ -63,6 +63,7 @@
         {% block content %}{% endblock %}
       </main>
     </div>
+    <script src="{{ url_for('budget.static', filename='app-refresh.js') }}"></script>
     {% block scripts %}{% endblock %}
   </body>
 </html>

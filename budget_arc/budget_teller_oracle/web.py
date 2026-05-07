@@ -823,6 +823,11 @@ def create_app() -> Flask:
             "products": institution.get("products") or [],
         }
 
+    def mark_budget_data_changed() -> str:
+        version = f"{int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)}-{secrets.token_urlsafe(8)}"
+        session["budget_data_version"] = version
+        return version
+
     @app.after_request
     def add_security_headers(response: Response) -> Response:
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -844,6 +849,10 @@ def create_app() -> Flask:
             "style-src 'self' https://teller.io https://*.teller.io 'unsafe-inline'; "
             "font-src 'self' https://teller.io https://*.teller.io",
         )
+        if request.endpoint and request.endpoint.startswith("budget.") and response.mimetype == "text/html":
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         return response
 
     @app.context_processor
@@ -857,6 +866,7 @@ def create_app() -> Flask:
             "is_authenticated": is_authenticated(),
             "is_admin": is_admin(),
             "current_user": current_user(),
+            "budget_data_version": session.get("budget_data_version", ""),
         }
 
     @budget.route("/login", methods=["GET", "POST"])
@@ -1602,10 +1612,12 @@ def create_app() -> Flask:
                 user_id=current_user_id(),
                 start_date=start_date,
             )
+            data_version = mark_budget_data_changed()
             flash(
                 f"Synced {summary['accounts']} accounts and {summary['transactions']} transactions.",
                 "success",
             )
+            return redirect(url_for("budget.accounts", data_version=data_version))
         except TellerAPIError as exc:
             if _teller_requires_reconnect(exc):
                 conn = connect(app_config.oracle)
@@ -1668,11 +1680,13 @@ def create_app() -> Flask:
                 conn.close()
 
             institution_name = result["institution_name"] or "Institution"
+            data_version = mark_budget_data_changed()
             flash(
                 f"Deleted {institution_name}: removed {result['accounts']} accounts, "
                 f"{result['transactions']} transactions, sync history, and the encrypted Teller token.",
                 "success",
             )
+            return redirect(url_for("budget.accounts", data_version=data_version))
         except Exception as exc:
             flash(f"Delete failed: {type(exc).__name__}: {str(exc)[:220]}", "error")
         return redirect(url_for("budget.accounts"))
@@ -1914,6 +1928,7 @@ def create_app() -> Flask:
                 conn.close()
 
             summary = _execute_sync(connection_id, user_id=current_user_id())
+            data_version = mark_budget_data_changed()
             session.pop("teller_nonce", None)
             session.pop("teller_csrf_token", None)
             session.pop("teller_institution_id", None)
@@ -1931,6 +1946,7 @@ def create_app() -> Flask:
                     "connectionId": connection_id,
                     "accountsSynced": summary["accounts"],
                     "transactionsSynced": summary["transactions"],
+                    "dataVersion": data_version,
                 }
             )
         except Exception as exc:
