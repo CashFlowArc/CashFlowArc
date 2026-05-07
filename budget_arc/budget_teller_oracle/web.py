@@ -2014,16 +2014,6 @@ def create_app() -> Flask:
             """,
             user_id=user_id,
         )
-        plan = _query_one(
-            """
-            SELECT PROJECTED_INCOME
-            FROM BUDGET_MONTHLY_PLANS
-            WHERE USER_ID = :user_id
-              AND MONTH_KEY = :month_key
-            """,
-            user_id=user_id,
-            month_key=selected_month,
-        ) or {"projected_income": Decimal("0")}
         income = _query_one(
             """
             SELECT SUM(CASE WHEN t.AMOUNT < 0 THEN ABS(t.AMOUNT) ELSE 0 END) AS ACTUAL_INCOME
@@ -2121,8 +2111,17 @@ def create_app() -> Flask:
                 str(row.get("category")).lower(),
             ),
         )
-        total_spent = sum((_decimal(row.get("spend_total")) for row in rows), Decimal("0"))
-        total_budgeted = sum((_decimal(row.get("budgeted_amount")) for row in rows), Decimal("0"))
+        spending_rows = [row for row in rows if (row.get("category_type") or "expense") != "income"]
+        total_spent = sum((_decimal(row.get("spend_total")) for row in spending_rows), Decimal("0"))
+        total_budgeted = sum((_decimal(row.get("budgeted_amount")) for row in spending_rows), Decimal("0"))
+        projected_income = sum(
+            (
+                _decimal(row.get("budgeted_amount"))
+                for row in rows
+                if (row.get("category_type") or "expense") == "income"
+            ),
+            Decimal("0"),
+        )
         for row in rows:
             spend = _decimal(row.get("spend_total"))
             budgeted = _decimal(row.get("budgeted_amount"))
@@ -2143,8 +2142,11 @@ def create_app() -> Flask:
                     row["budget_source_label"] = str(source_month)
         overbudget_rows = [
             row for row in rows
-            if (_decimal(row.get("budgeted_amount")) > 0 and _decimal(row.get("spend_total")) > _decimal(row.get("budgeted_amount")))
-            or (_decimal(row.get("budgeted_amount")) == 0 and _decimal(row.get("spend_total")) > 0)
+            if (row.get("category_type") or "expense") != "income"
+            and (
+                (_decimal(row.get("budgeted_amount")) > 0 and _decimal(row.get("spend_total")) > _decimal(row.get("budgeted_amount")))
+                or (_decimal(row.get("budgeted_amount")) == 0 and _decimal(row.get("spend_total")) > 0)
+            )
         ]
         group_labels = {
             "income": "Income",
@@ -2161,9 +2163,18 @@ def create_app() -> Flask:
                         "category_type": category_type,
                         "label": group_labels[category_type],
                         "rows": group_rows,
+                        "count": len(group_rows),
+                        "spent_total": sum(
+                            (_decimal(row.get("spend_total")) for row in group_rows),
+                            Decimal("0"),
+                        ),
+                        "budgeted_total": sum(
+                            (_decimal(row.get("budgeted_amount")) for row in group_rows),
+                            Decimal("0"),
+                        ),
+                        "inherited_count": sum(1 for row in group_rows if row.get("is_inherited")),
                     }
                 )
-        projected_income = _decimal(plan.get("projected_income"))
         actual_income = _decimal(income.get("actual_income"))
         income_pct = min(float((actual_income / projected_income) * Decimal("100")), 100.0) if projected_income > 0 else 0.0
         budget_pct = min(float((total_spent / total_budgeted) * Decimal("100")), 100.0) if total_budgeted > 0 else (100.0 if total_spent > 0 else 0.0)

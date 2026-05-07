@@ -665,7 +665,7 @@ td span {
   align-items: end;
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(180px, 240px) minmax(260px, 420px);
+  grid-template-columns: minmax(180px, 240px);
 }
 
 .income-form {
@@ -714,20 +714,80 @@ td span {
 }
 
 .budget-type-group {
-  border-top: 1px solid var(--line);
+  background: #fbfdfc;
+  border: 1px solid #cbd9d2;
+  border-radius: 4px;
+  box-shadow: inset 4px 0 0 #5abf78;
   display: grid;
+  margin: 0 0 14px;
+  overflow: hidden;
 }
 
 .budget-type-group:first-child {
-  border-top: 0;
+  margin-top: 4px;
 }
 
-.budget-type-group > h3 {
+.budget-type-group.type-income { box-shadow: inset 4px 0 0 #2c9a62; }
+.budget-type-group.type-expense { box-shadow: inset 4px 0 0 #d28a18; }
+.budget-type-group.type-transfer { box-shadow: inset 4px 0 0 #2e8eb8; }
+.budget-type-group.type-other { box-shadow: inset 4px 0 0 #7b8580; }
+
+.budget-type-summary {
+  align-items: center;
+  background: #eef7f2;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  list-style: none;
+  min-height: 52px;
+  padding: 12px 14px 12px 18px;
+}
+
+.budget-type-summary::-webkit-details-marker {
+  display: none;
+}
+
+.budget-type-summary::before {
   color: var(--muted);
+  content: "v";
+  font-size: 13px;
+  font-weight: 700;
+  grid-column: 1;
+  grid-row: 1;
+  margin-left: -12px;
+  width: 10px;
+}
+
+.budget-type-group:not([open]) .budget-type-summary::before {
+  content: ">";
+}
+
+.budget-type-title {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 800;
+  padding-left: 8px;
+}
+
+.budget-type-stats {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
   font-size: 12px;
+  gap: 10px;
+  justify-content: flex-end;
   letter-spacing: 0;
-  margin: 14px 0 6px;
-  text-transform: uppercase;
+}
+
+.budget-type-stats b {
+  color: var(--ink);
+}
+
+.budget-type-rows {
+  display: grid;
+  padding: 0 12px 8px;
 }
 
 .stack-form {
@@ -792,14 +852,44 @@ td span {
   min-height: 58px;
 }
 
+.category-actions {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.category-delete-dialog {
+  border: 1px solid #c9d7d1;
+  border-radius: 4px;
+  box-shadow: 0 18px 40px rgba(17, 39, 30, 0.24);
+  max-width: 460px;
+  padding: 18px;
+  width: min(460px, calc(100vw - 32px));
+}
+
+.category-delete-dialog::backdrop {
+  background: rgba(27, 44, 37, 0.24);
+}
+
 .category-delete-form {
-  align-items: end;
   display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(180px, 1fr) auto;
-  justify-self: end;
-  max-width: 420px;
-  width: 100%;
+  gap: 14px;
+}
+
+.category-delete-form h3 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.category-delete-form p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .category-usage {
