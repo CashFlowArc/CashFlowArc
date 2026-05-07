@@ -713,6 +713,23 @@ td span {
   color: #6c7671;
 }
 
+.budget-type-group {
+  border-top: 1px solid var(--line);
+  display: grid;
+}
+
+.budget-type-group:first-child {
+  border-top: 0;
+}
+
+.budget-type-group > h3 {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0;
+  margin: 14px 0 6px;
+  text-transform: uppercase;
+}
+
 .stack-form {
   display: grid;
   gap: 11px;
@@ -760,14 +777,29 @@ td span {
   padding-top: 10px;
 }
 
+.category-row-shell {
+  border-bottom: 1px dotted var(--line);
+  display: grid;
+  gap: 8px;
+  padding: 9px 0;
+}
+
 .category-row {
   align-items: end;
-  border-bottom: 1px dotted var(--line);
   display: grid;
   gap: 10px;
   grid-template-columns: minmax(160px, 1fr) 120px 110px minmax(150px, auto) auto;
   min-height: 58px;
-  padding: 9px 0;
+}
+
+.category-delete-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  justify-self: end;
+  max-width: 420px;
+  width: 100%;
 }
 
 .category-usage {
@@ -1416,6 +1448,7 @@ pre {
   .inline-admin-form,
   .budget-edit-form,
   .category-row,
+  .category-delete-form,
   .transaction-edit-form {
     grid-template-columns: 1fr;
   }

@@ -25,6 +25,10 @@ def _requires_reconnect(exc: Exception) -> bool:
     return isinstance(exc, TellerAPIError) and bool(exc.code and exc.code.startswith("enrollment.disconnected"))
 
 
+def _is_closed_account(exc: Exception) -> bool:
+    return isinstance(exc, TellerAPIError) and exc.status == 410 and exc.code == "account.closed"
+
+
 def sync_connection(
     *,
     store: BudgetStore,
@@ -40,6 +44,7 @@ def sync_connection(
 
     accounts = teller.list_accounts(access_token)
     total_transactions = 0
+    closed_account_ids: set[str] = set()
 
     for account in accounts:
         links = account.get("links") or {}
@@ -66,7 +71,13 @@ def sync_connection(
                     error_code=_sync_error_code(exc),
                     error_message=str(exc),
                 )
-                if _requires_reconnect(exc):
+                if _is_closed_account(exc):
+                    account["status"] = "closed"
+                    account["links"] = {**links, "balances": None, "transactions": None}
+                    if account.get("id"):
+                        closed_account_ids.add(account["id"])
+                    store.mark_account_closed(user_id=user_id, provider_account_id=account.get("id"))
+                elif _requires_reconnect(exc):
                     store.conn.commit()
                     raise
         store.record_raw_teller_account(user_id=user_id, connection_id=connection_id, account=account)
@@ -75,6 +86,8 @@ def sync_connection(
 
     for account in accounts:
         links = account.get("links") or {}
+        if account.get("id") in closed_account_ids or account.get("status") == "closed":
+            continue
         if not links.get("transactions"):
             continue
 
@@ -117,6 +130,10 @@ def sync_connection(
                 error_code=_sync_error_code(exc),
                 error_message=str(exc),
             )
+            if _is_closed_account(exc):
+                store.mark_account_closed(user_id=user_id, provider_account_id=account.get("id"))
+                store.conn.commit()
+                continue
             store.conn.commit()
             raise
 

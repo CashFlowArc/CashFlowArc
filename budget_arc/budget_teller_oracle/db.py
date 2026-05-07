@@ -1141,6 +1141,26 @@ class BudgetStore:
                 raw_json=_json(account),
             )
 
+    def mark_account_closed(self, *, user_id: str, provider_account_id: str | None) -> int:
+        if not provider_account_id:
+            return 0
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE BUDGET_ACCOUNTS
+                SET STATUS = 'closed',
+                    SUPPORTS_BALANCES = 0,
+                    SUPPORTS_TRANSACTIONS = 0,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE PROVIDER = 'teller'
+                  AND USER_ID = :user_id
+                  AND PROVIDER_ACCOUNT_ID = :provider_account_id
+                """,
+                user_id=user_id,
+                provider_account_id=provider_account_id,
+            )
+            return cur.rowcount
+
     def record_raw_teller_transaction(
         self,
         *,
@@ -1410,6 +1430,188 @@ class BudgetStore:
                 status=status,
             )
             return bool(cur.rowcount)
+
+    def delete_category_with_reassignment(
+        self,
+        *,
+        user_id: str,
+        source_category_id: str,
+        target_category_id: str,
+    ) -> dict[str, Any]:
+        if source_category_id == target_category_id:
+            return {"ok": False, "error": "same_category"}
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT CATEGORY_ID, NAME
+                FROM BUDGET_CATEGORIES
+                WHERE USER_ID = :user_id
+                  AND CATEGORY_ID IN (:source_category_id, :target_category_id)
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+                target_category_id=target_category_id,
+            )
+            found = {row[0]: row[1] for row in cur.fetchall()}
+            if source_category_id not in found:
+                return {"ok": False, "error": "source_missing"}
+            if target_category_id not in found:
+                return {"ok": False, "error": "target_missing"}
+
+            cur.execute(
+                """
+                UPDATE BUDGET_CATEGORY_ALIASES
+                SET CATEGORY_ID = :target_category_id,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND CATEGORY_ID = :source_category_id
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+                target_category_id=target_category_id,
+            )
+            alias_count = cur.rowcount
+
+            cur.execute(
+                """
+                UPDATE BUDGET_TRANSACTION_EDITS
+                SET CATEGORY_ID = :target_category_id,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND CATEGORY_ID = :source_category_id
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+                target_category_id=target_category_id,
+            )
+            edit_count = cur.rowcount
+
+            cur.execute(
+                """
+                UPDATE BUDGET_TRANSACTION_EDITS
+                SET SUBCATEGORY_ID = :target_category_id,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND SUBCATEGORY_ID = :source_category_id
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+                target_category_id=target_category_id,
+            )
+            subcategory_count = cur.rowcount
+
+            cur.execute(
+                """
+                UPDATE BUDGET_TRANSACTION_SPLITS
+                SET CATEGORY_ID = :target_category_id,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND CATEGORY_ID = :source_category_id
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+                target_category_id=target_category_id,
+            )
+            split_count = cur.rowcount
+
+            cur.execute(
+                """
+                UPDATE BUDGET_TRANSACTION_RULES
+                SET CATEGORY_ID = :target_category_id,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND CATEGORY_ID = :source_category_id
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+                target_category_id=target_category_id,
+            )
+            rule_count = cur.rowcount
+
+            cur.execute(
+                """
+                UPDATE BUDGET_CATEGORIES
+                SET PARENT_CATEGORY_ID = :target_category_id,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND PARENT_CATEGORY_ID = :source_category_id
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+                target_category_id=target_category_id,
+            )
+
+            cur.execute(
+                """
+                MERGE INTO BUDGET_CATEGORY_BUDGETS target
+                USING (
+                    SELECT USER_ID,
+                           MONTH_KEY,
+                           SUM(BUDGETED_AMOUNT) AS BUDGETED_AMOUNT,
+                           MAX(ALERT_THRESHOLD) AS ALERT_THRESHOLD
+                    FROM BUDGET_CATEGORY_BUDGETS
+                    WHERE USER_ID = :user_id
+                      AND CATEGORY_ID = :source_category_id
+                    GROUP BY USER_ID, MONTH_KEY
+                ) source
+                ON (
+                    target.USER_ID = source.USER_ID
+                    AND target.MONTH_KEY = source.MONTH_KEY
+                    AND target.CATEGORY_ID = :target_category_id
+                )
+                WHEN MATCHED THEN UPDATE SET
+                    target.BUDGETED_AMOUNT = target.BUDGETED_AMOUNT + source.BUDGETED_AMOUNT,
+                    target.ALERT_THRESHOLD = GREATEST(target.ALERT_THRESHOLD, source.ALERT_THRESHOLD),
+                    target.UPDATED_AT = SYSTIMESTAMP
+                WHEN NOT MATCHED THEN INSERT (
+                    CATEGORY_BUDGET_ID, USER_ID, MONTH_KEY, CATEGORY_ID, BUDGETED_AMOUNT, ALERT_THRESHOLD
+                ) VALUES (
+                    LOWER(RAWTOHEX(SYS_GUID())),
+                    source.USER_ID,
+                    source.MONTH_KEY,
+                    :target_category_id,
+                    source.BUDGETED_AMOUNT,
+                    source.ALERT_THRESHOLD
+                )
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+                target_category_id=target_category_id,
+            )
+
+            cur.execute(
+                """
+                DELETE FROM BUDGET_CATEGORY_BUDGETS
+                WHERE USER_ID = :user_id
+                  AND CATEGORY_ID = :source_category_id
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+            )
+            budget_count = cur.rowcount
+
+            cur.execute(
+                """
+                DELETE FROM BUDGET_CATEGORIES
+                WHERE USER_ID = :user_id
+                  AND CATEGORY_ID = :source_category_id
+                """,
+                user_id=user_id,
+                source_category_id=source_category_id,
+            )
+            deleted_count = cur.rowcount
+
+        return {
+            "ok": bool(deleted_count),
+            "source_name": found.get(source_category_id),
+            "target_name": found.get(target_category_id),
+            "aliases": alias_count,
+            "transaction_edits": edit_count + subcategory_count,
+            "splits": split_count,
+            "rules": rule_count,
+            "budget_months": budget_count,
+        }
 
     def ensure_merchant(self, *, user_id: str, display_name: str | None) -> str | None:
         clean_name = (display_name or "").strip()

@@ -1441,10 +1441,12 @@ def create_app() -> Flask:
         review = request.args.get("review", "").strip()
         account_id = request.args.get("account", "").strip()
         institution_id = request.args.get("institution", "").strip()
+        category_id = request.args.get("category", "").strip()
         params: dict[str, Any] = {"user_id": user_id, "month_start": month_start, "month_end": month_end}
         effective_date = "NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE)"
         effective_merchant = "COALESCE(e.EDITED_MERCHANT_NAME, m.DISPLAY_NAME, t.COUNTERPARTY_NAME, t.DESCRIPTION)"
         effective_category = "COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized')"
+        effective_category_id = "COALESCE(e.CATEGORY_ID, raw_c.CATEGORY_ID)"
         effective_review = "NVL(e.REVIEWED_STATUS, 'new')"
         clauses = [
             "t.PROVIDER = 'teller'",
@@ -1464,6 +1466,9 @@ def create_app() -> Flask:
         if review:
             clauses.append(f"{effective_review} = :review")
             params["review"] = review
+        if category_id:
+            clauses.append(f"{effective_category_id} = :category_id")
+            params["category_id"] = category_id
         if account_id:
             clauses.append("t.PROVIDER_ACCOUNT_ID = :account_id")
             params["account_id"] = account_id
@@ -1549,7 +1554,7 @@ def create_app() -> Flask:
         )
         categories = _query_all(
             """
-            SELECT NAME AS CATEGORY_NAME
+            SELECT CATEGORY_ID, NAME AS CATEGORY_NAME
             FROM BUDGET_CATEGORIES
             WHERE USER_ID = :user_id
               AND STATUS = 'ACTIVE'
@@ -1589,6 +1594,7 @@ def create_app() -> Flask:
                 "q": search,
                 "status": status,
                 "review": review,
+                "category": category_id,
                 "account": account_id,
                 "institution": institution_id,
                 "month": selected_month,
@@ -1606,6 +1612,7 @@ def create_app() -> Flask:
             "q": request.form.get("q") or None,
             "status": request.form.get("status") or None,
             "review": request.form.get("review") or None,
+            "category": request.form.get("category") or None,
             "account": request.form.get("account") or None,
             "institution": request.form.get("institution") or None,
         }
@@ -1662,6 +1669,7 @@ def create_app() -> Flask:
             "q": request.form.get("q") or None,
             "status": request.form.get("status") or None,
             "review": request.form.get("review") or None,
+            "category": request.form.get("category") or None,
             "account": request.form.get("account") or None,
             "institution": request.form.get("institution") or None,
         }
@@ -1807,12 +1815,54 @@ def create_app() -> Flask:
         flash("Category updated." if updated else "Category was not found for your user.", "success" if updated else "error")
         return redirect(url_for("budget.categories", data_version=data_version))
 
+    @budget.route("/actions/categories/<category_id>/delete", methods=["POST"])
+    @user_required
+    def delete_category_action(category_id: str) -> Any:
+        require_csrf()
+        target_category_id = request.form.get("target_category_id", "").strip()
+        if not target_category_id:
+            flash("Choose a category to receive the deleted category's transactions.", "error")
+            return redirect(url_for("budget.categories"))
+
+        conn = connect(app_config.oracle)
+        try:
+            result = BudgetStore(conn).delete_category_with_reassignment(
+                user_id=current_user_id(),
+                source_category_id=category_id,
+                target_category_id=target_category_id,
+            )
+            if result.get("ok"):
+                conn.commit()
+            else:
+                conn.rollback()
+        finally:
+            conn.close()
+
+        data_version = mark_budget_data_changed()
+        if not result.get("ok"):
+            message = {
+                "same_category": "Choose a different category before deleting.",
+                "source_missing": "That category was not found for your user.",
+                "target_missing": "The receiving category was not found for your user.",
+            }.get(result.get("error"), "Category could not be deleted.")
+            flash(message, "error")
+            return redirect(url_for("budget.categories", data_version=data_version))
+
+        flash(
+            f"Deleted {result.get('source_name')} and moved its activity to {result.get('target_name')}.",
+            "success",
+        )
+        return redirect(url_for("budget.categories", data_version=data_version))
+
     @budget.route("/budgets")
     @user_required
     def budgets() -> Any:
         user_id = current_user_id()
         _ensure_user_category_catalog(user_id)
         month_start, month_end, selected_month = _selected_month_bounds()
+        current_month_start = dt.date.today().replace(day=1)
+        is_past_month = month_start < current_month_start
+        is_future_month = month_start > current_month_start
         lookback_start = month_start
         for _ in range(3):
             lookback_start = (lookback_start - dt.timedelta(days=1)).replace(day=1)
@@ -1896,7 +1946,14 @@ def create_app() -> Flask:
         )
         budget_rows = _query_all(
             """
-            SELECT b.CATEGORY_ID, c.NAME AS CATEGORY, b.BUDGETED_AMOUNT, b.ALERT_THRESHOLD
+            SELECT
+                b.CATEGORY_ID,
+                c.NAME AS CATEGORY,
+                c.CATEGORY_TYPE,
+                b.BUDGETED_AMOUNT,
+                b.ALERT_THRESHOLD,
+                b.MONTH_KEY AS SOURCE_MONTH,
+                0 AS IS_INHERITED
             FROM BUDGET_CATEGORY_BUDGETS b
             JOIN BUDGET_CATEGORIES c
               ON c.USER_ID = b.USER_ID
@@ -1907,6 +1964,46 @@ def create_app() -> Flask:
             user_id=user_id,
             month_key=selected_month,
         )
+        if is_future_month:
+            inherited_budget_rows = _query_all(
+                """
+                SELECT
+                    CATEGORY_ID,
+                    CATEGORY,
+                    CATEGORY_TYPE,
+                    BUDGETED_AMOUNT,
+                    ALERT_THRESHOLD,
+                    SOURCE_MONTH,
+                    1 AS IS_INHERITED
+                FROM (
+                    SELECT
+                        b.CATEGORY_ID,
+                        c.NAME AS CATEGORY,
+                        c.CATEGORY_TYPE,
+                        b.BUDGETED_AMOUNT,
+                        b.ALERT_THRESHOLD,
+                        b.MONTH_KEY AS SOURCE_MONTH,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY b.CATEGORY_ID
+                            ORDER BY b.MONTH_KEY DESC
+                        ) AS RN
+                    FROM BUDGET_CATEGORY_BUDGETS b
+                    JOIN BUDGET_CATEGORIES c
+                      ON c.USER_ID = b.USER_ID
+                     AND c.CATEGORY_ID = b.CATEGORY_ID
+                    WHERE b.USER_ID = :user_id
+                      AND b.MONTH_KEY < :month_key
+                )
+                WHERE RN = 1
+                """,
+                user_id=user_id,
+                month_key=selected_month,
+            )
+            explicit_category_ids = {row.get("category_id") for row in budget_rows}
+            budget_rows.extend(
+                row for row in inherited_budget_rows
+                if row.get("category_id") not in explicit_category_ids
+            )
         managed_categories = _query_all(
             """
             SELECT CATEGORY_ID, NAME, CATEGORY_TYPE
@@ -1993,8 +2090,11 @@ def create_app() -> Flask:
                 },
             )
             item["category_id"] = row.get("category_id")
+            item["category_type"] = row.get("category_type") or item.get("category_type") or "expense"
             item["budgeted_amount"] = _decimal(row.get("budgeted_amount"))
             item["alert_threshold"] = _decimal(row.get("alert_threshold")) or Decimal("1")
+            item["budget_source_month"] = row.get("source_month") or selected_month
+            item["is_inherited"] = bool(row.get("is_inherited"))
         for row in recommended_rows:
             key = str(row.get("category") or "").lower()
             item = category_map.setdefault(
@@ -2012,7 +2112,15 @@ def create_app() -> Flask:
             )
             item["recommended_amount"] = _decimal(row.get("recommended_amount"))
 
-        rows = sorted(category_map.values(), key=lambda row: (_decimal(row.get("spend_total")) <= 0, str(row.get("category")).lower()))
+        type_order = {"income": 0, "expense": 1, "transfer": 2, "other": 3}
+        rows = sorted(
+            category_map.values(),
+            key=lambda row: (
+                type_order.get(str(row.get("category_type") or "expense"), 4),
+                _decimal(row.get("spend_total")) <= 0,
+                str(row.get("category")).lower(),
+            ),
+        )
         total_spent = sum((_decimal(row.get("spend_total")) for row in rows), Decimal("0"))
         total_budgeted = sum((_decimal(row.get("budgeted_amount")) for row in rows), Decimal("0"))
         for row in rows:
@@ -2026,11 +2134,35 @@ def create_app() -> Flask:
                 row["budget_pct"] = 100.0 if spend > 0 else 0.0
                 row["budget_delta"] = -spend
                 row["budget_state"] = "Unbudgeted" if spend > 0 else "Not set"
+            source_month = row.get("budget_source_month")
+            row["budget_source_label"] = ""
+            if source_month:
+                try:
+                    row["budget_source_label"] = dt.date.fromisoformat(f"{source_month}-01").strftime("%B %Y")
+                except ValueError:
+                    row["budget_source_label"] = str(source_month)
         overbudget_rows = [
             row for row in rows
             if (_decimal(row.get("budgeted_amount")) > 0 and _decimal(row.get("spend_total")) > _decimal(row.get("budgeted_amount")))
             or (_decimal(row.get("budgeted_amount")) == 0 and _decimal(row.get("spend_total")) > 0)
         ]
+        group_labels = {
+            "income": "Income",
+            "expense": "Expense",
+            "transfer": "Transfer",
+            "other": "Other",
+        }
+        budget_groups = []
+        for category_type in ["income", "expense", "transfer", "other"]:
+            group_rows = [row for row in rows if (row.get("category_type") or "expense") == category_type]
+            if group_rows:
+                budget_groups.append(
+                    {
+                        "category_type": category_type,
+                        "label": group_labels[category_type],
+                        "rows": group_rows,
+                    }
+                )
         projected_income = _decimal(plan.get("projected_income"))
         actual_income = _decimal(income.get("actual_income"))
         income_pct = min(float((actual_income / projected_income) * Decimal("100")), 100.0) if projected_income > 0 else 0.0
@@ -2049,17 +2181,26 @@ def create_app() -> Flask:
             "budgets.html",
             categories=rows,
             managed_categories=managed_categories,
+            budget_groups=budget_groups,
             overbudget_rows=overbudget_rows,
             summary=summary,
             month_start=month_start,
             selected_month=selected_month,
+            budget_period={
+                "is_past": is_past_month,
+                "is_future": is_future_month,
+            },
         )
 
     @budget.route("/actions/budgets/month", methods=["POST"])
     @user_required
     def save_monthly_budget_action() -> Any:
         require_csrf()
-        selected_month = (_parse_month(request.form.get("month")) or dt.date.today().replace(day=1)).strftime("%Y-%m")
+        selected_month_date = _parse_month(request.form.get("month")) or dt.date.today().replace(day=1)
+        selected_month = selected_month_date.strftime("%Y-%m")
+        if selected_month_date < dt.date.today().replace(day=1):
+            flash("Past month budget settings are locked.", "error")
+            return redirect(url_for("budget.budgets", month=selected_month))
         projected_income = _parse_money(request.form.get("projected_income"))
         if projected_income is None:
             flash("Enter a valid projected income.", "error")
@@ -2082,7 +2223,11 @@ def create_app() -> Flask:
     @user_required
     def save_category_budget_action() -> Any:
         require_csrf()
-        selected_month = (_parse_month(request.form.get("month")) or dt.date.today().replace(day=1)).strftime("%Y-%m")
+        selected_month_date = _parse_month(request.form.get("month")) or dt.date.today().replace(day=1)
+        selected_month = selected_month_date.strftime("%Y-%m")
+        if selected_month_date < dt.date.today().replace(day=1):
+            flash("Past month category budgets are locked.", "error")
+            return redirect(url_for("budget.budgets", month=selected_month))
         category_name = request.form.get("category_name", "").strip()
         budgeted_amount = _parse_money(request.form.get("budgeted_amount"))
         if not category_name:
