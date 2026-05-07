@@ -473,9 +473,9 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
                   AND a.USER_ID IS NOT NULL
                   AND NOT EXISTS (
                       SELECT 1
-                      FROM BUDGET_RAW_TELLER_ACCOUNTS raw
-                      WHERE raw.USER_ID = a.USER_ID
-                        AND raw.PROVIDER_ACCOUNT_ID = a.PROVIDER_ACCOUNT_ID
+                      FROM BUDGET_RAW_TELLER_ACCOUNTS r
+                      WHERE r.USER_ID = a.USER_ID
+                        AND r.PROVIDER_ACCOUNT_ID = a.PROVIDER_ACCOUNT_ID
                   )
                 """
             )
@@ -500,9 +500,9 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
                   AND t.USER_ID IS NOT NULL
                   AND NOT EXISTS (
                       SELECT 1
-                      FROM BUDGET_RAW_TELLER_TRANSACTIONS raw
-                      WHERE raw.USER_ID = t.USER_ID
-                        AND raw.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
+                      FROM BUDGET_RAW_TELLER_TRANSACTIONS r
+                      WHERE r.USER_ID = t.USER_ID
+                        AND r.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
                   )
                 """
             )
