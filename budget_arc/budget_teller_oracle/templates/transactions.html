@@ -133,6 +133,18 @@
                     </div>
                     <button class="primary-button small-button" type="submit">Save</button>
                   </form>
+                  {% if txn.has_user_edit %}
+                    <form class="transaction-reset-form" method="post" action="{{ url_for('budget.reset_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="month" value="{{ filters.month }}">
+                      <input type="hidden" name="q" value="{{ filters.q }}">
+                      <input type="hidden" name="status" value="{{ filters.status }}">
+                      <input type="hidden" name="review" value="{{ filters.review }}">
+                      <input type="hidden" name="account" value="{{ filters.account }}">
+                      <input type="hidden" name="institution" value="{{ filters.institution }}">
+                      <button class="ghost-button small-button" type="submit">Restore original</button>
+                    </form>
+                  {% endif %}
                 </details>
               </td>
               <td><span class="pill">{{ txn.category or "Uncategorized" }}</span></td>

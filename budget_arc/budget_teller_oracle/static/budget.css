@@ -634,11 +634,16 @@ td span {
   height: 100%;
 }
 
+.progress.over span {
+  background: var(--red);
+}
+
 .budget-amount,
 .amount { font-weight: 700; }
 .budget-amount,
 .right { text-align: right; }
 .credit { color: var(--green-dark); }
+.over-budget-text { color: var(--red); }
 
 .month-band {
   border-bottom: 1px solid var(--line);
@@ -654,6 +659,123 @@ td span {
   display: grid;
   grid-template-columns: minmax(180px, 240px);
   gap: 12px;
+}
+
+.budget-plan-band {
+  align-items: end;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(180px, 240px) minmax(260px, 420px);
+}
+
+.income-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(150px, 1fr) auto;
+}
+
+.budget-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 22px;
+}
+
+.budget-row-plan {
+  grid-template-columns: minmax(130px, 170px) minmax(170px, 1fr) minmax(360px, 450px);
+  min-height: 78px;
+}
+
+.budget-row-plan.is-over {
+  background: #fffaf9;
+}
+
+.budget-progress-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.budget-progress-cell > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.budget-edit-form {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(70px, 1fr)) auto;
+}
+
+.budget-edit-form input:disabled {
+  background: #f3f5f4;
+  color: #6c7671;
+}
+
+.stack-form {
+  display: grid;
+  gap: 11px;
+  padding-top: 12px;
+}
+
+.overbudget-list {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+  padding-top: 14px;
+}
+
+.overbudget-list a {
+  align-items: center;
+  border-bottom: 1px dotted var(--line);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 30px;
+}
+
+.overbudget-list strong {
+  color: var(--red);
+}
+
+.category-layout {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: 260px minmax(0, 1fr);
+  padding-top: 22px;
+}
+
+.category-side {
+  align-self: start;
+}
+
+.restore-note {
+  margin: 10px 0 0;
+}
+
+.category-list {
+  display: grid;
+  padding-top: 10px;
+}
+
+.category-row {
+  align-items: end;
+  border-bottom: 1px dotted var(--line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(160px, 1fr) 120px 110px minmax(150px, auto) auto;
+  min-height: 58px;
+  padding: 9px 0;
+}
+
+.category-usage {
+  color: var(--muted);
+  display: grid;
+  font-size: 11px;
+  gap: 2px;
+  padding-bottom: 6px;
 }
 
 label {
@@ -1276,6 +1398,9 @@ pre {
   .dashboard-layout,
   .transactions-layout,
   .budget-board,
+  .budget-plan-band,
+  .budget-summary-grid,
+  .category-layout,
   .connect-panel,
   .account-connect-form {
     grid-template-columns: 1fr;
@@ -1289,6 +1414,8 @@ pre {
   .filter-rail { order: -1; }
   .admin-form,
   .inline-admin-form,
+  .budget-edit-form,
+  .category-row,
   .transaction-edit-form {
     grid-template-columns: 1fr;
   }

@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+{% block title %}BudgetArc Categories{% endblock %}
+{% block heading %}Categories{% endblock %}
+{% block eyebrow %}User-owned categories and restore controls{% endblock %}
+{% block content %}
+<section class="category-layout">
+  <aside class="module category-side">
+    <div class="module-heading">
+      <h2>Create Category</h2>
+    </div>
+    <form class="stack-form" method="post" action="{{ url_for('budget.create_category_action') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>
+        Name
+        <input name="name" maxlength="256" placeholder="Dining, Groceries, Travel">
+      </label>
+      <label>
+        Type
+        <select name="category_type">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+          <option value="transfer">Transfer</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <button class="primary-button" type="submit">Create</button>
+    </form>
+  </aside>
+
+  <section class="module">
+    <div class="module-heading">
+      <div>
+        <h2>Managed Categories</h2>
+        <p>{{ categories|length }} categories</p>
+      </div>
+      <form method="post" action="{{ url_for('budget.reset_transaction_overlays_action') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="ghost-button small-button" type="submit">Restore Teller originals</button>
+      </form>
+    </div>
+    <p class="form-note restore-note">
+      Removes {{ overlay_summary.edit_count or 0 }} transaction edits and {{ overlay_summary.split_count or 0 }} splits. Teller originals, categories, and budgets stay intact.
+    </p>
+    <div class="category-list">
+      {% for category in categories %}
+        <form class="category-row" method="post" action="{{ url_for('budget.update_category_action', category_id=category.category_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label>
+            Name
+            <input name="name" value="{{ category.name }}" maxlength="256">
+          </label>
+          <label>
+            Type
+            <select name="category_type">
+              {% for value in ["expense", "income", "transfer", "other"] %}
+                <option value="{{ value }}" {{ 'selected' if category.category_type == value else '' }}>{{ value|title }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Status
+            <select name="status">
+              <option value="ACTIVE" {{ 'selected' if category.status == 'ACTIVE' else '' }}>Active</option>
+              <option value="INACTIVE" {{ 'selected' if category.status == 'INACTIVE' else '' }}>Inactive</option>
+            </select>
+          </label>
+          <div class="category-usage">
+            <span>{{ category.edited_transaction_count or 0 }} edited txns</span>
+            <span>{{ category.budget_month_count or 0 }} budget months</span>
+          </div>
+          <button class="ghost-button small-button" type="submit">Save</button>
+        </form>
+      {% else %}
+        <p class="empty">No categories yet. Create one here or from Budgets.</p>
+      {% endfor %}
+    </div>
+  </section>
+</section>
+{% endblock %}

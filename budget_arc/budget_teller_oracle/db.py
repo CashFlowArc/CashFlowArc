@@ -336,6 +336,42 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
             """,
         ),
         (
+            "BUDGET_MONTHLY_PLANS",
+            """
+            CREATE TABLE BUDGET_MONTHLY_PLANS (
+                PLAN_ID VARCHAR2(64) PRIMARY KEY,
+                USER_ID VARCHAR2(64) NOT NULL,
+                MONTH_KEY VARCHAR2(7) NOT NULL,
+                PROJECTED_INCOME NUMBER(19, 4) DEFAULT 0 NOT NULL,
+                CREATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                UPDATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                CONSTRAINT BUDGET_MONTH_PLANS_USER_FK FOREIGN KEY (USER_ID)
+                    REFERENCES BUDGET_USERS (USER_ID),
+                CONSTRAINT BUDGET_MONTH_PLANS_UK UNIQUE (USER_ID, MONTH_KEY)
+            )
+            """,
+        ),
+        (
+            "BUDGET_CATEGORY_BUDGETS",
+            """
+            CREATE TABLE BUDGET_CATEGORY_BUDGETS (
+                CATEGORY_BUDGET_ID VARCHAR2(64) PRIMARY KEY,
+                USER_ID VARCHAR2(64) NOT NULL,
+                MONTH_KEY VARCHAR2(7) NOT NULL,
+                CATEGORY_ID VARCHAR2(64) NOT NULL,
+                BUDGETED_AMOUNT NUMBER(19, 4) DEFAULT 0 NOT NULL,
+                ALERT_THRESHOLD NUMBER(8, 4) DEFAULT 1 NOT NULL,
+                CREATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                UPDATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                CONSTRAINT BUDGET_CAT_BUDGETS_USER_FK FOREIGN KEY (USER_ID)
+                    REFERENCES BUDGET_USERS (USER_ID),
+                CONSTRAINT BUDGET_CAT_BUDGETS_CAT_FK FOREIGN KEY (CATEGORY_ID)
+                    REFERENCES BUDGET_CATEGORIES (CATEGORY_ID),
+                CONSTRAINT BUDGET_CAT_BUDGETS_UK UNIQUE (USER_ID, MONTH_KEY, CATEGORY_ID)
+            )
+            """,
+        ),
+        (
             "BUDGET_SYNC_EVENTS",
             """
             CREATE TABLE BUDGET_SYNC_EVENTS (
@@ -523,6 +559,8 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
             "CREATE INDEX BUDGET_RULES_USER_IDX ON BUDGET_TRANSACTION_RULES (USER_ID, STATUS, PRIORITY)",
             "CREATE INDEX BUDGET_EDITS_USER_IDX ON BUDGET_TRANSACTION_EDITS (USER_ID, PROVIDER_TRANSACTION_ID)",
             "CREATE INDEX BUDGET_SPLITS_USER_IDX ON BUDGET_TRANSACTION_SPLITS (USER_ID, PROVIDER_TRANSACTION_ID)",
+            "CREATE INDEX BUDGET_MONTH_PLANS_IDX ON BUDGET_MONTHLY_PLANS (USER_ID, MONTH_KEY)",
+            "CREATE INDEX BUDGET_CAT_BUDGETS_IDX ON BUDGET_CATEGORY_BUDGETS (USER_ID, MONTH_KEY)",
             "CREATE INDEX BUDGET_SYNC_CONN_IDX ON BUDGET_SYNC_EVENTS (CONNECTION_ID, STARTED_AT)",
             "CREATE INDEX BUDGET_ALERTS_USER_MONTH_IDX ON BUDGET_ALERTS (USER_ID, MONTH_KEY, STATUS)",
         ]
@@ -531,7 +569,7 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
                 cur.execute(ddl)
             except oracledb.DatabaseError as exc:
                 error_obj = exc.args[0]
-                if getattr(error_obj, "code", None) != 955:
+                if getattr(error_obj, "code", None) not in {955, 1408}:
                     raise
 
     conn.commit()
@@ -1166,6 +1204,17 @@ class BudgetStore:
             )
             row = cur.fetchone()
             if row:
+                cur.execute(
+                    """
+                    UPDATE BUDGET_CATEGORIES
+                    SET STATUS = 'ACTIVE',
+                        UPDATED_AT = SYSTIMESTAMP
+                    WHERE USER_ID = :user_id
+                      AND CATEGORY_ID = :category_id
+                    """,
+                    user_id=user_id,
+                    category_id=row[0],
+                )
                 return row[0]
 
             category_id = uuid.uuid4().hex
@@ -1182,6 +1231,41 @@ class BudgetStore:
                 name=clean_name,
             )
             return category_id
+
+    def update_category(
+        self,
+        *,
+        user_id: str,
+        category_id: str,
+        name: str,
+        category_type: str,
+        status: str,
+    ) -> bool:
+        clean_name = name.strip()
+        if not clean_name:
+            return False
+        if category_type not in {"expense", "income", "transfer", "other"}:
+            category_type = "expense"
+        if status not in {"ACTIVE", "INACTIVE"}:
+            status = "ACTIVE"
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE BUDGET_CATEGORIES
+                SET NAME = :name,
+                    CATEGORY_TYPE = :category_type,
+                    STATUS = :status,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND CATEGORY_ID = :category_id
+                """,
+                user_id=user_id,
+                category_id=category_id,
+                name=clean_name[:256],
+                category_type=category_type,
+                status=status,
+            )
+            return bool(cur.rowcount)
 
     def ensure_merchant(self, *, user_id: str, display_name: str | None) -> str | None:
         clean_name = (display_name or "").strip()
@@ -1291,6 +1375,134 @@ class BudgetStore:
                 excluded_from_budget=excluded_from_budget,
                 excluded_from_cash_flow=excluded_from_cash_flow,
                 notes=(notes or "").strip()[:1024] or None,
+            )
+
+    def reset_transaction_edit(self, *, user_id: str, provider_transaction_id: str) -> int:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM BUDGET_TRANSACTION_SPLITS
+                WHERE USER_ID = :user_id
+                  AND PROVIDER = 'teller'
+                  AND PROVIDER_TRANSACTION_ID = :provider_transaction_id
+                """,
+                user_id=user_id,
+                provider_transaction_id=provider_transaction_id,
+            )
+            split_count = cur.rowcount
+            cur.execute(
+                """
+                DELETE FROM BUDGET_TRANSACTION_EDITS
+                WHERE USER_ID = :user_id
+                  AND PROVIDER = 'teller'
+                  AND PROVIDER_TRANSACTION_ID = :provider_transaction_id
+                """,
+                user_id=user_id,
+                provider_transaction_id=provider_transaction_id,
+            )
+            return split_count + cur.rowcount
+
+    def reset_all_transaction_edits(self, *, user_id: str) -> int:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM BUDGET_TRANSACTION_SPLITS
+                WHERE USER_ID = :user_id
+                  AND PROVIDER = 'teller'
+                """,
+                user_id=user_id,
+            )
+            split_count = cur.rowcount
+            cur.execute(
+                """
+                DELETE FROM BUDGET_TRANSACTION_EDITS
+                WHERE USER_ID = :user_id
+                  AND PROVIDER = 'teller'
+                """,
+                user_id=user_id,
+            )
+            return split_count + cur.rowcount
+
+    def save_monthly_plan(self, *, user_id: str, month_key: str, projected_income: Decimal | None) -> None:
+        plan_id = uuid.uuid4().hex
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                MERGE INTO BUDGET_MONTHLY_PLANS target
+                USING (
+                    SELECT
+                        :plan_id AS PLAN_ID,
+                        :user_id AS USER_ID,
+                        :month_key AS MONTH_KEY,
+                        :projected_income AS PROJECTED_INCOME
+                    FROM dual
+                ) source
+                ON (
+                    target.USER_ID = source.USER_ID
+                    AND target.MONTH_KEY = source.MONTH_KEY
+                )
+                WHEN MATCHED THEN UPDATE SET
+                    target.PROJECTED_INCOME = source.PROJECTED_INCOME,
+                    target.UPDATED_AT = SYSTIMESTAMP
+                WHEN NOT MATCHED THEN INSERT (
+                    PLAN_ID, USER_ID, MONTH_KEY, PROJECTED_INCOME
+                ) VALUES (
+                    source.PLAN_ID, source.USER_ID, source.MONTH_KEY, source.PROJECTED_INCOME
+                )
+                """,
+                plan_id=plan_id,
+                user_id=user_id,
+                month_key=month_key,
+                projected_income=projected_income or Decimal("0"),
+            )
+
+    def save_category_budget(
+        self,
+        *,
+        user_id: str,
+        month_key: str,
+        category_id: str,
+        budgeted_amount: Decimal | None,
+        alert_threshold: Decimal | None = None,
+    ) -> None:
+        category_budget_id = uuid.uuid4().hex
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                MERGE INTO BUDGET_CATEGORY_BUDGETS target
+                USING (
+                    SELECT
+                        :category_budget_id AS CATEGORY_BUDGET_ID,
+                        :user_id AS USER_ID,
+                        :month_key AS MONTH_KEY,
+                        :category_id AS CATEGORY_ID,
+                        :budgeted_amount AS BUDGETED_AMOUNT,
+                        :alert_threshold AS ALERT_THRESHOLD
+                    FROM dual
+                ) source
+                ON (
+                    target.USER_ID = source.USER_ID
+                    AND target.MONTH_KEY = source.MONTH_KEY
+                    AND target.CATEGORY_ID = source.CATEGORY_ID
+                )
+                WHEN MATCHED THEN UPDATE SET
+                    target.BUDGETED_AMOUNT = source.BUDGETED_AMOUNT,
+                    target.ALERT_THRESHOLD = source.ALERT_THRESHOLD,
+                    target.UPDATED_AT = SYSTIMESTAMP
+                WHEN NOT MATCHED THEN INSERT (
+                    CATEGORY_BUDGET_ID, USER_ID, MONTH_KEY, CATEGORY_ID,
+                    BUDGETED_AMOUNT, ALERT_THRESHOLD
+                ) VALUES (
+                    source.CATEGORY_BUDGET_ID, source.USER_ID, source.MONTH_KEY, source.CATEGORY_ID,
+                    source.BUDGETED_AMOUNT, source.ALERT_THRESHOLD
+                )
+                """,
+                category_budget_id=category_budget_id,
+                user_id=user_id,
+                month_key=month_key,
+                category_id=category_id,
+                budgeted_amount=budgeted_amount or Decimal("0"),
+                alert_threshold=alert_threshold or Decimal("1"),
             )
 
     def upsert_transaction(

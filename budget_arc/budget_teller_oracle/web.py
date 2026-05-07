@@ -227,6 +227,16 @@ def _parse_date(value: str | None) -> dt.date | None:
         return None
 
 
+def _parse_money(value: str | None) -> Decimal | None:
+    cleaned = (value or "").replace("$", "").replace(",", "").strip()
+    if not cleaned:
+        return Decimal("0")
+    try:
+        return Decimal(cleaned)
+    except Exception:
+        return None
+
+
 def _month_bounds(month_value: str | None = None) -> tuple[dt.date, dt.date]:
     start = _parse_month(month_value) or dt.date.today().replace(day=1)
     return start, _month_end(start)
@@ -1605,14 +1615,165 @@ def create_app() -> Flask:
         flash("Transaction edits saved without changing the Teller original.", "success")
         return redirect(url_for("budget.transactions", **clean_return_args))
 
+    @budget.route("/actions/transactions/<provider_transaction_id>/reset", methods=["POST"])
+    @user_required
+    def reset_transaction_action(provider_transaction_id: str) -> Any:
+        require_csrf()
+        user_id = current_user_id()
+        return_args = {
+            "month": request.form.get("month") or None,
+            "q": request.form.get("q") or None,
+            "status": request.form.get("status") or None,
+            "review": request.form.get("review") or None,
+            "account": request.form.get("account") or None,
+            "institution": request.form.get("institution") or None,
+        }
+        clean_return_args = {key: value for key, value in return_args.items() if value}
+        conn = connect(app_config.oracle)
+        try:
+            store = BudgetStore(conn)
+            if not store.transaction_belongs_to_user(
+                user_id=user_id,
+                provider_transaction_id=provider_transaction_id,
+            ):
+                flash("That transaction was not found for your user.", "error")
+                return redirect(url_for("budget.transactions", **clean_return_args))
+            removed_count = store.reset_transaction_edit(
+                user_id=user_id,
+                provider_transaction_id=provider_transaction_id,
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        data_version = mark_budget_data_changed()
+        clean_return_args["data_version"] = data_version
+        flash(
+            "Transaction restored to the Teller original." if removed_count else "That transaction was already original.",
+            "success",
+        )
+        return redirect(url_for("budget.transactions", **clean_return_args))
+
+    @budget.route("/actions/transaction-overlays/reset", methods=["POST"])
+    @user_required
+    def reset_transaction_overlays_action() -> Any:
+        require_csrf()
+        user_id = current_user_id()
+        conn = connect(app_config.oracle)
+        try:
+            removed_count = BudgetStore(conn).reset_all_transaction_edits(user_id=user_id)
+            conn.commit()
+        finally:
+            conn.close()
+        data_version = mark_budget_data_changed()
+        flash(f"Restored Teller originals by removing {removed_count} user transaction changes.", "success")
+        return redirect(url_for("budget.categories", data_version=data_version))
+
+    @budget.route("/categories")
+    @user_required
+    def categories() -> Any:
+        user_id = current_user_id()
+        rows = _query_all(
+            """
+            SELECT
+                c.CATEGORY_ID,
+                c.NAME,
+                c.CATEGORY_TYPE,
+                c.STATUS,
+                c.CREATED_AT,
+                c.UPDATED_AT,
+                COUNT(DISTINCT e.PROVIDER_TRANSACTION_ID) AS EDITED_TRANSACTION_COUNT,
+                COUNT(DISTINCT b.MONTH_KEY) AS BUDGET_MONTH_COUNT
+            FROM BUDGET_CATEGORIES c
+            LEFT JOIN BUDGET_TRANSACTION_EDITS e
+              ON e.USER_ID = c.USER_ID
+             AND e.CATEGORY_ID = c.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORY_BUDGETS b
+              ON b.USER_ID = c.USER_ID
+             AND b.CATEGORY_ID = c.CATEGORY_ID
+            WHERE c.USER_ID = :user_id
+            GROUP BY
+                c.CATEGORY_ID, c.NAME, c.CATEGORY_TYPE, c.STATUS, c.CREATED_AT, c.UPDATED_AT
+            ORDER BY c.STATUS, LOWER(c.NAME)
+            """,
+            user_id=user_id,
+        )
+        overlay_summary = _query_one(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM BUDGET_TRANSACTION_EDITS WHERE USER_ID = :user_id AND PROVIDER = 'teller') AS EDIT_COUNT,
+                (SELECT COUNT(*) FROM BUDGET_TRANSACTION_SPLITS WHERE USER_ID = :user_id AND PROVIDER = 'teller') AS SPLIT_COUNT
+            FROM dual
+            """,
+            user_id=user_id,
+        ) or {}
+        return render_template(
+            "categories.html",
+            categories=rows,
+            overlay_summary=overlay_summary,
+        )
+
+    @budget.route("/actions/categories/create", methods=["POST"])
+    @user_required
+    def create_category_action() -> Any:
+        require_csrf()
+        name = request.form.get("name", "").strip()
+        category_type = request.form.get("category_type", "expense").strip()
+        if not name:
+            flash("Enter a category name.", "error")
+            return redirect(url_for("budget.categories"))
+        conn = connect(app_config.oracle)
+        try:
+            store = BudgetStore(conn)
+            category_id = store.ensure_category(user_id=current_user_id(), name=name)
+            if category_id:
+                store.update_category(
+                    user_id=current_user_id(),
+                    category_id=category_id,
+                    name=name,
+                    category_type=category_type,
+                    status="ACTIVE",
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        data_version = mark_budget_data_changed()
+        flash("Category saved.", "success")
+        return redirect(url_for("budget.categories", data_version=data_version))
+
+    @budget.route("/actions/categories/<category_id>/update", methods=["POST"])
+    @user_required
+    def update_category_action(category_id: str) -> Any:
+        require_csrf()
+        conn = connect(app_config.oracle)
+        try:
+            updated = BudgetStore(conn).update_category(
+                user_id=current_user_id(),
+                category_id=category_id,
+                name=request.form.get("name", ""),
+                category_type=request.form.get("category_type", "expense"),
+                status=request.form.get("status", "ACTIVE"),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        data_version = mark_budget_data_changed()
+        flash("Category updated." if updated else "Category was not found for your user.", "success" if updated else "error")
+        return redirect(url_for("budget.categories", data_version=data_version))
+
     @budget.route("/budgets")
     @user_required
     def budgets() -> Any:
         user_id = current_user_id()
         month_start, month_end, selected_month = _selected_month_bounds()
-        rows = _query_all(
+        lookback_start = month_start
+        for _ in range(3):
+            lookback_start = (lookback_start - dt.timedelta(days=1)).replace(day=1)
+
+        actual_rows = _query_all(
             """
-            SELECT COALESCE(c.NAME, t.CATEGORY, 'uncategorized') AS CATEGORY,
+            SELECT
+                   COALESCE(e.CATEGORY_ID, original_c.CATEGORY_ID) AS CATEGORY_ID,
+                   COALESCE(edited_c.NAME, original_c.NAME, t.CATEGORY, 'uncategorized') AS CATEGORY,
                    SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) AS SPEND_TOTAL,
                    COUNT(*) AS TRANSACTION_COUNT
             FROM BUDGET_TRANSACTIONS t
@@ -1620,28 +1781,279 @@ def create_app() -> Flask:
               ON e.USER_ID = t.USER_ID
              AND e.PROVIDER = t.PROVIDER
              AND e.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
-            LEFT JOIN BUDGET_CATEGORIES c
-              ON c.USER_ID = t.USER_ID
-             AND c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORIES edited_c
+              ON edited_c.USER_ID = t.USER_ID
+             AND edited_c.CATEGORY_ID = e.CATEGORY_ID
+            LEFT JOIN BUDGET_CATEGORIES original_c
+              ON original_c.USER_ID = t.USER_ID
+             AND original_c.PARENT_CATEGORY_ID IS NULL
+             AND LOWER(original_c.NAME) = LOWER(t.CATEGORY)
             WHERE t.PROVIDER = 'teller'
               AND t.USER_ID = :user_id
               AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) >= :month_start
               AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) < :month_end
               AND NVL(e.EXCLUDED_FROM_BUDGET, 0) = 0
-            GROUP BY COALESCE(c.NAME, t.CATEGORY, 'uncategorized')
+            GROUP BY
+                COALESCE(e.CATEGORY_ID, original_c.CATEGORY_ID),
+                COALESCE(edited_c.NAME, original_c.NAME, t.CATEGORY, 'uncategorized')
             ORDER BY SPEND_TOTAL DESC NULLS LAST
             """,
             user_id=user_id,
             month_start=month_start,
             month_end=month_end,
         )
-        rows = _attach_bar_percent(rows, "spend_total")
+        recommended_rows = _query_all(
+            """
+            WITH monthly_spend AS (
+                SELECT
+                    COALESCE(edited_c.NAME, original_c.NAME, t.CATEGORY, 'uncategorized') AS CATEGORY,
+                    TO_CHAR(NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE), 'YYYY-MM') AS MONTH_KEY,
+                    SUM(CASE WHEN t.AMOUNT > 0 THEN t.AMOUNT ELSE 0 END) AS SPEND_TOTAL
+                FROM BUDGET_TRANSACTIONS t
+                LEFT JOIN BUDGET_TRANSACTION_EDITS e
+                  ON e.USER_ID = t.USER_ID
+                 AND e.PROVIDER = t.PROVIDER
+                 AND e.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
+                LEFT JOIN BUDGET_CATEGORIES edited_c
+                  ON edited_c.USER_ID = t.USER_ID
+                 AND edited_c.CATEGORY_ID = e.CATEGORY_ID
+                LEFT JOIN BUDGET_CATEGORIES original_c
+                  ON original_c.USER_ID = t.USER_ID
+                 AND original_c.PARENT_CATEGORY_ID IS NULL
+                 AND LOWER(original_c.NAME) = LOWER(t.CATEGORY)
+                WHERE t.PROVIDER = 'teller'
+                  AND t.USER_ID = :user_id
+                  AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) >= :lookback_start
+                  AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) < :month_start
+                  AND NVL(e.EXCLUDED_FROM_BUDGET, 0) = 0
+                GROUP BY
+                    COALESCE(edited_c.NAME, original_c.NAME, t.CATEGORY, 'uncategorized'),
+                    TO_CHAR(NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE), 'YYYY-MM')
+            )
+            SELECT CATEGORY, AVG(SPEND_TOTAL) AS RECOMMENDED_AMOUNT
+            FROM monthly_spend
+            GROUP BY CATEGORY
+            """,
+            user_id=user_id,
+            lookback_start=lookback_start,
+            month_start=month_start,
+        )
+        budget_rows = _query_all(
+            """
+            SELECT b.CATEGORY_ID, c.NAME AS CATEGORY, b.BUDGETED_AMOUNT, b.ALERT_THRESHOLD
+            FROM BUDGET_CATEGORY_BUDGETS b
+            JOIN BUDGET_CATEGORIES c
+              ON c.USER_ID = b.USER_ID
+             AND c.CATEGORY_ID = b.CATEGORY_ID
+            WHERE b.USER_ID = :user_id
+              AND b.MONTH_KEY = :month_key
+            """,
+            user_id=user_id,
+            month_key=selected_month,
+        )
+        managed_categories = _query_all(
+            """
+            SELECT CATEGORY_ID, NAME, CATEGORY_TYPE
+            FROM BUDGET_CATEGORIES
+            WHERE USER_ID = :user_id
+              AND STATUS = 'ACTIVE'
+            ORDER BY LOWER(NAME)
+            """,
+            user_id=user_id,
+        )
+        plan = _query_one(
+            """
+            SELECT PROJECTED_INCOME
+            FROM BUDGET_MONTHLY_PLANS
+            WHERE USER_ID = :user_id
+              AND MONTH_KEY = :month_key
+            """,
+            user_id=user_id,
+            month_key=selected_month,
+        ) or {"projected_income": Decimal("0")}
+        income = _query_one(
+            """
+            SELECT SUM(CASE WHEN t.AMOUNT < 0 THEN ABS(t.AMOUNT) ELSE 0 END) AS ACTUAL_INCOME
+            FROM BUDGET_TRANSACTIONS t
+            LEFT JOIN BUDGET_TRANSACTION_EDITS e
+              ON e.USER_ID = t.USER_ID
+             AND e.PROVIDER = t.PROVIDER
+             AND e.PROVIDER_TRANSACTION_ID = t.PROVIDER_TRANSACTION_ID
+            WHERE t.PROVIDER = 'teller'
+              AND t.USER_ID = :user_id
+              AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) >= :month_start
+              AND NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE) < :month_end
+              AND NVL(e.EXCLUDED_FROM_CASH_FLOW, 0) = 0
+            """,
+            user_id=user_id,
+            month_start=month_start,
+            month_end=month_end,
+        ) or {}
+
+        category_map: dict[str, dict[str, Any]] = {}
+        for category in managed_categories:
+            key = str(category.get("name") or "").lower()
+            category_map[key] = {
+                "category_id": category.get("category_id"),
+                "category": category.get("name"),
+                "category_type": category.get("category_type"),
+                "spend_total": Decimal("0"),
+                "transaction_count": 0,
+                "budgeted_amount": Decimal("0"),
+                "recommended_amount": Decimal("0"),
+                "alert_threshold": Decimal("1"),
+            }
+        for row in actual_rows:
+            key = str(row.get("category") or "uncategorized").lower()
+            item = category_map.setdefault(
+                key,
+                {
+                    "category_id": row.get("category_id"),
+                    "category": row.get("category") or "uncategorized",
+                    "category_type": "expense",
+                    "spend_total": Decimal("0"),
+                    "transaction_count": 0,
+                    "budgeted_amount": Decimal("0"),
+                    "recommended_amount": Decimal("0"),
+                    "alert_threshold": Decimal("1"),
+                },
+            )
+            item["category_id"] = item.get("category_id") or row.get("category_id")
+            item["spend_total"] = _decimal(row.get("spend_total"))
+            item["transaction_count"] = row.get("transaction_count") or 0
+        for row in budget_rows:
+            key = str(row.get("category") or "").lower()
+            item = category_map.setdefault(
+                key,
+                {
+                    "category_id": row.get("category_id"),
+                    "category": row.get("category"),
+                    "category_type": "expense",
+                    "spend_total": Decimal("0"),
+                    "transaction_count": 0,
+                    "budgeted_amount": Decimal("0"),
+                    "recommended_amount": Decimal("0"),
+                    "alert_threshold": Decimal("1"),
+                },
+            )
+            item["category_id"] = row.get("category_id")
+            item["budgeted_amount"] = _decimal(row.get("budgeted_amount"))
+            item["alert_threshold"] = _decimal(row.get("alert_threshold")) or Decimal("1")
+        for row in recommended_rows:
+            key = str(row.get("category") or "").lower()
+            item = category_map.setdefault(
+                key,
+                {
+                    "category_id": None,
+                    "category": row.get("category"),
+                    "category_type": "expense",
+                    "spend_total": Decimal("0"),
+                    "transaction_count": 0,
+                    "budgeted_amount": Decimal("0"),
+                    "recommended_amount": Decimal("0"),
+                    "alert_threshold": Decimal("1"),
+                },
+            )
+            item["recommended_amount"] = _decimal(row.get("recommended_amount"))
+
+        rows = sorted(category_map.values(), key=lambda row: (_decimal(row.get("spend_total")) <= 0, str(row.get("category")).lower()))
+        total_spent = sum((_decimal(row.get("spend_total")) for row in rows), Decimal("0"))
+        total_budgeted = sum((_decimal(row.get("budgeted_amount")) for row in rows), Decimal("0"))
+        for row in rows:
+            spend = _decimal(row.get("spend_total"))
+            budgeted = _decimal(row.get("budgeted_amount"))
+            if budgeted > 0:
+                row["budget_pct"] = min(float((spend / budgeted) * Decimal("100")), 100.0)
+                row["budget_delta"] = budgeted - spend
+                row["budget_state"] = "Over budget" if spend > budgeted else "On track"
+            else:
+                row["budget_pct"] = 100.0 if spend > 0 else 0.0
+                row["budget_delta"] = -spend
+                row["budget_state"] = "Unbudgeted" if spend > 0 else "Not set"
+        overbudget_rows = [
+            row for row in rows
+            if (_decimal(row.get("budgeted_amount")) > 0 and _decimal(row.get("spend_total")) > _decimal(row.get("budgeted_amount")))
+            or (_decimal(row.get("budgeted_amount")) == 0 and _decimal(row.get("spend_total")) > 0)
+        ]
+        projected_income = _decimal(plan.get("projected_income"))
+        actual_income = _decimal(income.get("actual_income"))
+        income_pct = min(float((actual_income / projected_income) * Decimal("100")), 100.0) if projected_income > 0 else 0.0
+        budget_pct = min(float((total_spent / total_budgeted) * Decimal("100")), 100.0) if total_budgeted > 0 else (100.0 if total_spent > 0 else 0.0)
+        summary = {
+            "projected_income": projected_income,
+            "actual_income": actual_income,
+            "income_pct": income_pct,
+            "total_budgeted": total_budgeted,
+            "total_spent": total_spent,
+            "budget_pct": budget_pct,
+            "forecast": projected_income - total_budgeted,
+            "actual_after_spend": actual_income - total_spent,
+        }
         return render_template(
             "budgets.html",
             categories=rows,
+            managed_categories=managed_categories,
+            overbudget_rows=overbudget_rows,
+            summary=summary,
             month_start=month_start,
             selected_month=selected_month,
         )
+
+    @budget.route("/actions/budgets/month", methods=["POST"])
+    @user_required
+    def save_monthly_budget_action() -> Any:
+        require_csrf()
+        selected_month = (_parse_month(request.form.get("month")) or dt.date.today().replace(day=1)).strftime("%Y-%m")
+        projected_income = _parse_money(request.form.get("projected_income"))
+        if projected_income is None:
+            flash("Enter a valid projected income.", "error")
+            return redirect(url_for("budget.budgets", month=selected_month))
+        conn = connect(app_config.oracle)
+        try:
+            BudgetStore(conn).save_monthly_plan(
+                user_id=current_user_id(),
+                month_key=selected_month,
+                projected_income=projected_income,
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        data_version = mark_budget_data_changed()
+        flash("Monthly income forecast saved for this month only.", "success")
+        return redirect(url_for("budget.budgets", month=selected_month, data_version=data_version))
+
+    @budget.route("/actions/budgets/category", methods=["POST"])
+    @user_required
+    def save_category_budget_action() -> Any:
+        require_csrf()
+        selected_month = (_parse_month(request.form.get("month")) or dt.date.today().replace(day=1)).strftime("%Y-%m")
+        category_name = request.form.get("category_name", "").strip()
+        budgeted_amount = _parse_money(request.form.get("budgeted_amount"))
+        if not category_name:
+            flash("Enter a category name.", "error")
+            return redirect(url_for("budget.budgets", month=selected_month))
+        if budgeted_amount is None:
+            flash("Enter a valid budget amount.", "error")
+            return redirect(url_for("budget.budgets", month=selected_month))
+        conn = connect(app_config.oracle)
+        try:
+            store = BudgetStore(conn)
+            category_id = store.ensure_category(user_id=current_user_id(), name=category_name)
+            if not category_id:
+                flash("Category could not be created.", "error")
+                return redirect(url_for("budget.budgets", month=selected_month))
+            store.save_category_budget(
+                user_id=current_user_id(),
+                month_key=selected_month,
+                category_id=category_id,
+                budgeted_amount=budgeted_amount,
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        data_version = mark_budget_data_changed()
+        flash("Category budget saved for this month only.", "success")
+        return redirect(url_for("budget.budgets", month=selected_month, data_version=data_version))
 
     @budget.route("/net-worth")
     @user_required

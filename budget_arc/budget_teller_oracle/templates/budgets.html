@@ -1,54 +1,138 @@
 {% extends "layout.html" %}
 {% block title %}BudgetArc Budgets{% endblock %}
 {% block heading %}Budgets{% endblock %}
-{% block eyebrow %}{{ month_start.strftime('%B %Y') }} category progress{% endblock %}
+{% block eyebrow %}{{ month_start.strftime('%B %Y') }} spending plan{% endblock %}
 {% block content %}
-<section class="month-band">
+<section class="month-band budget-plan-band">
   <form class="month-selector" method="get">
     <label>
       Review month
       <input name="month" type="month" value="{{ selected_month }}" onchange="this.form.submit()">
     </label>
   </form>
+  <form class="income-form" method="post" action="{{ url_for('budget.save_monthly_budget_action') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="month" value="{{ selected_month }}">
+    <label>
+      Projected income
+      <input name="projected_income" inputmode="decimal" value="{{ '%.2f'|format(summary.projected_income or 0) }}">
+    </label>
+    <button class="primary-button" type="submit">Save income</button>
+  </form>
+</section>
+
+<section class="budget-summary-grid">
+  <article class="module budget-total">
+    <div class="module-heading"><h2>Income Progress</h2></div>
+    <div class="budget-total-figure">
+      <span>Received / projected</span>
+      <strong>{{ format_money(summary.actual_income) }} / {{ format_money(summary.projected_income) }}</strong>
+      <div class="progress"><span style="width: {{ summary.income_pct }}%"></span></div>
+    </div>
+  </article>
+  <article class="module budget-total">
+    <div class="module-heading"><h2>Overall Budget</h2></div>
+    <div class="budget-total-figure">
+      <span>Spent / budgeted</span>
+      <strong>{{ format_money(summary.total_spent) }} / {{ format_money(summary.total_budgeted) }}</strong>
+      <div class="progress {{ 'over' if summary.total_budgeted and summary.total_spent > summary.total_budgeted else '' }}">
+        <span style="width: {{ summary.budget_pct }}%"></span>
+      </div>
+    </div>
+  </article>
+  <article class="module budget-total">
+    <div class="module-heading"><h2>Forecast</h2></div>
+    <div class="budget-total-figure">
+      <span>Projected income minus planned budget</span>
+      <strong class="{{ 'credit' if summary.forecast >= 0 else 'over-budget-text' }}">{{ format_money(summary.forecast) }}</strong>
+      <em>Actual after spending: {{ format_money(summary.actual_after_spend) }}</em>
+    </div>
+  </article>
 </section>
 
 <section class="budget-board">
   <article class="module budget-total">
     <div class="module-heading">
-      <h2>Spending by Category</h2>
+      <h2>Add Category Budget</h2>
     </div>
-    {% set top_category = categories[0] if categories else None %}
-    <div class="budget-total-figure">
-      <span>Total tracked</span>
-      <strong>
-        {% set total = namespace(value=0) %}
-        {% for row in categories %}
-          {% set total.value = total.value + (row.spend_total or 0) %}
-        {% endfor %}
-        {{ format_money(total.value) }}
-      </strong>
-      {% if top_category %}
-        <em>{{ top_category.category|title }} is the largest category.</em>
-      {% endif %}
+    <form class="stack-form" method="post" action="{{ url_for('budget.save_category_budget_action') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="month" value="{{ selected_month }}">
+      <label>
+        Category
+        <input name="category_name" list="budget-category-options" placeholder="Create or pick category">
+      </label>
+      <label>
+        Monthly budget
+        <input name="budgeted_amount" inputmode="decimal" placeholder="0.00">
+      </label>
+      <button class="primary-button" type="submit">Save category budget</button>
+    </form>
+    <div class="overbudget-list">
+      <h3>Over Budget</h3>
+      {% for row in overbudget_rows[:6] %}
+        <a href="{{ url_for('budget.transactions', month=selected_month, q=row.category) }}">
+          <span>{{ row.category|title }}</span>
+          <strong>{{ format_money(row.spend_total) }}</strong>
+        </a>
+      {% else %}
+        <p class="empty compact-empty">No categories are over budget.</p>
+      {% endfor %}
     </div>
   </article>
 
   <article class="module">
+    <div class="module-heading">
+      <div>
+        <h2>Category Budgets</h2>
+        <p>Changes apply to {{ month_start.strftime('%B %Y') }} only.</p>
+      </div>
+      <a class="text-link" href="{{ url_for('budget.categories') }}">Manage categories</a>
+    </div>
     <div class="budget-list large">
       {% for row in categories %}
         {% set spend = row.spend_total or 0 %}
-        <div class="budget-row budget-row-dense">
+        {% set budgeted = row.budgeted_amount or 0 %}
+        <div class="budget-row budget-row-plan {{ 'is-over' if row.budget_state == 'Over budget' or row.budget_state == 'Unbudgeted' else '' }}">
           <div class="budget-meta">
             <strong>{{ row.category|title }}</strong>
-            <span>{{ row.transaction_count }} transactions</span>
+            <span>{{ row.transaction_count }} transactions / {{ row.budget_state }}</span>
           </div>
-          <div class="progress"><span style="width: {{ row.bar_pct }}%"></span></div>
-          <div class="budget-amount">{{ format_money(spend) }}</div>
+          <div class="budget-progress-cell">
+            <div class="progress {{ 'over' if row.budget_state == 'Over budget' or row.budget_state == 'Unbudgeted' else '' }}">
+              <span style="width: {{ row.budget_pct }}%"></span>
+            </div>
+            <span>{{ format_money(spend) }} spent{% if budgeted %} of {{ format_money(budgeted) }}{% endif %}</span>
+          </div>
+          <form class="budget-edit-form" method="post" action="{{ url_for('budget.save_category_budget_action') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="month" value="{{ selected_month }}">
+            <input type="hidden" name="category_name" value="{{ row.category }}">
+            <label>
+              Current
+              <input value="{{ '%.2f'|format(budgeted) }}" disabled>
+            </label>
+            <label>
+              Recommended
+              <input value="{{ '%.2f'|format(row.recommended_amount or 0) }}" disabled>
+            </label>
+            <label>
+              New
+              <input name="budgeted_amount" inputmode="decimal" value="{{ '%.2f'|format(budgeted) }}">
+            </label>
+            <button class="ghost-button small-button" type="submit">Save</button>
+          </form>
         </div>
       {% else %}
-        <p class="empty">No categories yet. Sync accounts first.</p>
+        <p class="empty">No categories yet. Create one from the form on this page.</p>
       {% endfor %}
     </div>
   </article>
 </section>
+
+<datalist id="budget-category-options">
+  {% for category in managed_categories %}
+    <option value="{{ category.name }}"></option>
+  {% endfor %}
+</datalist>
 {% endblock %}
