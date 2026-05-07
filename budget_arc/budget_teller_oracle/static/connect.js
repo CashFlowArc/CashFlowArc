@@ -15,7 +15,14 @@
   const repairConnectionId = pageParams.get("connection_id") || "";
 
   function show(payload) {
-    status.textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+    const message = typeof payload === "string"
+      ? payload
+      : payload.message || payload.error || (payload.ok ? "Teller sync complete." : "Teller response received.");
+    if (status) {
+      status.textContent = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+    } else {
+      showInstitutionStatus(message);
+    }
   }
 
   function showInstitutionStatus(message) {

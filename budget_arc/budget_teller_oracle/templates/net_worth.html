@@ -66,29 +66,4 @@
     <p class="empty">No live balances have been synced yet. Run Sync after repairing the Teller connection.</p>
   {% endif %}
 </section>
-
-<section class="panel">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">Accounts</p>
-      <h2>{{ accounts|length }} balances included</h2>
-    </div>
-  </div>
-  <div class="account-grid">
-    {% for account in accounts %}
-      <article class="account-card">
-        <p>{{ account.institution_name }}</p>
-        <h3>{{ account.account_name }}</h3>
-        <div class="account-meta">
-          <span>{{ account.account_type or "account" }}{% if account.account_subtype %} · {{ account.account_subtype }}{% endif %}</span>
-          <span>{{ "Liability" if account.is_liability else "Asset" }} balance: {{ format_money(account.running_balance) }}</span>
-          <span>Net worth impact: {{ format_money(account.net_worth_balance) }}</span>
-          <span>Latest: {{ iso_date(account.last_transaction_date) or "n/a" }}</span>
-        </div>
-      </article>
-    {% else %}
-      <p class="empty">No accounts with running balances were found.</p>
-    {% endfor %}
-  </div>
-</section>
 {% endblock %}

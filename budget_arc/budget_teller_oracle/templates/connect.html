@@ -3,7 +3,7 @@
 {% block heading %}Connect Accounts{% endblock %}
 {% block eyebrow %}Teller Connect for supported institutions{% endblock %}
 {% block content %}
-<section class="panel connect-panel">
+<section class="panel">
   <div>
     <p class="eyebrow">Secure account linking</p>
     {% if repair_connection %}
@@ -24,7 +24,6 @@
       <button id="connect" class="primary-button" type="button">Connect with Teller</button>
     {% endif %}
   </div>
-  <pre id="connect-status">Loading Teller configuration...</pre>
 </section>
 {% endblock %}
 {% block scripts %}

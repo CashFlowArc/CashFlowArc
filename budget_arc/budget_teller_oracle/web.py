@@ -1585,11 +1585,6 @@ def create_app() -> Flask:
             """,
             user_id=user_id,
         )
-        return render_template("accounts.html", accounts=rows, connections=connections)
-
-    @budget.route("/connect")
-    @user_required
-    def connect_page() -> Any:
         repair_connection: dict[str, Any] | None = None
         try:
             connection_id = _selected_connection_id()
@@ -1605,12 +1600,27 @@ def create_app() -> Flask:
                   AND USER_ID = :user_id
                   AND CONNECTION_ID = :connection_id
                 """,
-                user_id=current_user_id(),
+                user_id=user_id,
                 connection_id=connection_id,
             )
             if not repair_connection:
                 flash("That Teller connection was not found for your user.", "error")
-        return render_template("connect.html", repair_connection=repair_connection)
+        return render_template(
+            "accounts.html",
+            accounts=rows,
+            connections=connections,
+            repair_connection=repair_connection,
+        )
+
+    @budget.route("/connect")
+    @user_required
+    def connect_page() -> Any:
+        try:
+            connection_id = _selected_connection_id()
+        except ValueError:
+            flash("That Teller connection id is invalid.", "error")
+            return redirect(url_for("budget.accounts"))
+        return redirect(url_for("budget.accounts", connection_id=connection_id) if connection_id else url_for("budget.accounts"))
 
     @budget.route("/settings")
     @admin_required
