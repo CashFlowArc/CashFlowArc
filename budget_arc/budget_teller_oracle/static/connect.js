@@ -7,12 +7,14 @@
   const institutionStatus = document.getElementById("institution-status");
   let tellerConnect = null;
   let configuredInstitutionId = null;
+  let tellerReady = false;
   let setupRequestId = 0;
   let institutionSearchTimer = null;
   let institutionOptionsByLabel = new Map();
   let selectedInstitutionLabel = "";
   const pageParams = new URLSearchParams(window.location.search);
   const repairConnectionId = pageParams.get("connection_id") || "";
+  const minimumSearchLength = 3;
 
   function show(payload) {
     const message = typeof payload === "string"
@@ -29,6 +31,21 @@
     if (institutionStatus) {
       institutionStatus.textContent = message;
     }
+  }
+
+  function institutionQuery() {
+    return institutionSearch ? institutionSearch.value.trim() : "";
+  }
+
+  function hasConnectableInstitutionInput() {
+    return repairConnectionId || institutionQuery().length >= minimumSearchLength;
+  }
+
+  function updateConnectButton() {
+    if (!button) {
+      return;
+    }
+    button.disabled = !tellerReady || !hasConnectableInstitutionInput();
   }
 
   function selectedInstitutionId() {
@@ -53,7 +70,7 @@
     }
 
     const previousId = institutionIdInput.value;
-    const typedValue = institutionSearch.value.trim();
+    const typedValue = institutionQuery();
     const selectedId = institutionOptionsByLabel.get(typedValue) || "";
     institutionIdInput.value = selectedId;
     selectedInstitutionLabel = selectedId ? typedValue : "";
@@ -61,10 +78,13 @@
     if (selectedId) {
       showInstitutionStatus(`Selected ${typedValue}.`);
     } else if (!typedValue) {
-      showInstitutionStatus("Leave blank to use Teller's own institution picker.");
+      showInstitutionStatus("");
+    } else if (typedValue.length < minimumSearchLength) {
+      showInstitutionStatus("Type at least 3 characters to search institutions.");
     } else {
-      showInstitutionStatus("Keep typing to narrow the list, then select a suggestion.");
+      showInstitutionStatus("Select a matching institution from the list.");
     }
+    updateConnectButton();
 
     return previousId !== selectedId;
   }
@@ -93,17 +113,15 @@
     }
 
     const cleanQuery = query.trim();
-    if (cleanQuery && cleanQuery.length < 2) {
+    if (cleanQuery.length < minimumSearchLength) {
       setInstitutionOptions([]);
-      showInstitutionStatus("Type at least 2 characters to search Teller institutions.");
+      showInstitutionStatus(cleanQuery ? "Type at least 3 characters to search institutions." : "");
       return;
     }
 
     const params = new URLSearchParams({ limit: "40" });
-    if (cleanQuery) {
-      params.set("q", cleanQuery);
-    }
-    showInstitutionStatus(cleanQuery ? "Searching Teller institutions..." : "Leave blank to use Teller's own institution picker.");
+    params.set("q", cleanQuery);
+    showInstitutionStatus("Searching Teller institutions...");
     const response = await fetch(`./api/institutions?${params.toString()}`, { cache: "no-store" });
     const payload = await response.json();
     if (!payload.ok) {
@@ -111,7 +129,7 @@
       return;
     }
 
-    if (selectedInstitutionId() && institutionSearch.value.trim() === selectedInstitutionLabel) {
+    if (selectedInstitutionId() && institutionQuery() === selectedInstitutionLabel) {
       return;
     }
 
@@ -119,14 +137,12 @@
     if (selectionChanged) {
       refreshForInstitutionChange();
     }
-    if (!cleanQuery) {
-      showInstitutionStatus("Leave blank to use Teller's own institution picker.");
-    } else if ((payload.institutions || []).length) {
+    if ((payload.institutions || []).length) {
       if (!selectedInstitutionId()) {
         showInstitutionStatus(`Found ${(payload.institutions || []).length} matching Teller institutions. Select one from the dropdown.`);
       }
     } else {
-      showInstitutionStatus("No matching Teller institutions found. Try a broader search or use the Teller picker.");
+      showInstitutionStatus("No matching Teller institutions found. Try a broader search.");
     }
   }
 
@@ -144,7 +160,8 @@
     const config = await configResponse.json();
     if (!config.ok) {
       show(config);
-      button.disabled = true;
+      tellerReady = false;
+      updateConnectButton();
       return null;
     }
     return config;
@@ -153,7 +170,12 @@
   async function configureTellerConnect() {
     const requestId = ++setupRequestId;
     tellerConnect = null;
-    button.disabled = true;
+    tellerReady = false;
+    updateConnectButton();
+    if (!hasConnectableInstitutionInput()) {
+      showInstitutionStatus(institutionQuery() ? "Type at least 3 characters to search institutions." : "");
+      return;
+    }
     show("Preparing Teller Connect...");
 
     const config = await loadConfig();
@@ -212,12 +234,13 @@
       }
       tellerConnect = TellerConnect.setup(setupOptions);
 
-      button.disabled = false;
+      tellerReady = true;
+      updateConnectButton();
       configuredInstitutionId = config.institutionId || "";
       if (config.mode === "repair") {
         show(`Ready to repair ${config.institutionName || "Teller enrollment"}. Environment: ${config.environment}`);
       } else {
-        show(`Ready. Environment: ${config.environment}; institution: ${configuredInstitutionId || "Teller picker"}`);
+        show(`Ready. Environment: ${config.environment}; institution: ${configuredInstitutionId || institutionQuery()}`);
       }
     } catch (error) {
       show("Teller setup error: " + error.message);
@@ -237,11 +260,15 @@
 
   try {
     await configureTellerConnect();
-    await loadInstitutions("");
 
     button.addEventListener("click", function () {
-      if (!tellerConnect) {
-        show("Teller Connect is not ready yet. Refresh the page and try again.");
+      if (!hasConnectableInstitutionInput()) {
+        showInstitutionStatus("Type at least 3 characters before connecting.");
+        updateConnectButton();
+        return;
+      }
+      if (!tellerConnect || button.disabled) {
+        show("Teller Connect is not ready yet.");
         return;
       }
       show("Opening Teller Connect...");
@@ -257,8 +284,14 @@
         if (selectedInstitutionId()) {
           return;
         }
+        if (institutionQuery().length < minimumSearchLength) {
+          setInstitutionOptions([]);
+          refreshForInstitutionChange();
+          return;
+        }
+        refreshForInstitutionChange();
         institutionSearchTimer = window.setTimeout(function () {
-          loadInstitutions(institutionSearch.value).catch(function (error) {
+          loadInstitutions(institutionQuery()).catch(function (error) {
             showInstitutionStatus("Institution lookup failed: " + error.message);
           });
         }, 300);

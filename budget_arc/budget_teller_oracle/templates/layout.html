@@ -32,10 +32,15 @@
           {% endif %}
         </nav>
         {% if is_authenticated %}
-        <form class="session-actions" method="post" action="{{ url_for('budget.logout') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="ghost-button" type="submit">Sign out</button>
-        </form>
+          <div class="session-cluster">
+            {% if current_user %}
+              <p class="user-note">{{ "Global administrator" if is_admin else current_user.email }}</p>
+            {% endif %}
+            <form class="session-actions" method="post" action="{{ url_for('budget.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="ghost-button" type="submit">Sign out</button>
+            </form>
+          </div>
         {% endif %}
         </div>
       </header>
@@ -45,9 +50,6 @@
             <p class="eyebrow">{% block eyebrow %}Personal finance dashboard{% endblock %}</p>
             <h1>{% block heading %}Overview{% endblock %}</h1>
           </div>
-          {% if current_user %}
-            <p class="user-note">{{ "Global administrator" if is_admin else current_user.email }}</p>
-          {% endif %}
         </header>
 
         {% with messages = get_flashed_messages(with_categories=true) %}

@@ -153,9 +153,21 @@ h3 { font-size: 15px; margin-bottom: 8px; }
   font-weight: 700;
 }
 
-.session-actions {
+.session-cluster {
+  align-items: center;
   align-self: center;
+  display: flex;
+  gap: 12px;
   margin: 0 0 8px;
+}
+
+.session-cluster .user-note {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.session-actions {
+  margin: 0;
 }
 
 .main {
@@ -995,6 +1007,13 @@ select {
   color: var(--red);
 }
 
+.primary-button:disabled,
+.ghost-button:disabled,
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .small-button {
   min-height: 29px;
   padding: 5px 10px;
@@ -1050,8 +1069,8 @@ select {
 
 .transactions-layout {
   display: grid;
-  gap: 22px;
-  grid-template-columns: 225px minmax(0, 1fr);
+  gap: 18px;
+  grid-template-columns: 205px minmax(0, 1fr);
   padding-top: 22px;
 }
 
@@ -1082,7 +1101,23 @@ table {
 }
 
 .ledger-table table {
-  min-width: 1160px;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.txn-col-date { width: 98px; }
+.txn-col-description { width: 27%; }
+.txn-col-category { width: 15%; }
+.txn-col-account { width: 14%; }
+.txn-col-review { width: 70px; }
+.txn-col-exclude { width: 92px; }
+.txn-col-amount { width: 88px; }
+.txn-col-actions { width: 62px; }
+
+.ledger-table th,
+.ledger-table td {
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 th {
@@ -1161,11 +1196,11 @@ tbody tr.has-user-edit { background: #fffef9; }
 }
 
 .editable-cell {
-  min-width: 100px;
+  min-width: 0;
 }
 
 .merchant-cell {
-  min-width: 230px;
+  min-width: 0;
 }
 
 .cell-control {
@@ -1174,6 +1209,7 @@ tbody tr.has-user-edit { background: #fffef9; }
   font-size: 12px;
   min-height: 28px;
   padding: 4px 6px;
+  width: 100%;
 }
 
 .cell-control:hover,
@@ -1184,17 +1220,17 @@ tbody tr.has-user-edit { background: #fffef9; }
 }
 
 .date-control {
-  min-width: 126px;
+  font-size: 11px;
+  min-width: 0;
 }
 
 .merchant-control,
-.category-control,
-.notes-control {
-  min-width: 145px;
+.category-control {
+  min-width: 0;
 }
 
 .ledger-flags {
-  min-width: 104px;
+  min-width: 0;
 }
 
 .inline-check {
@@ -1216,7 +1252,13 @@ tbody tr.has-user-edit { background: #fffef9; }
 .ledger-actions {
   display: grid;
   gap: 4px;
-  min-width: 74px;
+  min-width: 0;
+}
+
+.ledger-actions .small-button {
+  font-size: 11px;
+  min-height: 26px;
+  padding: 4px 6px;
 }
 
 .connection-list {
@@ -1305,6 +1347,14 @@ tbody tr.has-user-edit { background: #fffef9; }
   padding-top: 8px;
 }
 
+.accounts-top-grid {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding-top: 18px;
+}
+
 .account-connect-module {
   border: 1px solid var(--line);
   padding: 12px;
@@ -1317,9 +1367,13 @@ tbody tr.has-user-edit { background: #fffef9; }
 .account-connect-form {
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(240px, 1fr) auto;
-  max-width: 760px;
+  grid-template-columns: 1fr;
+  max-width: none;
   padding-top: 10px;
+}
+
+.account-connect-form .primary-button {
+  width: 100%;
 }
 
 .account-connect-form .form-note {
@@ -1450,6 +1504,10 @@ tbody tr.has-user-edit { background: #fffef9; }
   fill: var(--ink);
   font-weight: 700;
 }
+.net-worth-chart text.axis-date {
+  fill: var(--muted);
+  font-size: 11px;
+}
 .net-worth-chart polygon { fill: url(#netWorthFill); }
 .net-worth-chart polyline {
   fill: none;
@@ -1457,13 +1515,6 @@ tbody tr.has-user-edit { background: #fffef9; }
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 3;
-}
-
-.chart-dates {
-  color: var(--muted);
-  display: flex;
-  font-size: 12px;
-  justify-content: space-between;
 }
 
 .connect-panel {
@@ -1585,7 +1636,7 @@ pre {
     width: 100%;
   }
 
-  .session-actions { justify-self: start; }
+  .session-cluster { justify-self: start; }
   .main {
     border-left: 0;
     border-right: 0;
@@ -1600,6 +1651,7 @@ pre {
   .budget-summary-grid,
   .category-layout,
   .connect-panel,
+  .accounts-top-grid,
   .account-connect-form {
     grid-template-columns: 1fr;
   }
@@ -1626,6 +1678,11 @@ pre {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+  .session-cluster {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
   .summary-strip.compact,
   .hero-grid {

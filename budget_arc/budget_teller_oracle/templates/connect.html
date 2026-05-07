@@ -16,12 +16,12 @@
       <p>Teller handles credentials and MFA. BudgetArc receives a signed enrollment, verifies it, encrypts the access token, stores it in Oracle, and starts a transaction sync.</p>
       <label>
         Institution
-        <input id="institution-search" list="institution-options" autocomplete="off" placeholder="Start typing an institution, or leave blank for Teller's picker">
+        <input id="institution-search" list="institution-options" autocomplete="off" minlength="3" placeholder="Start typing an institution">
         <datalist id="institution-options"></datalist>
         <input id="institution-id" type="hidden">
       </label>
-      <p id="institution-status" class="form-note">Select a suggestion to skip Teller's picker, or leave blank to use Teller's own institution picker.</p>
-      <button id="connect" class="primary-button" type="button">Connect with Teller</button>
+      <p id="institution-status" class="form-note" aria-live="polite"></p>
+      <button id="connect" class="primary-button" type="button" disabled>Connect with Teller</button>
     {% endif %}
   </div>
 </section>

@@ -54,13 +54,11 @@
           <line x1="96" x2="706" y1="{{ tick.y }}" y2="{{ tick.y }}"{% if tick.is_zero %} class="zero-line"{% endif %}></line>
           <text x="0" y="{{ tick.y + 4 }}"{% if tick.is_zero %} class="zero-line"{% endif %}>{{ tick.label }}</text>
         {% endfor %}
+        <text class="axis-date" x="96" y="184">{{ iso_date(summary.start_date) }}</text>
+        <text class="axis-date" x="706" y="184" text-anchor="end">{{ iso_date(summary.end_date) }}</text>
         <polygon points="{{ chart.area_points }}"></polygon>
         <polyline points="{{ chart.points }}"></polyline>
       </svg>
-      <div class="chart-dates">
-        <span>{{ iso_date(summary.start_date) }}</span>
-        <span>{{ iso_date(summary.end_date) }}</span>
-      </div>
     </div>
   {% else %}
     <p class="empty">No live balances have been synced yet. Run Sync after repairing the Teller connection.</p>

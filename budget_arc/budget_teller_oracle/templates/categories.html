@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block title %}BudgetArc Categories{% endblock %}
 {% block heading %}Categories{% endblock %}
-{% block eyebrow %}User-owned categories and restore controls{% endblock %}
+{% block eyebrow %}User-owned categories{% endblock %}
 {% block content %}
 <section class="category-layout">
   <aside class="module category-side">
@@ -42,14 +42,7 @@
         <h2>Managed Categories</h2>
         <p>{{ categories|length }} categories</p>
       </div>
-      <form method="post" action="{{ url_for('budget.reset_transaction_overlays_action') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="ghost-button small-button" type="submit">Restore Teller originals</button>
-      </form>
     </div>
-    <p class="form-note restore-note">
-      Removes {{ overlay_summary.edit_count or 0 }} transaction edits and {{ overlay_summary.split_count or 0 }} splits. Teller originals, categories, and budgets stay intact.
-    </p>
     <div class="category-list">
       <div class="category-list-heading" aria-hidden="true">
         <span>Name</span>

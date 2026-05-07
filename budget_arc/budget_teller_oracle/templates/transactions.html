@@ -78,16 +78,24 @@
     </div>
     <div class="table-wrap ledger-table">
       <table>
+        <colgroup>
+          <col class="txn-col-date">
+          <col class="txn-col-description">
+          <col class="txn-col-category">
+          <col class="txn-col-account">
+          <col class="txn-col-review">
+          <col class="txn-col-exclude">
+          <col class="txn-col-amount">
+          <col class="txn-col-actions">
+        </colgroup>
         <thead>
           <tr>
             <th>Date</th>
             <th>Description</th>
             <th>Category</th>
             <th>Account</th>
-            <th>Status</th>
             <th>Review</th>
             <th>Exclude</th>
-            <th>Notes</th>
             <th class="right">Amount</th>
             <th></th>
           </tr>
@@ -101,6 +109,7 @@
               <td class="editable-cell">
                 <form id="{{ edit_form_id }}" method="post" action="{{ url_for('budget.edit_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="autosave" value="1">
                   <input type="hidden" name="month" value="{{ filters.month }}">
                   <input type="hidden" name="q" value="{{ filters.q }}">
                   <input type="hidden" name="status" value="{{ filters.status }}">
@@ -108,24 +117,24 @@
                   <input type="hidden" name="category" value="{{ filters.category }}">
                   <input type="hidden" name="account" value="{{ filters.account }}">
                   <input type="hidden" name="institution" value="{{ filters.institution }}">
+                  <input type="hidden" name="notes" value="{{ txn.notes or '' }}">
                 </form>
-                <input class="cell-control date-control" form="{{ edit_form_id }}" name="transaction_date" type="date" value="{{ iso_date(txn.transaction_date) }}" aria-label="Transaction date">
+                <input class="cell-control ledger-autosave-control date-control" form="{{ edit_form_id }}" name="transaction_date" type="date" value="{{ iso_date(txn.transaction_date) }}" aria-label="Transaction date">
               </td>
               <td class="editable-cell merchant-cell">
-                <input class="cell-control merchant-control" form="{{ edit_form_id }}" name="merchant_name" list="merchant-options" value="{{ txn.merchant_name or '' }}" placeholder="Merchant name" aria-label="Merchant name">
+                <input class="cell-control ledger-autosave-control merchant-control" form="{{ edit_form_id }}" name="merchant_name" list="merchant-options" value="{{ txn.merchant_name or '' }}" placeholder="Merchant name" aria-label="Merchant name">
                 <span>{{ txn.description }}</span>
-                <span class="original-transaction">Original: {{ iso_date(txn.original_transaction_date) }} / {{ txn.original_counterparty_name or txn.description }} / {{ txn.original_category or "Uncategorized" }}</span>
               </td>
               <td class="editable-cell">
-                <input class="cell-control category-control" form="{{ edit_form_id }}" name="category_name" list="category-options" value="{{ txn.category if txn.category and txn.category != 'Uncategorized' else '' }}" placeholder="Uncategorized" aria-label="Category">
+                <input class="cell-control ledger-autosave-control category-control" form="{{ edit_form_id }}" name="category_name" list="category-options" value="{{ txn.category if txn.category and txn.category != 'Uncategorized' else '' }}" placeholder="Uncategorized" aria-label="Category">
               </td>
               <td>
                 {{ txn.account_name or "Account" }}
                 <span>{{ txn.institution_name or "Institution" }}</span>
+                <span class="status {{ txn.status }}">{{ txn.status }}</span>
               </td>
-              <td><span class="status {{ txn.status }}">{{ txn.status }}</span></td>
               <td class="editable-cell">
-                <select class="cell-control review-control" form="{{ edit_form_id }}" name="reviewed_status" aria-label="Review status">
+                <select class="cell-control ledger-autosave-control review-control" form="{{ edit_form_id }}" name="reviewed_status" aria-label="Review status">
                   <option value="new" {{ 'selected' if review_status == 'new' else '' }}>New</option>
                   <option value="reviewed" {{ 'selected' if review_status == 'reviewed' else '' }}>Reviewed</option>
                   <option value="ignored" {{ 'selected' if review_status == 'ignored' else '' }}>Ignored</option>
@@ -136,20 +145,16 @@
               </td>
               <td class="ledger-flags editable-cell">
                 <label class="inline-check">
-                  <input form="{{ edit_form_id }}" name="excluded_from_budget" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_budget else '' }}>
+                  <input class="ledger-autosave-control" form="{{ edit_form_id }}" name="excluded_from_budget" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_budget else '' }}>
                   Budget
                 </label>
                 <label class="inline-check">
-                  <input form="{{ edit_form_id }}" name="excluded_from_cash_flow" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_cash_flow else '' }}>
+                  <input class="ledger-autosave-control" form="{{ edit_form_id }}" name="excluded_from_cash_flow" type="checkbox" value="1" {{ 'checked' if txn.excluded_from_cash_flow else '' }}>
                   Cash flow
                 </label>
               </td>
-              <td class="editable-cell">
-                <input class="cell-control notes-control" form="{{ edit_form_id }}" name="notes" value="{{ txn.notes or '' }}" placeholder="Memo" aria-label="Notes">
-              </td>
               <td class="right amount {{ 'credit' if txn.amount < 0 else '' }}">{{ format_money(txn.amount) }}</td>
               <td class="ledger-actions">
-                <button class="ghost-button small-button" form="{{ edit_form_id }}" type="submit">Save</button>
                 {% if txn.has_user_edit %}
                   <form id="{{ reset_form_id }}" method="post" action="{{ url_for('budget.reset_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -166,7 +171,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="10" class="empty">No transactions match this filter.</td></tr>
+            <tr><td colspan="8" class="empty">No transactions match this filter.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -183,4 +188,43 @@
     <option value="{{ merchant.merchant_name }}"></option>
   {% endfor %}
 </datalist>
+<script>
+  (function () {
+    function controlValue(control) {
+      return control.type === "checkbox" ? String(control.checked) : control.value;
+    }
+
+    function submitForm(control) {
+      const form = control.form;
+      if (!form || form.dataset.saving === "1") {
+        return;
+      }
+      const previousValue = control.dataset.savedValue;
+      const nextValue = controlValue(control);
+      if (previousValue === nextValue) {
+        return;
+      }
+      control.dataset.savedValue = nextValue;
+      form.dataset.saving = "1";
+      fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "fetch" }
+      }).catch(function () {
+        control.dataset.savedValue = previousValue || "";
+      }).finally(function () {
+        form.dataset.saving = "0";
+      });
+    }
+
+    document.querySelectorAll(".ledger-autosave-control").forEach(function (control) {
+      control.dataset.savedValue = controlValue(control);
+      const eventName = control.matches("select, input[type='checkbox']") ? "change" : "blur";
+      control.addEventListener(eventName, function () {
+        submitForm(control);
+      });
+    });
+  })();
+</script>
 {% endblock %}

@@ -1693,6 +1693,8 @@ def create_app() -> Flask:
             conn.close()
 
         data_version = mark_budget_data_changed()
+        if request.form.get("autosave") == "1" or request.headers.get("X-Requested-With") == "fetch":
+            return ("", 204)
         clean_return_args["data_version"] = data_version
         flash("Transaction edits saved without changing the Teller original.", "success")
         return redirect(url_for("budget.transactions", **clean_return_args))
@@ -1805,20 +1807,10 @@ def create_app() -> Flask:
             row for row in rows
             if not row.get("parent_category_id") and row.get("status") == "ACTIVE"
         ]
-        overlay_summary = _query_one(
-            """
-            SELECT
-                (SELECT COUNT(*) FROM BUDGET_TRANSACTION_EDITS WHERE USER_ID = :user_id AND PROVIDER = 'teller') AS EDIT_COUNT,
-                (SELECT COUNT(*) FROM BUDGET_TRANSACTION_SPLITS WHERE USER_ID = :user_id AND PROVIDER = 'teller') AS SPLIT_COUNT
-            FROM dual
-            """,
-            user_id=user_id,
-        ) or {}
         return render_template(
             "categories.html",
             categories=rows,
             parent_options=parent_options,
-            overlay_summary=overlay_summary,
         )
 
     @budget.route("/actions/categories/create", methods=["POST"])
