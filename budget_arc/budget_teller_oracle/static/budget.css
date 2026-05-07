@@ -871,6 +871,7 @@ td span {
 
 .category-list {
   display: grid;
+  gap: 6px;
   padding-top: 10px;
 }
 
@@ -881,23 +882,47 @@ td span {
   font-size: 11px;
   font-weight: 700;
   gap: 8px;
-  grid-template-columns: minmax(150px, 1fr) 150px 110px 110px 150px auto;
+  grid-template-columns: minmax(140px, 1fr) 150px 105px 105px 135px 70px;
   padding: 0 0 5px;
 }
 
-.category-row-shell {
+.category-group {
   border-bottom: 1px dotted var(--line);
   display: grid;
+}
+
+.category-group:last-child {
+  border-bottom: 0;
+}
+
+.category-row-shell {
+  display: grid;
   gap: 4px;
-  padding: 4px 0;
+  padding: 3px 0;
+}
+
+.category-children {
+  border-left: 3px solid #d8e7df;
+  display: grid;
+  margin-left: 14px;
+  padding-left: 10px;
 }
 
 .category-row {
   align-items: center;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(150px, 1fr) 150px 110px 110px 150px auto;
+  grid-template-columns: minmax(140px, 1fr) 150px 105px 105px 135px 70px;
   min-height: 38px;
+}
+
+.category-row-parent input[name="name"] {
+  font-weight: 700;
+}
+
+.category-row-child input[name="name"] {
+  border-left: 3px solid #bdd8c8;
+  padding-left: 9px;
 }
 
 .category-row input,
@@ -906,10 +931,16 @@ td span {
   padding: 5px 7px;
 }
 
+.category-row select:disabled {
+  background: #f3f6f4;
+  color: var(--muted);
+}
+
 .category-actions {
   align-items: center;
   display: flex;
   gap: 6px;
+  justify-content: flex-end;
 }
 
 .category-delete-dialog {
@@ -1212,6 +1243,16 @@ tbody tr.has-user-edit { background: #fffef9; }
 
 .merchant-cell {
   min-width: 0;
+  text-align: left;
+}
+
+.merchant-cell .merchant-control,
+.merchant-cell span {
+  text-align: left;
+}
+
+.merchant-cell span {
+  padding-left: 6px;
 }
 
 .cell-control {

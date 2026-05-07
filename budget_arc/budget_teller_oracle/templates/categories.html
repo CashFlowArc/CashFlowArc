@@ -2,6 +2,67 @@
 {% block title %}BudgetArc Categories{% endblock %}
 {% block heading %}Categories{% endblock %}
 {% block eyebrow %}User-owned categories{% endblock %}
+{% macro category_editor(category, row_level) %}
+  <div class="category-row-shell category-row-shell-{{ row_level }}">
+    <form class="category-row category-autosave-form category-row-{{ row_level }}" method="post" action="{{ url_for('budget.update_category_action', category_id=category.category_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="autosave" value="1">
+      <input class="category-autosave-control" name="name" value="{{ category.name }}" maxlength="256" aria-label="Category name">
+      <select class="category-autosave-control" name="parent_category_id" aria-label="Parent category" {{ 'disabled' if category.subcategory_count else '' }}>
+        <option value="">Top level</option>
+        {% for parent in parent_options %}
+          {% if parent.category_id != category.category_id %}
+            <option value="{{ parent.category_id }}" {{ 'selected' if category.parent_category_id == parent.category_id else '' }}>{{ parent.name }}</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <select class="category-autosave-control" name="category_type" aria-label="Category type">
+        {% for value in ["expense", "income", "transfer", "other"] %}
+          <option value="{{ value }}" {{ 'selected' if category.category_type == value else '' }}>{{ value|title }}</option>
+        {% endfor %}
+      </select>
+      <select class="category-autosave-control" name="status" aria-label="Category status">
+        <option value="ACTIVE" {{ 'selected' if category.status == 'ACTIVE' else '' }}>Active</option>
+        <option value="INACTIVE" {{ 'selected' if category.status == 'INACTIVE' else '' }}>Inactive</option>
+      </select>
+      <div class="category-usage">
+        <span>{{ category.raw_transaction_count or 0 }} synced txns</span>
+        <span>{{ category.edited_transaction_count or 0 }} edited txns</span>
+        {% if category.subcategory_count %}
+          <span>{{ category.subcategory_count }} subcategories</span>
+        {% endif %}
+        <span>{{ category.budget_month_count or 0 }} budget months</span>
+      </div>
+      <div class="category-actions">
+        <button class="danger-button small-button" type="button" onclick="document.getElementById('delete-category-{{ category.category_id }}').showModal()" {{ 'disabled' if categories|length <= 1 else '' }}>Delete</button>
+      </div>
+    </form>
+    <dialog class="category-delete-dialog" id="delete-category-{{ category.category_id }}">
+      <form class="category-delete-form" method="post" action="{{ url_for('budget.delete_category_action', category_id=category.category_id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+          <h3>Delete {{ category.name }}</h3>
+          <p>Move transactions, rules, and budgets into another category first.</p>
+        </div>
+        <label>
+          Move into
+          <select name="target_category_id" required>
+            <option value="">Choose category</option>
+            {% for target in categories %}
+              {% if target.category_id != category.category_id and target.status == 'ACTIVE' %}
+                <option value="{{ target.category_id }}">{{ target.display_name }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </label>
+        <div class="dialog-actions">
+          <button class="ghost-button small-button" type="button" onclick="this.closest('dialog').close()">Cancel</button>
+          <button class="danger-button small-button" type="submit">Delete category</button>
+        </div>
+      </form>
+    </dialog>
+  </div>
+{% endmacro %}
 {% block content %}
 <section class="category-layout">
   <aside class="module category-side">
@@ -52,70 +113,70 @@
         <span>Usage</span>
         <span></span>
       </div>
-      {% for category in categories %}
-        <div class="category-row-shell">
-          <form class="category-row" method="post" action="{{ url_for('budget.update_category_action', category_id=category.category_id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input name="name" value="{{ category.name }}" maxlength="256" aria-label="Category name">
-            <select name="parent_category_id" aria-label="Parent category" {{ 'disabled' if category.subcategory_count else '' }}>
-              <option value="">Top level</option>
-              {% for parent in parent_options %}
-                {% if parent.category_id != category.category_id %}
-                  <option value="{{ parent.category_id }}" {{ 'selected' if category.parent_category_id == parent.category_id else '' }}>{{ parent.name }}</option>
-                {% endif %}
+      {% for group in category_groups %}
+        <section class="category-group">
+          {% if group.parent %}
+            {{ category_editor(group.parent, "parent") }}
+          {% endif %}
+          {% if group.children %}
+            <div class="category-children">
+              {% for category in group.children %}
+                {{ category_editor(category, "child") }}
               {% endfor %}
-            </select>
-            <select name="category_type" aria-label="Category type">
-              {% for value in ["expense", "income", "transfer", "other"] %}
-                <option value="{{ value }}" {{ 'selected' if category.category_type == value else '' }}>{{ value|title }}</option>
-              {% endfor %}
-            </select>
-            <select name="status" aria-label="Category status">
-              <option value="ACTIVE" {{ 'selected' if category.status == 'ACTIVE' else '' }}>Active</option>
-              <option value="INACTIVE" {{ 'selected' if category.status == 'INACTIVE' else '' }}>Inactive</option>
-            </select>
-            <div class="category-usage">
-              <span>{{ category.raw_transaction_count or 0 }} synced txns</span>
-              <span>{{ category.edited_transaction_count or 0 }} edited txns</span>
-              {% if category.subcategory_count %}
-                <span>{{ category.subcategory_count }} subcategories</span>
-              {% endif %}
-              <span>{{ category.budget_month_count or 0 }} budget months</span>
             </div>
-            <div class="category-actions">
-              <button class="ghost-button small-button" type="submit">Save</button>
-              <button class="danger-button small-button" type="button" onclick="document.getElementById('delete-category-{{ category.category_id }}').showModal()" {{ 'disabled' if categories|length <= 1 else '' }}>Delete</button>
-            </div>
-          </form>
-          <dialog class="category-delete-dialog" id="delete-category-{{ category.category_id }}">
-            <form class="category-delete-form" method="post" action="{{ url_for('budget.delete_category_action', category_id=category.category_id) }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <div>
-                <h3>Delete {{ category.name }}</h3>
-                <p>Move transactions, rules, and budgets into another category first.</p>
-              </div>
-              <label>
-                Move into
-                <select name="target_category_id" required>
-                  <option value="">Choose category</option>
-                  {% for target in categories %}
-                    {% if target.category_id != category.category_id and target.status == 'ACTIVE' %}
-                      <option value="{{ target.category_id }}">{{ target.display_name }}</option>
-                    {% endif %}
-                  {% endfor %}
-                </select>
-              </label>
-              <div class="dialog-actions">
-                <button class="ghost-button small-button" type="button" onclick="this.closest('dialog').close()">Cancel</button>
-                <button class="danger-button small-button" type="submit">Delete category</button>
-              </div>
-            </form>
-          </dialog>
-        </div>
+          {% endif %}
+        </section>
       {% else %}
         <p class="empty">No categories yet. Create one here or from Budgets.</p>
       {% endfor %}
     </div>
   </section>
 </section>
+<script>
+  (function () {
+    function controlValue(control) {
+      return control.value;
+    }
+
+    function submitCategory(control) {
+      const form = control.form;
+      if (!form || form.dataset.saving === "1") {
+        return;
+      }
+      const previousValue = control.dataset.savedValue;
+      const nextValue = controlValue(control);
+      if (previousValue === nextValue) {
+        return;
+      }
+      control.dataset.savedValue = nextValue;
+      form.dataset.saving = "1";
+      fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "fetch" }
+      }).then(function (response) {
+        if (!response.ok) {
+          throw new Error("Category save failed");
+        }
+        if (control.name === "parent_category_id") {
+          window.location.reload();
+        }
+      }).catch(function () {
+        control.value = previousValue || "";
+        control.dataset.savedValue = previousValue || "";
+      }).finally(function () {
+        form.dataset.saving = "0";
+      });
+    }
+
+    document.querySelectorAll(".category-autosave-control").forEach(function (control) {
+      control.dataset.savedValue = controlValue(control);
+      const eventName = control.matches("select") ? "change" : "blur";
+      control.addEventListener(eventName, function () {
+        submitCategory(control);
+      });
+    });
+  })();
+</script>
 {% endblock %}

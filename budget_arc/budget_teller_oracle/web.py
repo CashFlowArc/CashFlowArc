@@ -1843,9 +1843,32 @@ def create_app() -> Flask:
             row for row in rows
             if not row.get("parent_category_id") and row.get("status") == "ACTIVE"
         ]
+        children_by_parent: dict[str, list[dict[str, Any]]] = {}
+        parent_rows: list[dict[str, Any]] = []
+        row_ids = {row["category_id"] for row in rows}
+        for row in rows:
+            parent_category_id = row.get("parent_category_id")
+            if parent_category_id:
+                children_by_parent.setdefault(parent_category_id, []).append(row)
+            else:
+                parent_rows.append(row)
+        category_groups: list[dict[str, Any]] = [
+            {
+                "parent": row,
+                "children": children_by_parent.get(row["category_id"], []),
+            }
+            for row in parent_rows
+        ]
+        orphan_children = [
+            row for row in rows
+            if row.get("parent_category_id") and row.get("parent_category_id") not in row_ids
+        ]
+        if orphan_children:
+            category_groups.append({"parent": None, "children": orphan_children})
         return render_template(
             "categories.html",
             categories=rows,
+            category_groups=category_groups,
             parent_options=parent_options,
         )
 
@@ -1902,6 +1925,8 @@ def create_app() -> Flask:
         finally:
             conn.close()
         data_version = mark_budget_data_changed()
+        if request.form.get("autosave") == "1" or request.headers.get("X-Requested-With") == "fetch":
+            return ("", 204 if updated else 404)
         flash("Category updated." if updated else "Category was not found for your user.", "success" if updated else "error")
         return redirect(url_for("budget.categories", data_version=data_version))
 
