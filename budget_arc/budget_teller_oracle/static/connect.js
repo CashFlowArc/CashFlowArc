@@ -177,6 +177,16 @@
           });
           const payload = await response.json();
           show(payload);
+          if (payload.ok) {
+            const dataVersion = payload.dataVersion || String(Date.now());
+            if (window.BudgetArcDataRefresh) {
+              window.BudgetArcDataRefresh.publish(dataVersion);
+            }
+            show("Sync complete. Loading updated accounts...");
+            const accountsUrl = new URL("./accounts", window.location.href);
+            accountsUrl.searchParams.set("data_version", dataVersion);
+            window.location.assign(accountsUrl.toString());
+          }
         },
         onExit: function () {
           show("Teller Connect closed before enrollment completed.");
