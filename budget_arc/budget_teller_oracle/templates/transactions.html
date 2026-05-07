@@ -7,8 +7,12 @@
   <aside class="filter-rail">
     <form class="filter-stack" method="get">
       <label>
-        Month
-        <input name="month" type="month" value="{{ filters.month }}">
+        Start month
+        <input name="start_month" type="month" value="{{ filters.start_month }}">
+      </label>
+      <label>
+        End month
+        <input name="end_month" type="month" value="{{ filters.end_month }}">
       </label>
       <label>
         Search
@@ -26,23 +30,23 @@
         </select>
       </label>
       <label>
-        Account
-        <select name="account">
-          <option value="">All accounts</option>
-          {% for account in accounts %}
-            <option value="{{ account.provider_account_id }}" {{ 'selected' if filters.account == account.provider_account_id else '' }}>
-              {{ account.account_name }}{% if account.last_four %} ending {{ account.last_four }}{% endif %}
+        Institution
+        <select name="institution">
+          <option value="">All institutions</option>
+          {% for institution in institutions %}
+            <option value="{{ institution.institution_id }}" data-accounts="{{ institution.account_ids or '' }}" {{ 'selected' if filters.institution == institution.institution_id else '' }}>
+              {{ institution.institution_name or institution.institution_id }}
             </option>
           {% endfor %}
         </select>
       </label>
       <label>
-        Institution
-        <select name="institution">
-          <option value="">All institutions</option>
-          {% for institution in institutions %}
-            <option value="{{ institution.institution_id }}" {{ 'selected' if filters.institution == institution.institution_id else '' }}>
-              {{ institution.institution_name or institution.institution_id }}
+        Account
+        <select name="account">
+          <option value="">All accounts</option>
+          {% for account in accounts %}
+            <option value="{{ account.provider_account_id }}" data-institution="{{ account.institution_id or '' }}" {{ 'selected' if filters.account == account.provider_account_id else '' }}>
+              {{ account.account_name }}{% if account.last_four %} ending {{ account.last_four }}{% endif %}
             </option>
           {% endfor %}
         </select>
@@ -77,7 +81,8 @@
       <div class="ledger-heading-actions">
         <form method="post" action="{{ url_for('budget.review_listed_transactions_action') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="month" value="{{ filters.month }}">
+          <input type="hidden" name="start_month" value="{{ filters.start_month }}">
+          <input type="hidden" name="end_month" value="{{ filters.end_month }}">
           <input type="hidden" name="q" value="{{ filters.q }}">
           <input type="hidden" name="status" value="{{ filters.status }}">
           <input type="hidden" name="review" value="{{ filters.review }}">
@@ -89,7 +94,7 @@
           {% endfor %}
           <button class="ghost-button small-button" type="submit" {{ 'disabled' if not transactions else '' }}>Mark listed reviewed</button>
         </form>
-        <a class="ghost-button small-button" href="{{ url_for('budget.transactions', month=filters.month) }}">Clear</a>
+        <a class="ghost-button small-button" href="{{ url_for('budget.transactions') }}">Clear</a>
       </div>
     </div>
     <div class="table-wrap ledger-table">
@@ -124,7 +129,8 @@
                 <form id="{{ edit_form_id }}" method="post" action="{{ url_for('budget.edit_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <input type="hidden" name="autosave" value="1">
-                  <input type="hidden" name="month" value="{{ filters.month }}">
+                  <input type="hidden" name="start_month" value="{{ filters.start_month }}">
+                  <input type="hidden" name="end_month" value="{{ filters.end_month }}">
                   <input type="hidden" name="q" value="{{ filters.q }}">
                   <input type="hidden" name="status" value="{{ filters.status }}">
                   <input type="hidden" name="review" value="{{ filters.review }}">
@@ -158,7 +164,8 @@
                   <span class="pill edited-pill">edited</span>
                   <form id="{{ reset_form_id }}" method="post" action="{{ url_for('budget.reset_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="month" value="{{ filters.month }}">
+                    <input type="hidden" name="start_month" value="{{ filters.start_month }}">
+                    <input type="hidden" name="end_month" value="{{ filters.end_month }}">
                     <input type="hidden" name="q" value="{{ filters.q }}">
                     <input type="hidden" name="status" value="{{ filters.status }}">
                     <input type="hidden" name="review" value="{{ filters.review }}">
@@ -237,6 +244,47 @@
         submitForm(control);
       });
     });
+
+    const institutionSelect = document.querySelector("select[name='institution']");
+    const accountSelect = document.querySelector("select[name='account']");
+
+    function optionAccountIds(option) {
+      return (option.dataset.accounts || "").split(/\s+/).filter(Boolean);
+    }
+
+    function syncInstitutionAccountFilters(changed) {
+      if (!institutionSelect || !accountSelect) {
+        return;
+      }
+      const accountOption = accountSelect.selectedOptions[0];
+      const accountInstitution = accountOption ? accountOption.dataset.institution || "" : "";
+      if (accountSelect.value && accountInstitution) {
+        if (changed === "account" || !institutionSelect.value) {
+          institutionSelect.value = accountInstitution;
+        } else if (institutionSelect.value !== accountInstitution) {
+          accountSelect.value = "";
+        }
+      }
+
+      const selectedInstitution = institutionSelect.value;
+      const selectedAccount = accountSelect.value;
+      Array.from(accountSelect.options).forEach(function (option, index) {
+        option.hidden = index > 0 && selectedInstitution && option.dataset.institution !== selectedInstitution;
+      });
+      Array.from(institutionSelect.options).forEach(function (option, index) {
+        option.hidden = index > 0 && selectedAccount && !optionAccountIds(option).includes(selectedAccount);
+      });
+    }
+
+    if (institutionSelect && accountSelect) {
+      institutionSelect.addEventListener("change", function () {
+        syncInstitutionAccountFilters("institution");
+      });
+      accountSelect.addEventListener("change", function () {
+        syncInstitutionAccountFilters("account");
+      });
+      syncInstitutionAccountFilters();
+    }
   })();
 </script>
 {% endblock %}

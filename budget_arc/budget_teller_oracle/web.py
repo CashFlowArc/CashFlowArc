@@ -1512,14 +1512,28 @@ def create_app() -> Flask:
     def transactions() -> Any:
         user_id = current_user_id()
         _ensure_user_category_catalog(user_id)
-        month_start, month_end, selected_month = _selected_month_bounds()
+        current_month = dt.date.today().replace(day=1)
+        date_filter_requested = any(key in request.args for key in ("month", "start_month", "end_month"))
+        start_month = _parse_month(request.args.get("start_month") or request.args.get("month"))
+        end_month_start = _parse_month(request.args.get("end_month"))
+        if not date_filter_requested:
+            start_month = current_month
+            end_month_start = current_month
+        elif start_month and not end_month_start:
+            end_month_start = start_month
+        elif end_month_start and not start_month:
+            start_month = None
+        if start_month and end_month_start and end_month_start < start_month:
+            start_month, end_month_start = end_month_start, start_month
+        month_end = _month_end(end_month_start) if end_month_start else None
+        selected_month = (start_month or end_month_start or current_month).strftime("%Y-%m")
         search = request.args.get("q", "").strip()
         status = request.args.get("status", "").strip()
         review = request.args.get("review", "").strip()
         account_id = request.args.get("account", "").strip()
         institution_id = request.args.get("institution", "").strip()
         category_id = request.args.get("category", "").strip()
-        params: dict[str, Any] = {"user_id": user_id, "month_start": month_start, "month_end": month_end}
+        params: dict[str, Any] = {"user_id": user_id}
         effective_date = "NVL(e.EDITED_TRANSACTION_DATE, t.TRANSACTION_DATE)"
         effective_merchant = "COALESCE(e.EDITED_MERCHANT_NAME, m.DISPLAY_NAME, t.COUNTERPARTY_NAME, t.DESCRIPTION)"
         effective_category = "COALESCE(edited_c.NAME, raw_c.NAME, NULLIF(TRIM(t.CATEGORY), ''), 'Uncategorized')"
@@ -1528,9 +1542,13 @@ def create_app() -> Flask:
         clauses = [
             "t.PROVIDER = 'teller'",
             "t.USER_ID = :user_id",
-            f"{effective_date} >= :month_start",
-            f"{effective_date} < :month_end",
         ]
+        if start_month:
+            clauses.append(f"{effective_date} >= :month_start")
+            params["month_start"] = start_month
+        if month_end:
+            clauses.append(f"{effective_date} < :month_end")
+            params["month_end"] = month_end
         if search:
             clauses.append(
                 f"(LOWER(t.DESCRIPTION) LIKE :search OR LOWER({effective_merchant}) LIKE :search "
@@ -1544,7 +1562,17 @@ def create_app() -> Flask:
             clauses.append(f"{effective_review} = :review")
             params["review"] = review
         if category_id:
-            clauses.append(f"{effective_category_id} = :category_id")
+            clauses.append(
+                f"""(
+                    {effective_category_id} = :category_id
+                    OR {effective_category_id} IN (
+                        SELECT CATEGORY_ID
+                        FROM BUDGET_CATEGORIES
+                        WHERE USER_ID = :user_id
+                          AND PARENT_CATEGORY_ID = :category_id
+                    )
+                )"""
+            )
             params["category_id"] = category_id
         if account_id:
             clauses.append("t.PROVIDER_ACCOUNT_ID = :account_id")
@@ -1610,7 +1638,7 @@ def create_app() -> Flask:
         )
         accounts = _query_all(
             """
-            SELECT PROVIDER_ACCOUNT_ID, ACCOUNT_NAME, LAST_FOUR
+            SELECT PROVIDER_ACCOUNT_ID, ACCOUNT_NAME, LAST_FOUR, INSTITUTION_ID, INSTITUTION_NAME
             FROM BUDGET_ACCOUNTS
             WHERE PROVIDER = 'teller'
               AND USER_ID = :user_id
@@ -1620,11 +1648,15 @@ def create_app() -> Flask:
         )
         institutions = _query_all(
             """
-            SELECT DISTINCT INSTITUTION_ID, INSTITUTION_NAME
+            SELECT
+                INSTITUTION_ID,
+                INSTITUTION_NAME,
+                LISTAGG(PROVIDER_ACCOUNT_ID, ' ') WITHIN GROUP (ORDER BY ACCOUNT_NAME) AS ACCOUNT_IDS
             FROM BUDGET_ACCOUNTS
             WHERE PROVIDER = 'teller'
               AND USER_ID = :user_id
               AND INSTITUTION_ID IS NOT NULL
+            GROUP BY INSTITUTION_ID, INSTITUTION_NAME
             ORDER BY INSTITUTION_NAME
             """,
             user_id=user_id,
@@ -1683,8 +1715,10 @@ def create_app() -> Flask:
                 "account": account_id,
                 "institution": institution_id,
                 "month": selected_month,
+                "start_month": start_month.strftime("%Y-%m") if start_month else "",
+                "end_month": end_month_start.strftime("%Y-%m") if end_month_start else "",
             },
-            month_start=month_start,
+            month_start=start_month or end_month_start or current_month,
         )
 
     @budget.route("/actions/transactions/<provider_transaction_id>/edit", methods=["POST"])
@@ -1694,6 +1728,8 @@ def create_app() -> Flask:
         user_id = current_user_id()
         return_args = {
             "month": request.form.get("month") or None,
+            "start_month": request.form.get("start_month") or None,
+            "end_month": request.form.get("end_month") or None,
             "q": request.form.get("q") or None,
             "status": request.form.get("status") or None,
             "review": request.form.get("review") or None,
@@ -1753,6 +1789,8 @@ def create_app() -> Flask:
         user_id = current_user_id()
         return_args = {
             "month": request.form.get("month") or None,
+            "start_month": request.form.get("start_month") or None,
+            "end_month": request.form.get("end_month") or None,
             "q": request.form.get("q") or None,
             "status": request.form.get("status") or None,
             "review": request.form.get("review") or None,
@@ -1789,6 +1827,8 @@ def create_app() -> Flask:
         user_id = current_user_id()
         return_args = {
             "month": request.form.get("month") or None,
+            "start_month": request.form.get("start_month") or None,
+            "end_month": request.form.get("end_month") or None,
             "q": request.form.get("q") or None,
             "status": request.form.get("status") or None,
             "review": request.form.get("review") or None,
@@ -1912,10 +1952,48 @@ def create_app() -> Flask:
         ]
         if orphan_children:
             category_groups.append({"parent": None, "children": orphan_children})
+        category_type_order = [
+            ("income", "Income"),
+            ("expense", "Expense"),
+            ("transfer", "Transfer"),
+            ("other", "Other"),
+        ]
+        category_type_groups: list[dict[str, Any]] = []
+        for type_key, type_label in category_type_order:
+            type_rows = [
+                row for row in rows
+                if str(row.get("category_type") or "expense").lower() == type_key
+            ]
+            type_row_ids = {row["category_id"] for row in type_rows}
+            type_children_by_parent: dict[str, list[dict[str, Any]]] = {}
+            type_parent_rows: list[dict[str, Any]] = []
+            for row in type_rows:
+                parent_category_id = row.get("parent_category_id")
+                if parent_category_id and parent_category_id in type_row_ids:
+                    type_children_by_parent.setdefault(parent_category_id, []).append(row)
+                else:
+                    type_parent_rows.append(row)
+            groups = [
+                {
+                    "parent": row,
+                    "children": type_children_by_parent.get(row["category_id"], []),
+                }
+                for row in type_parent_rows
+            ]
+            if type_rows:
+                category_type_groups.append(
+                    {
+                        "key": type_key,
+                        "label": type_label,
+                        "count": len(type_rows),
+                        "groups": groups,
+                    }
+                )
         return render_template(
             "categories.html",
             categories=rows,
             category_groups=category_groups,
+            category_type_groups=category_type_groups,
             parent_options=parent_options,
         )
 
@@ -2173,6 +2251,7 @@ def create_app() -> Flask:
             SELECT
                 c.CATEGORY_ID,
                 c.NAME,
+                c.PARENT_CATEGORY_ID,
                 p.NAME AS PARENT_NAME,
                 c.CATEGORY_TYPE
             FROM BUDGET_CATEGORIES c
@@ -2212,6 +2291,9 @@ def create_app() -> Flask:
             category_map[key] = {
                 "category_id": category.get("category_id"),
                 "category": category.get("display_name") or category.get("name"),
+                "category_name": category.get("name"),
+                "parent_category_id": category.get("parent_category_id"),
+                "parent_name": category.get("parent_name"),
                 "category_type": category.get("category_type"),
                 "spend_total": Decimal("0"),
                 "transaction_count": 0,
@@ -2226,6 +2308,9 @@ def create_app() -> Flask:
                 {
                     "category_id": row.get("category_id"),
                     "category": row.get("category") or "uncategorized",
+                    "category_name": row.get("category") or "uncategorized",
+                    "parent_category_id": None,
+                    "parent_name": None,
                     "category_type": "expense",
                     "spend_total": Decimal("0"),
                     "transaction_count": 0,
@@ -2244,6 +2329,9 @@ def create_app() -> Flask:
                 {
                     "category_id": row.get("category_id"),
                     "category": row.get("category"),
+                    "category_name": row.get("category"),
+                    "parent_category_id": None,
+                    "parent_name": None,
                     "category_type": "expense",
                     "spend_total": Decimal("0"),
                     "transaction_count": 0,
@@ -2265,6 +2353,9 @@ def create_app() -> Flask:
                 {
                     "category_id": None,
                     "category": row.get("category"),
+                    "category_name": row.get("category"),
+                    "parent_category_id": None,
+                    "parent_name": None,
                     "category_type": "expense",
                     "spend_total": Decimal("0"),
                     "transaction_count": 0,
@@ -2331,11 +2422,28 @@ def create_app() -> Flask:
         for category_type in ["income", "expense", "transfer", "other"]:
             group_rows = [row for row in rows if (row.get("category_type") or "expense") == category_type]
             if group_rows:
+                group_row_ids = {row.get("category_id") for row in group_rows if row.get("category_id")}
+                child_rows_by_parent: dict[str, list[dict[str, Any]]] = {}
+                parent_rows: list[dict[str, Any]] = []
+                for row in group_rows:
+                    parent_category_id = row.get("parent_category_id")
+                    if parent_category_id and parent_category_id in group_row_ids:
+                        child_rows_by_parent.setdefault(parent_category_id, []).append(row)
+                    else:
+                        parent_rows.append(row)
+                category_groups = [
+                    {
+                        "parent": row,
+                        "children": child_rows_by_parent.get(row.get("category_id"), []),
+                    }
+                    for row in parent_rows
+                ]
                 budget_groups.append(
                     {
                         "category_type": category_type,
                         "label": group_labels[category_type],
                         "rows": group_rows,
+                        "category_groups": category_groups,
                         "count": len(group_rows),
                         "spent_total": sum(
                             (_decimal(row.get("spend_total")) for row in group_rows),

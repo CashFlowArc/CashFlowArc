@@ -2,6 +2,45 @@
 {% block title %}BudgetArc Budgets{% endblock %}
 {% block heading %}Budgets{% endblock %}
 {% block eyebrow %}{% endblock %}
+{% macro budget_editor(row, row_level) %}
+  {% set spend = row.spend_total or 0 %}
+  {% set budgeted = row.budgeted_amount or 0 %}
+  <div class="budget-row budget-row-plan budget-row-{{ row_level }} {{ 'is-over' if row.budget_state == 'Over budget' or row.budget_state == 'Unbudgeted' else '' }}">
+    <div class="budget-meta">
+      <a class="budget-category-link" href="{{ url_for('budget.transactions', month=selected_month, category=row.category_id) if row.category_id else url_for('budget.transactions', month=selected_month, q=row.category) }}">
+        <strong>{{ (row.category_name or row.category)|title }}</strong>
+      </a>
+      <span>
+        {{ row.transaction_count }} transactions / {{ row.budget_state }}
+        {% if row.is_inherited %} / inherited from {{ row.budget_source_label }}{% endif %}
+      </span>
+    </div>
+    <div class="budget-progress-cell">
+      <div class="progress {{ 'over' if row.budget_state == 'Over budget' or row.budget_state == 'Unbudgeted' else '' }}">
+        <span style="width: {{ row.budget_pct }}%"></span>
+      </div>
+      <span>{{ format_money(spend) }} spent{% if budgeted %} of {{ format_money(budgeted) }}{% endif %}</span>
+    </div>
+    <form class="budget-edit-form" method="post" action="{{ url_for('budget.save_category_budget_action') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="month" value="{{ selected_month }}">
+      <input type="hidden" name="category_name" value="{{ row.category }}">
+      <label>
+        Current
+        <input value="{{ '%.2f'|format(budgeted) }}" disabled>
+      </label>
+      <label>
+        Recommended
+        <input value="{{ '%.2f'|format(row.recommended_amount or 0) }}" disabled>
+      </label>
+      <label>
+        New
+        <input name="budgeted_amount" inputmode="decimal" value="{{ '%.2f'|format(budgeted) }}" {{ 'disabled' if budget_period.is_past else '' }}>
+      </label>
+      <button class="ghost-button small-button" type="submit" {{ 'disabled' if budget_period.is_past else '' }}>Save</button>
+    </form>
+  </div>
+{% endmacro %}
 {% block content %}
 <section class="month-band budget-plan-band">
   <form class="month-selector" method="get">
@@ -101,44 +140,15 @@
             </span>
           </summary>
           <div class="budget-type-rows">
-          {% for row in group.rows %}
-            {% set spend = row.spend_total or 0 %}
-            {% set budgeted = row.budgeted_amount or 0 %}
-            <div class="budget-row budget-row-plan {{ 'is-over' if row.budget_state == 'Over budget' or row.budget_state == 'Unbudgeted' else '' }}">
-              <div class="budget-meta">
-                <a class="budget-category-link" href="{{ url_for('budget.transactions', month=selected_month, category=row.category_id) if row.category_id else url_for('budget.transactions', month=selected_month, q=row.category) }}">
-                  <strong>{{ row.category|title }}</strong>
-                </a>
-                <span>
-                  {{ row.transaction_count }} transactions / {{ row.budget_state }}
-                  {% if row.is_inherited %} / inherited from {{ row.budget_source_label }}{% endif %}
-                </span>
+          {% for category_group in group.category_groups %}
+            {{ budget_editor(category_group.parent, "parent") }}
+            {% if category_group.children %}
+              <div class="budget-child-rows">
+                {% for child_row in category_group.children %}
+                  {{ budget_editor(child_row, "child") }}
+                {% endfor %}
               </div>
-              <div class="budget-progress-cell">
-                <div class="progress {{ 'over' if row.budget_state == 'Over budget' or row.budget_state == 'Unbudgeted' else '' }}">
-                  <span style="width: {{ row.budget_pct }}%"></span>
-                </div>
-                <span>{{ format_money(spend) }} spent{% if budgeted %} of {{ format_money(budgeted) }}{% endif %}</span>
-              </div>
-              <form class="budget-edit-form" method="post" action="{{ url_for('budget.save_category_budget_action') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="month" value="{{ selected_month }}">
-                <input type="hidden" name="category_name" value="{{ row.category }}">
-                <label>
-                  Current
-                  <input value="{{ '%.2f'|format(budgeted) }}" disabled>
-                </label>
-                <label>
-                  Recommended
-                  <input value="{{ '%.2f'|format(row.recommended_amount or 0) }}" disabled>
-                </label>
-                <label>
-                  New
-                  <input name="budgeted_amount" inputmode="decimal" value="{{ '%.2f'|format(budgeted) }}" {{ 'disabled' if budget_period.is_past else '' }}>
-                </label>
-                <button class="ghost-button small-button" type="submit" {{ 'disabled' if budget_period.is_past else '' }}>Save</button>
-              </form>
-            </div>
+            {% endif %}
           {% endfor %}
           </div>
         </details>

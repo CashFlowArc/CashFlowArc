@@ -569,6 +569,28 @@ td span {
 .alert-icon.ledger::before { top: 8px; }
 .alert-icon.ledger::after { top: 14px; }
 
+.alerts-module {
+  background: #f7faf8;
+  border: 1px solid var(--line);
+  padding: 0 14px 0;
+}
+
+.alerts-module .module-heading {
+  border-bottom: 0;
+  padding-top: 10px;
+}
+
+.alerts-module .alert-row {
+  border-bottom: 0;
+  min-height: 56px;
+  padding: 0 0 12px;
+}
+
+.alerts-module .alert-row + .alert-row {
+  border-top: 1px dotted var(--line);
+  padding-top: 8px;
+}
+
 .advice-module {
   background: #fffdf0;
   border: 1px solid #e5e3c6;
@@ -830,6 +852,17 @@ td span {
   padding: 0 12px 8px;
 }
 
+.budget-child-rows {
+  border-left: 3px solid #d8e7df;
+  display: grid;
+  margin-left: 12px;
+  padding-left: 10px;
+}
+
+.budget-row-child .budget-meta strong {
+  font-weight: 700;
+}
+
 .stack-form {
   display: grid;
   gap: 11px;
@@ -879,6 +912,71 @@ td span {
   display: grid;
   gap: 6px;
   padding-top: 10px;
+}
+
+.category-type-groups {
+  gap: 10px;
+}
+
+.category-type-group {
+  background: #fbfdfc;
+  border: 1px solid #cbd9d2;
+  border-radius: 4px;
+  box-shadow: inset 4px 0 0 #5abf78;
+  display: grid;
+  overflow: hidden;
+}
+
+.category-type-income { box-shadow: inset 4px 0 0 #2c9a62; }
+.category-type-expense { box-shadow: inset 4px 0 0 #d28a18; }
+.category-type-transfer { box-shadow: inset 4px 0 0 #2e8eb8; }
+.category-type-other { box-shadow: inset 4px 0 0 #7b8580; }
+
+.category-type-summary {
+  align-items: center;
+  background: #eef7f2;
+  cursor: pointer;
+  display: flex;
+  gap: 9px;
+  list-style: none;
+  min-height: 42px;
+  padding: 8px 12px 8px 16px;
+}
+
+.category-type-summary::-webkit-details-marker {
+  display: none;
+}
+
+.category-type-summary::before {
+  color: var(--muted);
+  content: "v";
+  flex: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  width: 10px;
+}
+
+.category-type-group:not([open]) .category-type-summary::before {
+  content: ">";
+}
+
+.category-type-title {
+  color: var(--ink);
+  flex: 0 0 auto;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.category-type-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.category-type-body {
+  display: grid;
+  padding: 0 12px 10px;
 }
 
 .category-list-heading {
@@ -1413,6 +1511,7 @@ tbody tr.has-user-edit { background: #fffef9; }
 }
 
 .account-connect-module {
+  background: #f7faf8;
   border: 1px solid var(--line);
   padding: 12px;
 }
@@ -1473,7 +1572,11 @@ tbody tr.has-user-edit { background: #fffef9; }
   text-overflow: ellipsis;
 }
 
-.account-inventory { padding-top: 4px; }
+.account-inventory {
+  background: #f7faf8;
+  border: 1px solid var(--line);
+  padding: 12px;
+}
 
 .budget-board {
   display: grid;

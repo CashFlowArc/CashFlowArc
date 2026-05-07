@@ -104,28 +104,38 @@
         <p>{{ categories|length }} categories</p>
       </div>
     </div>
-    <div class="category-list">
-      <div class="category-list-heading" aria-hidden="true">
-        <span>Name</span>
-        <span>Parent</span>
-        <span>Type</span>
-        <span>Status</span>
-        <span>Usage</span>
-        <span></span>
-      </div>
-      {% for group in category_groups %}
-        <section class="category-group">
-          {% if group.parent %}
-            {{ category_editor(group.parent, "parent") }}
-          {% endif %}
-          {% if group.children %}
-            <div class="category-children">
-              {% for category in group.children %}
-                {{ category_editor(category, "child") }}
-              {% endfor %}
+    <div class="category-list category-type-groups">
+      {% for type_group in category_type_groups %}
+        <details class="category-type-group category-type-{{ type_group.key }}" open>
+          <summary class="category-type-summary">
+            <span class="category-type-title">{{ type_group.label }}</span>
+            <span class="category-type-count">{{ type_group.count }} categories</span>
+          </summary>
+          <div class="category-type-body">
+            <div class="category-list-heading" aria-hidden="true">
+              <span>Name</span>
+              <span>Parent</span>
+              <span>Type</span>
+              <span>Status</span>
+              <span>Usage</span>
+              <span></span>
             </div>
-          {% endif %}
-        </section>
+            {% for group in type_group.groups %}
+              <section class="category-group">
+                {% if group.parent %}
+                  {{ category_editor(group.parent, "parent") }}
+                {% endif %}
+                {% if group.children %}
+                  <div class="category-children">
+                    {% for category in group.children %}
+                      {{ category_editor(category, "child") }}
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </section>
+            {% endfor %}
+          </div>
+        </details>
       {% else %}
         <p class="empty">No categories yet. Create one here or from Budgets.</p>
       {% endfor %}
@@ -159,9 +169,7 @@
         if (!response.ok) {
           throw new Error("Category save failed");
         }
-        if (control.name === "parent_category_id") {
-          window.location.reload();
-        }
+        window.location.reload();
       }).catch(function () {
         control.value = previousValue || "";
         control.dataset.savedValue = previousValue || "";
