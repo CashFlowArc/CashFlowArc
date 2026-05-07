@@ -9,6 +9,15 @@
   <a href="{{ url_for('budget.accounts') }}">Refresh account data</a>
 </section>
 
+<section class="month-band overview-month-band">
+  <form class="month-selector" method="get">
+    <label>
+      Review month
+      <input name="month" type="month" value="{{ selected_month }}" onchange="this.form.submit()">
+    </label>
+  </form>
+</section>
+
 <section class="dashboard-layout">
   <aside class="account-rail" aria-label="Accounts">
     <div class="rail-heading">
@@ -39,11 +48,6 @@
     {% else %}
       <p class="empty compact-empty">No accounts have been synced yet.</p>
     {% endfor %}
-
-    <div class="net-worth-row">
-      <span>Net Worth</span>
-      <strong>{{ format_money(net_worth_total) }}</strong>
-    </div>
   </aside>
 
   <div class="dashboard-main">
@@ -71,31 +75,22 @@
         <h2>Alerts</h2>
       </div>
       <div class="alert-list">
-        <a class="alert-row" href="{{ url_for('budget.accounts') }}">
-          <span class="alert-icon notice" aria-hidden="true"></span>
-          <span>You have {{ accounts.account_count or 0 }} connected accounts in BudgetArc.</span>
-          <time>{{ month_start.strftime('%b') }}</time>
-        </a>
-        {% if categories %}
-          {% set top_category = categories[0] %}
-          <a class="alert-row" href="{{ url_for('budget.budgets', month=selected_month) }}">
-            <span class="alert-icon warning" aria-hidden="true"></span>
-            <span>Your largest {{ month_start.strftime('%B') }} category is {{ top_category.category|title }} at {{ format_money(top_category.spend_total) }}.</span>
-            <time>{{ month_start.strftime('%b') }}</time>
-          </a>
-        {% endif %}
-        {% if summary.spend_total and previous.spend_total and summary.spend_total > previous.spend_total %}
-          <a class="alert-row" href="{{ url_for('budget.budgets', month=selected_month) }}">
-            <span class="alert-icon warning" aria-hidden="true"></span>
-            <span>Monthly spending is running above the previous month.</span>
-            <time>{{ month_start.strftime('%b') }}</time>
-          </a>
-        {% endif %}
-        <a class="alert-row" href="{{ url_for('budget.transactions', month=selected_month) }}">
-          <span class="alert-icon ledger" aria-hidden="true"></span>
-          <span>{{ summary.transaction_count or 0 }} transactions are available for review.</span>
-          <time>{{ month_start.strftime('%b') }}</time>
-        </a>
+        {% for alert in alerts %}
+          <div class="alert-row">
+            <a class="alert-link" href="{{ alert.target_path }}">
+              <span class="alert-icon {{ alert.icon_type }}" aria-hidden="true"></span>
+              <span>{{ alert.message }}</span>
+              <time>{{ month_start.strftime('%b') }}</time>
+            </a>
+            <form class="alert-delete-form" method="post" action="{{ url_for('budget.delete_alert_action', alert_id=alert.alert_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="month" value="{{ selected_month }}">
+              <button class="icon-button alert-delete-button" type="submit" aria-label="Delete alert" title="Delete alert"></button>
+            </form>
+          </div>
+        {% else %}
+          <p class="empty">No alerts for this month.</p>
+        {% endfor %}
       </div>
     </section>
 

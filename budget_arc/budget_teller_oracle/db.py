@@ -214,6 +214,27 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
             )
             """,
         ),
+        (
+            "BUDGET_ALERTS",
+            """
+            CREATE TABLE BUDGET_ALERTS (
+                ALERT_ID VARCHAR2(64) PRIMARY KEY,
+                USER_ID VARCHAR2(64) NOT NULL,
+                MONTH_KEY VARCHAR2(7) NOT NULL,
+                ALERT_KEY VARCHAR2(128) NOT NULL,
+                ICON_TYPE VARCHAR2(32) NOT NULL,
+                MESSAGE VARCHAR2(1024) NOT NULL,
+                TARGET_PATH VARCHAR2(1024) NOT NULL,
+                STATUS VARCHAR2(32) DEFAULT 'ACTIVE' NOT NULL,
+                CREATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                UPDATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
+                DELETED_AT TIMESTAMP WITH TIME ZONE,
+                CONSTRAINT BUDGET_ALERTS_USER_FK FOREIGN KEY (USER_ID)
+                    REFERENCES BUDGET_USERS (USER_ID),
+                CONSTRAINT BUDGET_ALERTS_USER_KEY_UK UNIQUE (USER_ID, ALERT_KEY)
+            )
+            """,
+        ),
     ]
 
     created: list[str] = []
@@ -271,6 +292,7 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
             "CREATE INDEX BUDGET_TXNS_ACCT_DATE_IDX ON BUDGET_TRANSACTIONS (PROVIDER_ACCOUNT_ID, TRANSACTION_DATE)",
             "CREATE INDEX BUDGET_TXNS_CONN_DATE_IDX ON BUDGET_TRANSACTIONS (CONNECTION_ID, TRANSACTION_DATE)",
             "CREATE INDEX BUDGET_SYNC_CONN_IDX ON BUDGET_SYNC_EVENTS (CONNECTION_ID, STARTED_AT)",
+            "CREATE INDEX BUDGET_ALERTS_USER_MONTH_IDX ON BUDGET_ALERTS (USER_ID, MONTH_KEY, STATUS)",
         ]
         for ddl in indexes:
             try:

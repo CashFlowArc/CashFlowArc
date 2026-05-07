@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -336,9 +337,9 @@ def _dashboard_account_groups(rows: list[dict[str, Any]]) -> tuple[list[dict[str
     net_worth = Decimal("0")
 
     for row in rows:
-        balance = _account_balance_from_raw(row.get("raw_json"))
+        balance = _decimal(row.get("running_balance")) if row.get("running_balance") is not None else None
         if balance is None:
-            balance = _decimal(row.get("running_balance"))
+            balance = _account_balance_from_raw(row.get("raw_json"))
         signed_balance = _signed_net_worth_balance(
             balance,
             row.get("account_type"),
@@ -562,6 +563,105 @@ def _query_all(sql: str, **params: Any) -> list[dict[str, Any]]:
 def _query_one(sql: str, **params: Any) -> dict[str, Any] | None:
     rows = _query_all(sql, **params)
     return rows[0] if rows else None
+
+
+def _dashboard_alert_id(user_id: str, alert_key: str) -> str:
+    return hashlib.sha256(f"{user_id}:dashboard-alert:{alert_key}".encode("utf-8")).hexdigest()
+
+
+def _sync_dashboard_alerts(
+    *,
+    user_id: str,
+    month_key: str,
+    generated_alerts: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    cfg = load_config()
+    conn = connect(cfg.oracle)
+    try:
+        rows: list[dict[str, Any]] = []
+        with conn.cursor() as cur:
+            for alert in generated_alerts:
+                alert_key = alert["alert_key"]
+                cur.execute(
+                    """
+                    MERGE INTO BUDGET_ALERTS target
+                    USING (
+                        SELECT
+                            :alert_id AS ALERT_ID,
+                            :user_id AS USER_ID,
+                            :month_key AS MONTH_KEY,
+                            :alert_key AS ALERT_KEY,
+                            :icon_type AS ICON_TYPE,
+                            :message AS MESSAGE,
+                            :target_path AS TARGET_PATH
+                        FROM dual
+                    ) source
+                    ON (target.ALERT_ID = source.ALERT_ID)
+                    WHEN MATCHED THEN UPDATE SET
+                        target.ICON_TYPE = source.ICON_TYPE,
+                        target.MESSAGE = source.MESSAGE,
+                        target.TARGET_PATH = source.TARGET_PATH,
+                        target.UPDATED_AT = SYSTIMESTAMP
+                    WHERE target.STATUS <> 'DELETED'
+                    WHEN NOT MATCHED THEN INSERT (
+                        ALERT_ID, USER_ID, MONTH_KEY, ALERT_KEY, ICON_TYPE, MESSAGE, TARGET_PATH
+                    ) VALUES (
+                        source.ALERT_ID, source.USER_ID, source.MONTH_KEY, source.ALERT_KEY,
+                        source.ICON_TYPE, source.MESSAGE, source.TARGET_PATH
+                    )
+                    """,
+                    alert_id=_dashboard_alert_id(user_id, alert_key),
+                    user_id=user_id,
+                    month_key=month_key,
+                    alert_key=alert_key,
+                    icon_type=alert["icon_type"],
+                    message=alert["message"][:1024],
+                    target_path=alert["target_path"][:1024],
+                )
+
+            cur.execute(
+                """
+                SELECT ALERT_ID, ALERT_KEY, ICON_TYPE, MESSAGE, TARGET_PATH, CREATED_AT
+                FROM BUDGET_ALERTS
+                WHERE USER_ID = :user_id
+                  AND MONTH_KEY = :month_key
+                  AND STATUS = 'ACTIVE'
+                ORDER BY CREATED_AT, ALERT_KEY
+                """,
+                user_id=user_id,
+                month_key=month_key,
+            )
+            columns = [col[0].lower() for col in cur.description]
+            rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+        conn.commit()
+        return rows
+    finally:
+        conn.close()
+
+
+def _delete_dashboard_alert(*, user_id: str, alert_id: str) -> int:
+    cfg = load_config()
+    conn = connect(cfg.oracle)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE BUDGET_ALERTS
+                SET STATUS = 'DELETED',
+                    DELETED_AT = SYSTIMESTAMP,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                  AND ALERT_ID = :alert_id
+                  AND STATUS <> 'DELETED'
+                """,
+                user_id=user_id,
+                alert_id=alert_id,
+            )
+            rowcount = cur.rowcount
+        conn.commit()
+        return rowcount
+    finally:
+        conn.close()
 
 
 def _execute_sync(
@@ -1016,6 +1116,7 @@ def create_app() -> Flask:
                     FROM BUDGET_TRANSACTIONS t
                     WHERE t.PROVIDER = 'teller'
                       AND t.USER_ID = :user_id
+                      AND t.TRANSACTION_DATE < :month_end
                       AND t.RUNNING_BALANCE IS NOT NULL
                 )
                 WHERE RN = 1
@@ -1025,6 +1126,7 @@ def create_app() -> Flask:
                 FROM BUDGET_TRANSACTIONS
                 WHERE PROVIDER = 'teller'
                   AND USER_ID = :user_id
+                  AND TRANSACTION_DATE < :month_end
                 GROUP BY PROVIDER, PROVIDER_ACCOUNT_ID, USER_ID
             )
             SELECT
@@ -1052,8 +1154,9 @@ def create_app() -> Flask:
             ORDER BY a.INSTITUTION_NAME, a.ACCOUNT_NAME
             """,
             user_id=user_id,
+            month_end=month_end,
         )
-        account_groups, net_worth_total = _dashboard_account_groups(account_rows)
+        account_groups, _ = _dashboard_account_groups(account_rows)
         recent_transactions = _query_all(
             """
             SELECT TRANSACTION_DATE, AMOUNT, STATUS, CATEGORY, DESCRIPTION, COUNTERPARTY_NAME, TRANSACTION_TYPE
@@ -1088,18 +1191,75 @@ def create_app() -> Flask:
             month_end=month_end,
         )
         categories = _attach_bar_percent(categories, "spend_total")
+        generated_alerts = [
+            {
+                "alert_key": f"{selected_month}:connected-accounts",
+                "icon_type": "notice",
+                "message": f"You have {accounts.get('account_count') or 0} connected accounts in BudgetArc.",
+                "target_path": url_for("budget.accounts"),
+            },
+        ]
+        if categories:
+            top_category = categories[0]
+            generated_alerts.append(
+                {
+                    "alert_key": f"{selected_month}:largest-category",
+                    "icon_type": "warning",
+                    "message": (
+                        f"Your largest {month_start.strftime('%B')} category is "
+                        f"{str(top_category['category']).title()} at {_money(top_category.get('spend_total'))}."
+                    ),
+                    "target_path": url_for("budget.budgets", month=selected_month),
+                }
+            )
+        if summary.get("spend_total") and previous.get("spend_total") and summary["spend_total"] > previous["spend_total"]:
+            generated_alerts.append(
+                {
+                    "alert_key": f"{selected_month}:spending-above-previous",
+                    "icon_type": "warning",
+                    "message": "Monthly spending is running above the previous month.",
+                    "target_path": url_for("budget.budgets", month=selected_month),
+                }
+            )
+        generated_alerts.append(
+            {
+                "alert_key": f"{selected_month}:transactions-review",
+                "icon_type": "ledger",
+                "message": f"{summary.get('transaction_count') or 0} transactions are available for review.",
+                "target_path": url_for("budget.transactions", month=selected_month),
+            }
+        )
+        alerts = _sync_dashboard_alerts(
+            user_id=user_id,
+            month_key=selected_month,
+            generated_alerts=generated_alerts,
+        )
         return render_template(
             "dashboard.html",
             summary=summary,
             previous=previous,
             accounts=accounts,
             account_groups=account_groups,
-            net_worth_total=net_worth_total,
             recent_transactions=recent_transactions,
             categories=categories,
+            alerts=alerts,
             month_start=month_start,
             selected_month=selected_month,
         )
+
+    @budget.route("/actions/delete-alert/<alert_id>", methods=["POST"])
+    @user_required
+    def delete_alert_action(alert_id: str) -> Any:
+        require_csrf()
+        selected_month = (_parse_month(request.form.get("month")) or dt.date.today().replace(day=1)).strftime("%Y-%m")
+        if not re.fullmatch(r"[a-f0-9]{64}", alert_id):
+            flash("Alert could not be deleted.", "error")
+            return redirect(url_for("budget.dashboard", month=selected_month))
+
+        deleted_count = _delete_dashboard_alert(user_id=current_user_id(), alert_id=alert_id)
+        if not deleted_count:
+            flash("Alert was already removed.", "error")
+        return redirect(url_for("budget.dashboard", month=selected_month))
 
     @budget.route("/transactions")
     @user_required

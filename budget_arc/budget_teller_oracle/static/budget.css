@@ -395,22 +395,7 @@ td span {
 
 .account-line b,
 .activity-row b,
-.account-group-summary b,
-.net-worth-row strong { text-align: right; }
-
-.net-worth-row {
-  align-items: center;
-  background: #f2f5f3;
-  border-top: 1px solid #cfd8d3;
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 12px 14px 28px;
-}
-
-.net-worth-row span {
-  color: #555f5a;
-  font-size: 16px;
-}
+.account-group-summary b { text-align: right; }
 
 .dashboard-main {
   display: grid;
@@ -458,7 +443,6 @@ td span {
   display: grid;
 }
 
-.alert-row,
 .activity-row {
   align-items: center;
   border-bottom: 1px dotted var(--line);
@@ -469,7 +453,25 @@ td span {
 }
 
 .alert-row {
+  align-items: center;
+  border-bottom: 1px dotted var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  min-height: 42px;
+  padding: 6px 0;
+}
+
+.alert-link {
+  align-items: center;
+  display: grid;
+  gap: 12px;
   grid-template-columns: 34px minmax(0, 1fr) 54px;
+  min-height: 42px;
+}
+
+.alert-link:hover span:not(.alert-icon) {
+  color: #006da1;
 }
 
 .alert-row time {
@@ -479,6 +481,8 @@ td span {
   text-align: right;
   text-transform: uppercase;
 }
+
+.alert-delete-form { margin: 0; }
 
 .alert-icon,
 .advice-icon {
@@ -633,6 +637,10 @@ td span {
   padding: 16px 0;
 }
 
+.overview-month-band {
+  margin-bottom: 0;
+}
+
 .month-selector {
   display: grid;
   grid-template-columns: minmax(180px, 240px);
@@ -695,6 +703,54 @@ select {
 .small-button {
   min-height: 29px;
   padding: 5px 10px;
+}
+
+.icon-button {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  padding: 0;
+  width: 28px;
+}
+
+.alert-delete-button {
+  color: #7a8580;
+  position: relative;
+}
+
+.alert-delete-button:hover,
+.alert-delete-button:focus-visible {
+  background: #fff4f2;
+  border-color: #d9aaa4;
+  color: var(--red);
+  outline: 0;
+}
+
+.alert-delete-button::before {
+  border: 2px solid currentColor;
+  border-top: 0;
+  bottom: 7px;
+  content: "";
+  left: 9px;
+  position: absolute;
+  top: 10px;
+  width: 8px;
+}
+
+.alert-delete-button::after {
+  background: currentColor;
+  box-shadow: 2px -3px 0 -1px currentColor;
+  content: "";
+  height: 2px;
+  left: 8px;
+  position: absolute;
+  top: 7px;
+  width: 12px;
 }
 
 .transactions-layout {
@@ -1120,14 +1176,22 @@ pre {
   }
   .budget-row,
   .activity-row,
-  .alert-row,
   .advice-row {
     grid-template-columns: 1fr;
   }
+  .alert-row {
+    grid-template-columns: minmax(0, 1fr) 30px;
+  }
+  .alert-link {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .alert-link time {
+    grid-column: 2;
+    text-align: left;
+  }
   .budget-amount,
   .right,
-  .activity-row b,
-  .alert-row time {
+  .activity-row b {
     text-align: left;
   }
   .settings-list { grid-template-columns: 1fr; }
