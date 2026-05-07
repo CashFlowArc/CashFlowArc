@@ -199,6 +199,10 @@ h3 { font-size: 15px; margin-bottom: 8px; }
   text-transform: uppercase;
 }
 
+.eyebrow:empty {
+  display: none;
+}
+
 .user-note {
   color: var(--muted);
   font-size: 12px;
@@ -241,7 +245,6 @@ h3 { font-size: 15px; margin-bottom: 8px; }
 .account-rail {
   background: #f8faf8;
   border: 1px solid #d6ddd9;
-  border-top: 0;
   align-self: start;
 }
 
@@ -863,6 +866,9 @@ td span {
 
 .category-side {
   align-self: start;
+  background: #f7faf8;
+  border: 1px solid var(--line);
+  padding: 12px;
 }
 
 .restore-note {
@@ -1411,6 +1417,16 @@ tbody tr.has-user-edit { background: #fffef9; }
   padding: 12px;
 }
 
+.account-connections-module {
+  background: #f7faf8;
+  border: 1px solid var(--line);
+  padding: 12px;
+}
+
+.account-connections-module .module-heading {
+  padding-bottom: 8px;
+}
+
 .account-connect-module .module-heading {
   padding-bottom: 8px;
 }
@@ -1430,6 +1446,16 @@ tbody tr.has-user-edit { background: #fffef9; }
 .account-connect-form .form-note {
   grid-column: 1 / -1;
   margin: 0;
+}
+
+.timezone-form {
+  align-items: end;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 12px;
+  padding-top: 12px;
 }
 
 .connection-line span,
@@ -1703,7 +1729,8 @@ pre {
   .category-layout,
   .connect-panel,
   .accounts-top-grid,
-  .account-connect-form {
+  .account-connect-form,
+  .timezone-form {
     grid-template-columns: 1fr;
   }
 

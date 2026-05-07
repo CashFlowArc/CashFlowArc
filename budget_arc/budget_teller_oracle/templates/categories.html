@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block title %}BudgetArc Categories{% endblock %}
 {% block heading %}Categories{% endblock %}
-{% block eyebrow %}User-owned categories{% endblock %}
+{% block eyebrow %}{% endblock %}
 {% macro category_editor(category, row_level) %}
   <div class="category-row-shell category-row-shell-{{ row_level }}">
     <form class="category-row category-autosave-form category-row-{{ row_level }}" method="post" action="{{ url_for('budget.update_category_action', category_id=category.category_id) }}">

@@ -4,7 +4,7 @@
 {% block eyebrow %}Connections, balances, and sync controls{% endblock %}
 {% block content %}
 <section class="accounts-top-grid">
-  <section class="module">
+  <section class="module account-connections-module">
     <div class="module-heading">
       <div>
         <h2>Connections</h2>
@@ -41,13 +41,24 @@
         <p class="empty">No Teller connections yet.</p>
       {% endfor %}
     </div>
+    <form class="timezone-form" method="post" action="{{ url_for('budget.update_account_timezone_action') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>
+        Time zone
+        <select name="timezone_name">
+          {% for option in timezone_options %}
+            <option value="{{ option.name }}" {{ 'selected' if option.name == user_timezone else '' }}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="ghost-button small-button" type="submit">Save</button>
+    </form>
   </section>
 
   <section class="module account-connect-module">
     <div class="module-heading">
       <div>
         <h2>{{ "Repair " ~ (repair_connection.institution_name or "connection") if repair_connection else "Connect Account" }}</h2>
-        <p>{{ "Complete Teller repair for this existing enrollment." if repair_connection else "Search for an institution." }}</p>
       </div>
     </div>
     <div class="account-connect-form">
@@ -55,12 +66,9 @@
         <p id="institution-status" class="form-note">Repairing the existing Teller enrollment for this institution.</p>
         <button id="connect" class="primary-button" type="button">Repair with Teller</button>
       {% else %}
-        <label>
-          Institution
-          <input id="institution-search" list="institution-options" autocomplete="off" minlength="3" placeholder="Start typing an institution">
-          <datalist id="institution-options"></datalist>
-          <input id="institution-id" type="hidden">
-        </label>
+        <input id="institution-search" list="institution-options" autocomplete="off" minlength="3" placeholder="Start typing an institution" aria-label="Institution">
+        <datalist id="institution-options"></datalist>
+        <input id="institution-id" type="hidden">
         <p id="institution-status" class="form-note" aria-live="polite"></p>
         <button id="connect" class="primary-button" type="button" disabled>Connect with Teller</button>
       {% endif %}

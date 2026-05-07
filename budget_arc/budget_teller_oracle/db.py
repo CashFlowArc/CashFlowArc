@@ -67,6 +67,7 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
                 DISPLAY_NAME VARCHAR2(256),
                 PASSWORD_HASH VARCHAR2(512) NOT NULL,
                 STATUS VARCHAR2(32) DEFAULT 'ACTIVE' NOT NULL,
+                TIMEZONE_NAME VARCHAR2(64) DEFAULT 'America/New_York' NOT NULL,
                 CREATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
                 UPDATED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
                 EMAIL_VERIFIED_AT TIMESTAMP WITH TIME ZONE,
@@ -493,6 +494,7 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
         user_extra_columns = [
             ("EMAIL_VERIFIED_AT", "TIMESTAMP WITH TIME ZONE"),
             ("PASSWORD_SET_AT", "TIMESTAMP WITH TIME ZONE"),
+            ("TIMEZONE_NAME", "VARCHAR2(64)"),
         ]
         for column_name, column_type in user_extra_columns:
             if _table_exists(conn, "BUDGET_USERS") and not _column_exists(conn, "BUDGET_USERS", column_name):
@@ -503,9 +505,17 @@ def initialize_schema(conn: oracledb.Connection) -> list[str]:
                 """
                 UPDATE BUDGET_USERS
                 SET EMAIL_VERIFIED_AT = NVL(EMAIL_VERIFIED_AT, CREATED_AT),
-                    PASSWORD_SET_AT = NVL(PASSWORD_SET_AT, CREATED_AT)
+                    PASSWORD_SET_AT = NVL(PASSWORD_SET_AT, CREATED_AT),
+                    TIMEZONE_NAME = NVL(TIMEZONE_NAME, 'America/New_York')
                 WHERE STATUS = 'ACTIVE'
-                  AND (EMAIL_VERIFIED_AT IS NULL OR PASSWORD_SET_AT IS NULL)
+                  AND (EMAIL_VERIFIED_AT IS NULL OR PASSWORD_SET_AT IS NULL OR TIMEZONE_NAME IS NULL)
+                """
+            )
+            cur.execute(
+                """
+                UPDATE BUDGET_USERS
+                SET TIMEZONE_NAME = 'America/New_York'
+                WHERE TIMEZONE_NAME IS NULL
                 """
             )
 
@@ -683,6 +693,7 @@ class BudgetStore:
                     u.EMAIL_VERIFIED_AT,
                     u.PASSWORD_SET_AT,
                     u.LAST_LOGIN_AT,
+                    u.TIMEZONE_NAME,
                     COUNT(DISTINCT c.CONNECTION_ID) AS CONNECTION_COUNT,
                     COUNT(DISTINCT a.PROVIDER_ACCOUNT_ID) AS ACCOUNT_COUNT
                 FROM BUDGET_USERS u
@@ -695,7 +706,7 @@ class BudgetStore:
                 GROUP BY
                     u.USER_ID, u.EMAIL, u.DISPLAY_NAME, u.STATUS,
                     u.CREATED_AT, u.UPDATED_AT, u.EMAIL_VERIFIED_AT,
-                    u.PASSWORD_SET_AT, u.LAST_LOGIN_AT
+                    u.PASSWORD_SET_AT, u.LAST_LOGIN_AT, u.TIMEZONE_NAME
                 ORDER BY u.EMAIL
                 """
             )
@@ -710,8 +721,9 @@ class BudgetStore:
                     "email_verified_at": row[6],
                     "password_set_at": row[7],
                     "last_login_at": row[8],
-                    "connection_count": row[9],
-                    "account_count": row[10],
+                    "timezone_name": row[9],
+                    "connection_count": row[10],
+                    "account_count": row[11],
                 }
                 for row in cur.fetchall()
             ]
@@ -720,7 +732,7 @@ class BudgetStore:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS, EMAIL_VERIFIED_AT
+                SELECT USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS, EMAIL_VERIFIED_AT, TIMEZONE_NAME
                 FROM BUDGET_USERS
                 WHERE EMAIL = :email
                 """,
@@ -736,13 +748,14 @@ class BudgetStore:
                 "password_hash": row[3],
                 "status": row[4],
                 "email_verified_at": row[5],
+                "timezone_name": row[6],
             }
 
     def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS, EMAIL_VERIFIED_AT, PASSWORD_SET_AT
+                SELECT USER_ID, EMAIL, DISPLAY_NAME, PASSWORD_HASH, STATUS, EMAIL_VERIFIED_AT, PASSWORD_SET_AT, TIMEZONE_NAME
                 FROM BUDGET_USERS
                 WHERE USER_ID = :user_id
                 """,
@@ -759,7 +772,21 @@ class BudgetStore:
                 "status": row[4],
                 "email_verified_at": row[5],
                 "password_set_at": row[6],
+                "timezone_name": row[7],
             }
+
+    def update_user_timezone(self, *, user_id: str, timezone_name: str) -> None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE BUDGET_USERS
+                SET TIMEZONE_NAME = :timezone_name,
+                    UPDATED_AT = SYSTIMESTAMP
+                WHERE USER_ID = :user_id
+                """,
+                user_id=user_id,
+                timezone_name=timezone_name,
+            )
 
     def set_user_password(self, *, user_id: str, password_hash: str) -> None:
         with self.conn.cursor() as cur:

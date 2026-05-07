@@ -11,6 +11,7 @@ from decimal import Decimal
 from functools import wraps
 from typing import Any, Callable
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import (
     Blueprint,
@@ -39,6 +40,17 @@ from .web_security import hash_password, verify_password
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 INSTITUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 CONNECTION_ID_RE = re.compile(r"^[A-Fa-f0-9]{64}$")
+DEFAULT_TIMEZONE = "America/New_York"
+TIMEZONE_OPTIONS = [
+    {"name": "America/New_York", "label": "Eastern Time"},
+    {"name": "America/Chicago", "label": "Central Time"},
+    {"name": "America/Denver", "label": "Mountain Time"},
+    {"name": "America/Phoenix", "label": "Arizona Time"},
+    {"name": "America/Los_Angeles", "label": "Pacific Time"},
+    {"name": "America/Anchorage", "label": "Alaska Time"},
+    {"name": "Pacific/Honolulu", "label": "Hawaii Time"},
+    {"name": "UTC", "label": "UTC"},
+]
 
 
 @dataclass(frozen=True)
@@ -144,15 +156,40 @@ def _date(value: Any) -> str:
     return str(value)
 
 
-def _datetime_label(value: Any) -> str:
+def _valid_timezone_name(value: str | None) -> str | None:
+    if not value:
+        return None
+    clean_value = value.strip()
+    try:
+        ZoneInfo(clean_value)
+    except ZoneInfoNotFoundError:
+        return None
+    return clean_value
+
+
+def _timezone(value: str | None) -> ZoneInfo:
+    timezone_name = _valid_timezone_name(value) or DEFAULT_TIMEZONE
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def _datetime_label(value: Any, timezone_name: str | None = None) -> str:
     if value is None:
         return ""
     if hasattr(value, "strftime"):
-        month = value.strftime("%b")
-        day = value.strftime("%d").lstrip("0") or "0"
-        year = value.strftime("%Y")
-        time_text = value.strftime("%I:%M %p").lstrip("0")
-        return f"{month} {day}, {year} {time_text}"
+        local_value = value
+        if isinstance(value, dt.datetime):
+            if value.tzinfo is None:
+                local_value = value.replace(tzinfo=dt.timezone.utc)
+            local_value = local_value.astimezone(_timezone(timezone_name))
+        month = local_value.strftime("%b")
+        day = local_value.strftime("%d").lstrip("0") or "0"
+        year = local_value.strftime("%Y")
+        time_text = local_value.strftime("%I:%M %p").lstrip("0")
+        timezone_text = local_value.strftime("%Z") if isinstance(local_value, dt.datetime) else ""
+        return f"{month} {day}, {year} {time_text}{(' ' + timezone_text) if timezone_text else ''}"
     return str(value)
 
 
@@ -846,6 +883,7 @@ def create_app() -> Flask:
                 "email": session.get("user_email"),
                 "display_name": session.get("display_name") or session.get("user_email"),
                 "user_id": session.get("user_id"),
+                "timezone_name": session.get("timezone_name") or DEFAULT_TIMEZONE,
             }
         return None
 
@@ -862,6 +900,12 @@ def create_app() -> Flask:
         if not user or user["role"] != "user" or not user["user_id"]:
             raise PermissionError("A budget user login is required")
         return str(user["user_id"])
+
+    def current_user_timezone() -> str:
+        user = current_user()
+        if user and user["role"] == "user":
+            return _valid_timezone_name(str(user.get("timezone_name") or "")) or DEFAULT_TIMEZONE
+        return DEFAULT_TIMEZONE
 
     def csrf_token() -> str:
         token = session.get("csrf_token")
@@ -970,6 +1014,8 @@ def create_app() -> Flask:
             "is_authenticated": is_authenticated(),
             "is_admin": is_admin(),
             "current_user": current_user(),
+            "current_user_timezone": current_user_timezone(),
+            "timezone_options": TIMEZONE_OPTIONS,
             "budget_data_version": session.get("budget_data_version", ""),
         }
 
@@ -1010,6 +1056,7 @@ def create_app() -> Flask:
                         session["user_id"] = user["user_id"]
                         session["user_email"] = user["email"]
                         session["display_name"] = user["display_name"] or user["email"]
+                        session["timezone_name"] = _valid_timezone_name(user.get("timezone_name")) or DEFAULT_TIMEZONE
                         csrf_token()
                         next_url = request.args.get("next") or url_for("budget.dashboard")
                         return redirect(next_url)
@@ -2501,6 +2548,7 @@ def create_app() -> Flask:
     @user_required
     def accounts() -> Any:
         user_id = current_user_id()
+        user_timezone = current_user_timezone()
         rows = _query_all(
             """
             SELECT
@@ -2574,7 +2622,7 @@ def create_app() -> Flask:
         )
         for connection in connections:
             connection["warning_label"] = _connection_warning_label(connection)
-            connection["last_sync_label"] = _datetime_label(connection.get("last_sync_at")) or "Not synced yet"
+            connection["last_sync_label"] = _datetime_label(connection.get("last_sync_at"), user_timezone) or "Not synced yet"
         repair_connection: dict[str, Any] | None = None
         try:
             connection_id = _selected_connection_id()
@@ -2600,7 +2648,30 @@ def create_app() -> Flask:
             accounts=rows,
             connections=connections,
             repair_connection=repair_connection,
+            user_timezone=user_timezone,
         )
+
+    @budget.route("/actions/account/timezone", methods=["POST"])
+    @user_required
+    def update_account_timezone_action() -> Any:
+        require_csrf()
+        timezone_name = _valid_timezone_name(request.form.get("timezone_name"))
+        if not timezone_name:
+            flash("Choose a valid time zone.", "error")
+            return redirect(url_for("budget.accounts"))
+
+        cfg = load_config(require_teller=False)
+        conn = connect(cfg.oracle)
+        try:
+            store = BudgetStore(conn)
+            store.update_user_timezone(user_id=current_user_id(), timezone_name=timezone_name)
+            conn.commit()
+        finally:
+            conn.close()
+
+        session["timezone_name"] = timezone_name
+        flash("Time zone preference saved.", "success")
+        return redirect(url_for("budget.accounts"))
 
     @budget.route("/connect")
     @user_required
