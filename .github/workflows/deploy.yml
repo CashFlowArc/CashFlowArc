@@ -1,0 +1,35 @@
+name: Deploy CashFlowArc Home
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, ARM64]
+
+    steps:
+      - name: Update home checkout
+        run: |
+          cd /home/opc/CashFlowArc
+          git fetch origin
+          git reset --hard origin/main
+
+      - name: Install or update home site
+        run: |
+          cd /home/opc/CashFlowArc
+          bash deploy/install_home_on_oel.sh
+
+      - name: Routing diagnostics
+        run: |
+          echo "=== listening ports ==="
+          sudo ss -ltnp | sed -E 's/users:\(\(\"[^\"]+\",pid=[0-9]+,fd=[0-9]+\)\)/users:REDACTED/g' || true
+          echo "=== relevant services ==="
+          systemctl list-unit-files | grep -Ei 'cash|budget|trader|nginx|httpd|gunicorn' || true
+          echo "=== nginx routes ==="
+          if command -v nginx >/dev/null 2>&1; then
+            sudo grep -R "server_name\|proxy_pass\|location /budget\|location /trader\|location /" /etc/nginx 2>/dev/null || true
+          else
+            echo "nginx not installed"
+          fi
