@@ -1089,6 +1089,18 @@ td span {
   padding-bottom: 6px;
 }
 
+.category-usage-link {
+  border-radius: 3px;
+  text-decoration: none;
+}
+
+.category-usage-link:hover,
+.category-usage-link:focus-visible {
+  color: var(--link);
+  outline: 1px solid #9fcabb;
+  outline-offset: 3px;
+}
+
 label {
   color: #59625d;
   display: grid;

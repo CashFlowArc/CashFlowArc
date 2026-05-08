@@ -25,14 +25,14 @@
         <option value="ACTIVE" {{ 'selected' if category.status == 'ACTIVE' else '' }}>Active</option>
         <option value="INACTIVE" {{ 'selected' if category.status == 'INACTIVE' else '' }}>Inactive</option>
       </select>
-      <div class="category-usage">
+      <a class="category-usage category-usage-link" href="{{ url_for('budget.transactions', month='', category=category.category_id) }}" aria-label="View all transactions in {{ category.display_name }}">
         <span>{{ category.raw_transaction_count or 0 }} synced txns</span>
         <span>{{ category.edited_transaction_count or 0 }} edited txns</span>
         {% if category.subcategory_count %}
           <span>{{ category.subcategory_count }} subcategories</span>
         {% endif %}
         <span>{{ category.budget_month_count or 0 }} budget months</span>
-      </div>
+      </a>
       <div class="category-actions">
         <button class="danger-button small-button" type="button" onclick="document.getElementById('delete-category-{{ category.category_id }}').showModal()" {{ 'disabled' if categories|length <= 1 else '' }}>Delete</button>
       </div>
