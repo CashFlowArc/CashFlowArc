@@ -166,6 +166,20 @@
 </datalist>
 <script>
   (function () {
+    const scrollKey = "budget-scroll:" + window.location.pathname + window.location.search;
+    const savedScroll = window.sessionStorage.getItem(scrollKey);
+    if (savedScroll !== null) {
+      window.sessionStorage.removeItem(scrollKey);
+      window.requestAnimationFrame(function () {
+        window.scrollTo(0, Number(savedScroll) || 0);
+      });
+    }
+
+    function refreshBudgetPage() {
+      window.sessionStorage.setItem(scrollKey, String(window.scrollY));
+      window.location.reload();
+    }
+
     function submitBudget(control) {
       const form = control.form;
       if (!form || form.dataset.saving === "1") {
@@ -185,9 +199,9 @@
         headers: { "X-Requested-With": "fetch" }
       }).then(function (response) {
         if (!response.ok) {
-          control.dataset.savedValue = previousValue;
-          control.value = previousValue;
+          throw new Error("Budget save failed");
         }
+        refreshBudgetPage();
       }).catch(function () {
         control.dataset.savedValue = previousValue;
         control.value = previousValue;
