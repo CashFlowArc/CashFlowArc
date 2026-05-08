@@ -229,6 +229,18 @@
       });
     });
 
+    document.querySelectorAll("form[id^='transaction-edit-']").forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        const control = document.activeElement && document.activeElement.form === form
+          ? document.activeElement
+          : form.querySelector(".ledger-autosave-control");
+        if (control) {
+          submitForm(control);
+        }
+      });
+    });
+
     const filterForm = document.querySelector(".filter-stack");
     const startMonthInput = document.querySelector("input[name='start_month']");
     const endMonthInput = document.querySelector("input[name='end_month']");

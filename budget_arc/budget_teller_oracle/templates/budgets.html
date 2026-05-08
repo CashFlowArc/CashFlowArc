@@ -205,6 +205,16 @@
         submitBudget(control);
       });
     });
+
+    document.querySelectorAll(".budget-edit-form").forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        const control = form.querySelector(".budget-autosave-control");
+        if (control) {
+          submitBudget(control);
+        }
+      });
+    });
   })();
 </script>
 {% endblock %}
