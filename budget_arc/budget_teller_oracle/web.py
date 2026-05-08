@@ -1667,47 +1667,62 @@ def create_app() -> Flask:
             SELECT
                 c.CATEGORY_ID,
                 c.NAME AS CATEGORY_NAME,
-                p.NAME AS PARENT_NAME
+                p.NAME AS PARENT_NAME,
+                LOWER(NVL(c.CATEGORY_TYPE, 'expense')) AS CATEGORY_TYPE
             FROM BUDGET_CATEGORIES c
             LEFT JOIN BUDGET_CATEGORIES p
               ON p.USER_ID = c.USER_ID
              AND p.CATEGORY_ID = c.PARENT_CATEGORY_ID
             WHERE c.USER_ID = :user_id
               AND c.STATUS = 'ACTIVE'
-            ORDER BY LOWER(NVL(p.NAME, c.NAME)), c.PARENT_CATEGORY_ID NULLS FIRST, LOWER(c.NAME)
+            ORDER BY
+                CASE LOWER(NVL(c.CATEGORY_TYPE, 'expense'))
+                    WHEN 'income' THEN 0
+                    WHEN 'expense' THEN 1
+                    WHEN 'transfer' THEN 2
+                    WHEN 'other' THEN 3
+                    ELSE 4
+                END,
+                LOWER(NVL(p.NAME, c.NAME)),
+                c.PARENT_CATEGORY_ID NULLS FIRST,
+                LOWER(c.NAME)
             """,
             user_id=user_id,
         )
         for category in categories:
             category["category_display"] = _category_display(category)
-        merchants = _query_all(
-            """
-            SELECT DISTINCT MERCHANT_NAME
-            FROM (
-                SELECT DISPLAY_NAME AS MERCHANT_NAME
-                FROM BUDGET_MERCHANTS
-                WHERE USER_ID = :user_id
-                  AND STATUS = 'ACTIVE'
-                UNION ALL
-                SELECT COUNTERPARTY_NAME AS MERCHANT_NAME
-                FROM BUDGET_TRANSACTIONS
-                WHERE PROVIDER = 'teller'
-                  AND USER_ID = :user_id
-                  AND COUNTERPARTY_NAME IS NOT NULL
-            )
-            WHERE MERCHANT_NAME IS NOT NULL
-            ORDER BY MERCHANT_NAME
-            FETCH FIRST 200 ROWS ONLY
-            """,
-            user_id=user_id,
-        )
+        category_type_labels = {
+            "income": "Income",
+            "expense": "Expense",
+            "transfer": "Transfer",
+            "other": "Other",
+        }
+        def dropdown_category_type(category: dict[str, Any]) -> str:
+            category_type = str(category.get("category_type") or "expense").lower()
+            return category_type if category_type in category_type_labels else "other"
+
+        category_dropdown_groups = [
+            {
+                "key": category_type,
+                "label": label,
+                "options": [
+                    category for category in categories
+                    if dropdown_category_type(category) == category_type
+                ],
+            }
+            for category_type, label in category_type_labels.items()
+        ]
+        category_dropdown_groups = [
+            group for group in category_dropdown_groups
+            if group["options"]
+        ]
         return render_template(
             "transactions.html",
             transactions=rows,
             accounts=accounts,
             institutions=institutions,
             categories=categories,
-            merchants=merchants,
+            category_dropdown_groups=category_dropdown_groups,
             filters={
                 "q": search,
                 "status": status,

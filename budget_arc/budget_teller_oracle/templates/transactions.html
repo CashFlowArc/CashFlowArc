@@ -22,10 +22,14 @@
         Category
         <select name="category">
           <option value="">All categories</option>
-          {% for category in categories %}
-            <option value="{{ category.category_id }}" {{ 'selected' if filters.category == category.category_id else '' }}>
-              {{ category.category_display }}
-            </option>
+          {% for group in category_dropdown_groups %}
+            <optgroup label="{{ group.label }}">
+              {% for category in group.options %}
+                <option value="{{ category.category_id }}" {{ 'selected' if filters.category == category.category_id else '' }}>
+                  {{ category.category_display }}
+                </option>
+              {% endfor %}
+            </optgroup>
           {% endfor %}
         </select>
       </label>
@@ -141,17 +145,21 @@
                 <input class="cell-control ledger-autosave-control date-control" form="{{ edit_form_id }}" name="transaction_date" type="date" value="{{ iso_date(txn.transaction_date) }}" aria-label="Transaction date">
               </td>
               <td class="editable-cell merchant-cell">
-                <input class="cell-control ledger-autosave-control merchant-control" form="{{ edit_form_id }}" name="merchant_name" list="merchant-options" value="{{ txn.merchant_name or '' }}" placeholder="Merchant name" aria-label="Merchant name">
+                <input class="cell-control ledger-autosave-control merchant-control" form="{{ edit_form_id }}" name="merchant_name" value="{{ txn.merchant_name or '' }}" placeholder="Merchant name" aria-label="Merchant name">
                 <span>{{ txn.description }}</span>
               </td>
               <td class="editable-cell">
                 {% set current_category_label = txn.category if txn.category and txn.category != 'Uncategorized' else '' %}
                 <select class="cell-control ledger-autosave-control category-control" form="{{ edit_form_id }}" name="category_id" aria-label="Category">
                   <option value="" {{ 'selected' if not txn.category_id else '' }}>{{ current_category_label or "Uncategorized" }}</option>
-                  {% for category in categories %}
-                    <option value="{{ category.category_id }}" {{ 'selected' if txn.category_id == category.category_id else '' }}>
-                      {{ category.category_display }}
-                    </option>
+                  {% for group in category_dropdown_groups %}
+                    <optgroup label="{{ group.label }}">
+                      {% for category in group.options %}
+                        <option value="{{ category.category_id }}" {{ 'selected' if txn.category_id == category.category_id else '' }}>
+                          {{ category.category_display }}
+                        </option>
+                      {% endfor %}
+                    </optgroup>
                   {% endfor %}
                 </select>
               </td>
@@ -189,11 +197,6 @@
     </div>
   </section>
 </section>
-<datalist id="merchant-options">
-  {% for merchant in merchants %}
-    <option value="{{ merchant.merchant_name }}"></option>
-  {% endfor %}
-</datalist>
 <script>
   (function () {
     function controlValue(control) {
