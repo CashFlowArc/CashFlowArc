@@ -12,7 +12,7 @@
       </label>
       <label>
         End month
-        <input name="end_month" type="month" value="{{ filters.end_month }}">
+        <input name="end_month" type="month" value="{{ filters.end_month }}" min="{{ filters.start_month }}">
       </label>
       <label>
         Search
@@ -122,9 +122,8 @@
         <tbody>
           {% for txn in transactions %}
             {% set edit_form_id = 'transaction-edit-' ~ loop.index %}
-            {% set reset_form_id = 'transaction-reset-' ~ loop.index %}
             {% set review_status = txn.reviewed_status or 'new' %}
-            <tr class="{{ 'has-user-edit' if txn.has_user_edit else '' }}">
+            <tr>
               <td class="editable-cell">
                 <form id="{{ edit_form_id }}" method="post" action="{{ url_for('budget.edit_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -157,24 +156,9 @@
                 <div class="ledger-review-stack">
                 <select class="cell-control ledger-autosave-control review-control" form="{{ edit_form_id }}" name="reviewed_status" aria-label="Review status">
                   <option value="new" {{ 'selected' if review_status == 'new' else '' }}>New</option>
-                  <option value="reviewed" {{ 'selected' if review_status == 'reviewed' else '' }}>Reviewed</option>
-                  <option value="ignored" {{ 'selected' if review_status == 'ignored' else '' }}>Ignored</option>
+                  <option value="reviewed" {{ 'selected' if review_status == 'reviewed' else '' }}>Review</option>
+                  <option value="ignored" {{ 'selected' if review_status == 'ignored' else '' }}>Ignore</option>
                 </select>
-                {% if txn.has_user_edit %}
-                  <span class="pill edited-pill">edited</span>
-                  <form id="{{ reset_form_id }}" method="post" action="{{ url_for('budget.reset_transaction_action', provider_transaction_id=txn.provider_transaction_id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="start_month" value="{{ filters.start_month }}">
-                    <input type="hidden" name="end_month" value="{{ filters.end_month }}">
-                    <input type="hidden" name="q" value="{{ filters.q }}">
-                    <input type="hidden" name="status" value="{{ filters.status }}">
-                    <input type="hidden" name="review" value="{{ filters.review }}">
-                    <input type="hidden" name="category" value="{{ filters.category }}">
-                    <input type="hidden" name="account" value="{{ filters.account }}">
-                    <input type="hidden" name="institution" value="{{ filters.institution }}">
-                    <button class="ghost-button small-button" type="submit">Restore</button>
-                  </form>
-                {% endif %}
                 </div>
               </td>
               <td class="ledger-flags editable-cell">
@@ -244,6 +228,29 @@
         submitForm(control);
       });
     });
+
+    const filterForm = document.querySelector(".filter-stack");
+    const startMonthInput = document.querySelector("input[name='start_month']");
+    const endMonthInput = document.querySelector("input[name='end_month']");
+
+    function enforceMonthRange() {
+      if (!startMonthInput || !endMonthInput) {
+        return;
+      }
+      endMonthInput.min = startMonthInput.value || "";
+      if (startMonthInput.value && endMonthInput.value && endMonthInput.value < startMonthInput.value) {
+        endMonthInput.value = startMonthInput.value;
+      }
+    }
+
+    if (startMonthInput && endMonthInput) {
+      startMonthInput.addEventListener("change", enforceMonthRange);
+      endMonthInput.addEventListener("change", enforceMonthRange);
+      if (filterForm) {
+        filterForm.addEventListener("submit", enforceMonthRange);
+      }
+      enforceMonthRange();
+    }
 
     const institutionSelect = document.querySelector("select[name='institution']");
     const accountSelect = document.querySelector("select[name='account']");

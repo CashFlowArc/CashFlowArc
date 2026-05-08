@@ -23,6 +23,7 @@
     </div>
     <form class="budget-edit-form" method="post" action="{{ url_for('budget.save_category_budget_action') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="autosave" value="1">
       <input type="hidden" name="month" value="{{ selected_month }}">
       <input type="hidden" name="category_name" value="{{ row.category }}">
       <label>
@@ -35,9 +36,8 @@
       </label>
       <label>
         New
-        <input name="budgeted_amount" inputmode="decimal" value="{{ '%.2f'|format(budgeted) }}" {{ 'disabled' if budget_period.is_past else '' }}>
+        <input class="budget-autosave-control" name="budgeted_amount" inputmode="decimal" value="{{ '%.2f'|format(budgeted) }}" {{ 'disabled' if budget_period.is_past else '' }}>
       </label>
-      <button class="ghost-button small-button" type="submit" {{ 'disabled' if budget_period.is_past else '' }}>Save</button>
     </form>
   </div>
 {% endmacro %}
@@ -164,4 +164,47 @@
     <option value="{{ category.display_name }}"></option>
   {% endfor %}
 </datalist>
+<script>
+  (function () {
+    function submitBudget(control) {
+      const form = control.form;
+      if (!form || form.dataset.saving === "1") {
+        return;
+      }
+      const previousValue = control.dataset.savedValue || "";
+      const nextValue = control.value;
+      if (previousValue === nextValue) {
+        return;
+      }
+      control.dataset.savedValue = nextValue;
+      form.dataset.saving = "1";
+      fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "fetch" }
+      }).then(function (response) {
+        if (!response.ok) {
+          control.dataset.savedValue = previousValue;
+          control.value = previousValue;
+        }
+      }).catch(function () {
+        control.dataset.savedValue = previousValue;
+        control.value = previousValue;
+      }).finally(function () {
+        form.dataset.saving = "0";
+      });
+    }
+
+    document.querySelectorAll(".budget-autosave-control").forEach(function (control) {
+      control.dataset.savedValue = control.value;
+      control.addEventListener("blur", function () {
+        submitBudget(control);
+      });
+      control.addEventListener("change", function () {
+        submitBudget(control);
+      });
+    });
+  })();
+</script>
 {% endblock %}

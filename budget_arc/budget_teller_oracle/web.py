@@ -1524,7 +1524,7 @@ def create_app() -> Flask:
         elif end_month_start and not start_month:
             start_month = None
         if start_month and end_month_start and end_month_start < start_month:
-            start_month, end_month_start = end_month_start, start_month
+            end_month_start = start_month
         month_end = _month_end(end_month_start) if end_month_start else None
         selected_month = (start_month or end_month_start or current_month).strftime("%Y-%m")
         search = request.args.get("q", "").strip()
@@ -2515,26 +2515,30 @@ def create_app() -> Flask:
     @user_required
     def save_category_budget_action() -> Any:
         require_csrf()
+        is_autosave = request.form.get("autosave") == "1" or request.headers.get("X-Requested-With") == "fetch"
         selected_month_date = _parse_month(request.form.get("month")) or dt.date.today().replace(day=1)
         selected_month = selected_month_date.strftime("%Y-%m")
-        if selected_month_date < dt.date.today().replace(day=1):
-            flash("Past month category budgets are locked.", "error")
+
+        def category_budget_response(message: str, category: str, status: int = 400) -> Any:
+            if is_autosave:
+                return jsonify({"message": message}), status
+            flash(message, category)
             return redirect(url_for("budget.budgets", month=selected_month))
+
+        if selected_month_date < dt.date.today().replace(day=1):
+            return category_budget_response("Past month category budgets are locked.", "error")
         category_name = request.form.get("category_name", "").strip()
         budgeted_amount = _parse_money(request.form.get("budgeted_amount"))
         if not category_name:
-            flash("Enter a category name.", "error")
-            return redirect(url_for("budget.budgets", month=selected_month))
+            return category_budget_response("Enter a category name.", "error")
         if budgeted_amount is None:
-            flash("Enter a valid budget amount.", "error")
-            return redirect(url_for("budget.budgets", month=selected_month))
+            return category_budget_response("Enter a valid budget amount.", "error")
         conn = connect(app_config.oracle)
         try:
             store = BudgetStore(conn)
             category_id = _ensure_category_from_input(store, user_id=current_user_id(), value=category_name)
             if not category_id:
-                flash("Category could not be created.", "error")
-                return redirect(url_for("budget.budgets", month=selected_month))
+                return category_budget_response("Category could not be created.", "error")
             store.save_category_budget(
                 user_id=current_user_id(),
                 month_key=selected_month,
@@ -2545,6 +2549,8 @@ def create_app() -> Flask:
         finally:
             conn.close()
         data_version = mark_budget_data_changed()
+        if is_autosave:
+            return jsonify({"data_version": data_version}), 200
         flash("Category budget saved for this month and future months until changed.", "success")
         return redirect(url_for("budget.budgets", month=selected_month, data_version=data_version))
 

@@ -742,7 +742,7 @@ td span {
 }
 
 .budget-row-plan {
-  grid-template-columns: minmax(130px, 170px) minmax(170px, 1fr) minmax(360px, 450px);
+  grid-template-columns: minmax(130px, 170px) minmax(170px, 1fr) minmax(320px, 420px);
   min-height: 78px;
 }
 
@@ -764,7 +764,7 @@ td span {
   align-items: end;
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(70px, 1fr)) auto;
+  grid-template-columns: repeat(3, minmax(70px, 1fr));
 }
 
 .budget-edit-form input:disabled {
@@ -1252,13 +1252,13 @@ table {
   table-layout: fixed;
 }
 
-.txn-col-date { width: 98px; }
-.txn-col-description { width: 27%; }
-.txn-col-category { width: 15%; }
-.txn-col-account { width: 14%; }
-.txn-col-review { width: 70px; }
-.txn-col-exclude { width: 92px; }
-.txn-col-amount { width: 88px; }
+.txn-col-date { width: 96px; }
+.txn-col-description { width: 28%; }
+.txn-col-category { width: 14%; }
+.txn-col-account { width: 15%; }
+.txn-col-review { width: 76px; }
+.txn-col-exclude { width: 86px; }
+.txn-col-amount { width: 76px; }
 
 .ledger-table th,
 .ledger-table td {
@@ -1392,6 +1392,11 @@ tbody tr.has-user-edit { background: #fffef9; }
 .ledger-review-stack {
   display: grid;
   gap: 4px;
+  justify-items: start;
+}
+
+.review-control {
+  padding-right: 2px;
 }
 
 .inline-check {
