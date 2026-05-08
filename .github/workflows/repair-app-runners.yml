@@ -1,0 +1,41 @@
+name: Repair App Runners
+
+on:
+  workflow_dispatch:
+
+jobs:
+  repair:
+    runs-on: [self-hosted, linux, ARM64]
+
+    steps:
+      - name: Repair app runner services
+        run: |
+          set -euo pipefail
+
+          repair_runner() {
+            local dir="$1"
+            local service="$2"
+
+            if [[ ! -d "$dir" ]]; then
+              echo "Runner directory missing: $dir" >&2
+              return 1
+            fi
+
+            sudo chown -R opc:opc "$dir"
+            chmod +x "$dir/config.sh" "$dir/run.sh" "$dir/runsvc.sh" "$dir/svc.sh"
+            find "$dir/bin" "$dir/externals" -type f \( -name Runner.Listener -o -name Runner.Worker -o -name node \) 2>/dev/null | xargs -r chmod +x
+
+            if command -v restorecon >/dev/null 2>&1; then
+              sudo restorecon -R "$dir" || true
+            fi
+            if command -v chcon >/dev/null 2>&1; then
+              sudo chcon -R -t bin_t "$dir" || true
+            fi
+
+            sudo systemctl daemon-reload
+            sudo systemctl restart "$service"
+            sudo systemctl --no-pager --full status "$service" || true
+          }
+
+          repair_runner "/home/opc/actions-runner-budget" "actions.runner.CashFlowArc-CashFlowArc-Budget.cashflowarc-budget-runner.service"
+          repair_runner "/home/opc/actions-runner-trader" "actions.runner.CashFlowArc-CashFlowArc-Trader.cashflowarc-trader-runner.service"
