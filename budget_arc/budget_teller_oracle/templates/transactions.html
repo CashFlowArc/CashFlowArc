@@ -146,13 +146,10 @@
               </td>
               <td class="editable-cell">
                 {% set current_category_label = txn.category if txn.category and txn.category != 'Uncategorized' else '' %}
-                <select class="cell-control ledger-autosave-control category-control" form="{{ edit_form_id }}" name="category_name" aria-label="Category">
-                  <option value="" {{ 'selected' if not txn.category_id and not current_category_label else '' }}>Uncategorized</option>
-                  {% if current_category_label and not txn.category_id %}
-                    <option value="{{ current_category_label }}" selected>{{ current_category_label }}</option>
-                  {% endif %}
+                <select class="cell-control ledger-autosave-control category-control" form="{{ edit_form_id }}" name="category_id" aria-label="Category">
+                  <option value="" {{ 'selected' if not txn.category_id else '' }}>{{ current_category_label or "Uncategorized" }}</option>
                   {% for category in categories %}
-                    <option value="{{ category.category_display }}" {{ 'selected' if txn.category_id == category.category_id else '' }}>
+                    <option value="{{ category.category_id }}" {{ 'selected' if txn.category_id == category.category_id else '' }}>
                       {{ category.category_display }}
                     </option>
                   {% endfor %}

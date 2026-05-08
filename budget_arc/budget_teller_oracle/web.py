@@ -1757,9 +1757,31 @@ def create_app() -> Flask:
                 flash("That transaction was not found for your user.", "error")
                 return redirect(url_for("budget.transactions", **clean_return_args))
             merchant_name = request.form.get("merchant_name", "").strip()
+            category_id_input = request.form.get("category_id", "").strip()
             category_name = request.form.get("category_name", "").strip()
             merchant_id = store.ensure_merchant(user_id=user_id, display_name=merchant_name)
-            category_id = _ensure_category_from_input(store, user_id=user_id, value=category_name)
+            category_id = None
+            if category_id_input:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT CATEGORY_ID
+                        FROM BUDGET_CATEGORIES
+                        WHERE USER_ID = :user_id
+                          AND CATEGORY_ID = :category_id
+                          AND STATUS = 'ACTIVE'
+                        """,
+                        user_id=user_id,
+                        category_id=category_id_input,
+                    )
+                    if not cur.fetchone():
+                        if request.form.get("autosave") == "1" or request.headers.get("X-Requested-With") == "fetch":
+                            return ("Invalid category", 400)
+                        flash("Choose a valid category.", "error")
+                        return redirect(url_for("budget.transactions", **clean_return_args))
+                category_id = category_id_input
+            elif category_name:
+                category_id = _ensure_category_from_input(store, user_id=user_id, value=category_name)
             store.save_transaction_edit(
                 user_id=user_id,
                 provider_transaction_id=provider_transaction_id,
