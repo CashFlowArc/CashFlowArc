@@ -1,0 +1,69 @@
+name: Register App Runners
+
+on:
+  workflow_dispatch:
+    inputs:
+      budget_runner_token:
+        description: Budget repository runner registration token
+        required: true
+      trader_runner_token:
+        description: Trader repository runner registration token
+        required: true
+
+jobs:
+  register:
+    runs-on: [self-hosted, linux, ARM64]
+
+    steps:
+      - name: Register Budget and Trader runners
+        env:
+          BUDGET_RUNNER_TOKEN: ${{ inputs.budget_runner_token }}
+          TRADER_RUNNER_TOKEN: ${{ inputs.trader_runner_token }}
+        run: |
+          set -euo pipefail
+
+          source_runner="$(find /home/opc -maxdepth 3 -type f -name config.sh -path '*actions-runner*' -print -quit)"
+          if [[ -z "$source_runner" ]]; then
+            echo "Could not find existing actions-runner installation under /home/opc" >&2
+            exit 1
+          fi
+          source_dir="$(dirname "$source_runner")"
+
+          install_runner() {
+            local repo="$1"
+            local token="$2"
+            local dir="$3"
+            local name="$4"
+
+            mkdir -p "$dir"
+            if [[ ! -x "$dir/config.sh" ]]; then
+              rsync -a \
+                --exclude '.runner' \
+                --exclude '.credentials' \
+                --exclude '.credentials_rsaparams' \
+                --exclude '.service' \
+                --exclude '_diag' \
+                --exclude '_work' \
+                "$source_dir/" "$dir/"
+            fi
+
+            cd "$dir"
+            if [[ ! -f .runner ]]; then
+              ./config.sh \
+                --url "https://github.com/CashFlowArc/$repo" \
+                --token "$token" \
+                --name "$name" \
+                --labels self-hosted,linux,ARM64 \
+                --unattended \
+                --replace
+            fi
+
+            if ! systemctl list-unit-files | grep -q "actions.runner.CashFlowArc-$repo"; then
+              sudo ./svc.sh install opc || sudo ./svc.sh install
+            fi
+            sudo ./svc.sh start
+            sudo ./svc.sh status || true
+          }
+
+          install_runner "CashFlowArc-Budget" "$BUDGET_RUNNER_TOKEN" "/home/opc/actions-runner-budget" "cashflowarc-budget-runner"
+          install_runner "CashFlowArc-Trader" "$TRADER_RUNNER_TOKEN" "/home/opc/actions-runner-trader" "cashflowarc-trader-runner"
