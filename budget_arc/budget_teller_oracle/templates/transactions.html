@@ -145,7 +145,18 @@
                 <span>{{ txn.description }}</span>
               </td>
               <td class="editable-cell">
-                <input class="cell-control ledger-autosave-control category-control" form="{{ edit_form_id }}" name="category_name" list="category-options" value="{{ txn.category if txn.category and txn.category != 'Uncategorized' else '' }}" placeholder="Uncategorized" aria-label="Category">
+                {% set current_category_label = txn.category if txn.category and txn.category != 'Uncategorized' else '' %}
+                <select class="cell-control ledger-autosave-control category-control" form="{{ edit_form_id }}" name="category_name" aria-label="Category">
+                  <option value="" {{ 'selected' if not txn.category_id and not current_category_label else '' }}>Uncategorized</option>
+                  {% if current_category_label and not txn.category_id %}
+                    <option value="{{ current_category_label }}" selected>{{ current_category_label }}</option>
+                  {% endif %}
+                  {% for category in categories %}
+                    <option value="{{ category.category_display }}" {{ 'selected' if txn.category_id == category.category_id else '' }}>
+                      {{ category.category_display }}
+                    </option>
+                  {% endfor %}
+                </select>
               </td>
               <td>
                 {{ txn.account_name or "Account" }}
@@ -181,11 +192,6 @@
     </div>
   </section>
 </section>
-<datalist id="category-options">
-  {% for category in categories %}
-    <option value="{{ category.category_display }}"></option>
-  {% endfor %}
-</datalist>
 <datalist id="merchant-options">
   {% for merchant in merchants %}
     <option value="{{ merchant.merchant_name }}"></option>

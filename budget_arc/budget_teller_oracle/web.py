@@ -1589,6 +1589,7 @@ def create_app() -> Flask:
                 t.CURRENCY_CODE,
                 t.STATUS,
                 {effective_category} AS CATEGORY,
+                {effective_category_id} AS CATEGORY_ID,
                 {effective_merchant} AS MERCHANT_NAME,
                 t.CATEGORY AS ORIGINAL_CATEGORY,
                 t.COUNTERPARTY_NAME AS ORIGINAL_COUNTERPARTY_NAME,

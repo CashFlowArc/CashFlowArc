@@ -75,7 +75,7 @@
     <div class="budget-total-figure">
       <span>Income budget minus planned spending</span>
       <strong class="{{ 'credit' if summary.forecast >= 0 else 'over-budget-text' }}">{{ format_money(summary.forecast) }}</strong>
-      <em>Actual after spending: {{ format_money(summary.actual_after_spend) }}</em>
+      <em>Net so far (income - spending): {{ format_money(summary.actual_after_spend) }}</em>
     </div>
   </article>
 </section>
