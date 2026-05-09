@@ -461,7 +461,13 @@ BASE_PAGE = """
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 16px;
         }
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 14px;
+        }
         .info-card,
+        .step-card,
         .app-card,
         .policy-card {
             border: 1px solid var(--line);
@@ -470,10 +476,12 @@ BASE_PAGE = """
             box-shadow: var(--shadow);
         }
         .info-card,
+        .step-card,
         .policy-card {
             padding: 22px;
         }
         .info-card h3,
+        .step-card h3,
         .policy-card h2,
         .app-card h3 {
             margin: 0 0 10px;
@@ -482,14 +490,29 @@ BASE_PAGE = """
             line-height: 1.15;
         }
         .info-card p,
+        .step-card p,
         .policy-card p,
         .policy-card li,
         .app-card p {
             color: var(--muted);
         }
         .info-card p,
+        .step-card p,
         .policy-card p {
             margin-bottom: 0;
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            margin-bottom: 16px;
+            border-radius: 999px;
+            background: var(--accent);
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 900;
         }
         .badge {
             display: inline-flex;
@@ -611,6 +634,9 @@ BASE_PAGE = """
             .card-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
+            .step-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
         }
         @media (max-width: 820px) {
             .header-inner,
@@ -653,6 +679,7 @@ BASE_PAGE = """
             }
             .mock-grid,
             .app-grid,
+            .step-grid,
             .story {
                 grid-template-columns: 1fr;
             }
@@ -736,13 +763,50 @@ HOME_CONTENT = """
             <div class="hero-copy">
                 <p class="eyebrow">Private cash flow intelligence</p>
                 <h1>cashflow<span class="arc">ARC</span></h1>
-                <p>Know your current cash flow, get ideas to improve it, and predict what your cash flow will be like in the future.</p>
+                <p>A planning engine that collects transactions and upcoming life events, then builds a living forecast of your future financial lifestyle.</p>
                 <div class="hero-actions">
-                    <a class="button primary" href="/budget/">budgetARC</a>
+                    <a class="button primary" href="/budget/register">Sign Up</a>
+                    <a class="button dark" href="/budget/">budgetARC</a>
                     <a class="button dark" href="/trader/">traderARC</a>
                     <a class="button dark" href="/security">Security</a>
                 </div>
-                <p class="hero-trust">cashflowARC never accesses or stores your financial institution usernames or passwords, and we do not sell your personal information. <a href="/security">Learn more about security.</a></p>
+                <p class="hero-trust">cashflowARC never sees, reads, or stores your financial institution usernames or passwords, and we do not sell your personal information. <a href="/security">Learn more about security.</a></p>
+            </div>
+        </div>
+    </section>
+
+    <section class="band white" aria-label="Planning workflow">
+        <div class="section-inner">
+            <div class="section-heading">
+                <h2>Plan the next version of your financial life.</h2>
+                <p>cashflowARC turns today's activity, tomorrow's obligations, and major life changes into a living cash flow forecast.</p>
+            </div>
+            <div class="step-grid">
+                <article class="step-card">
+                    <span class="step-number">1</span>
+                    <h3>Collect transactions</h3>
+                    <p>Bring spending, income, and account activity into one planning view.</p>
+                </article>
+                <article class="step-card">
+                    <span class="step-number">2</span>
+                    <h3>Set budget and forecast 12 months of cash flow</h3>
+                    <p>Build a 12-month cash flow forecast around your actual habits.</p>
+                </article>
+                <article class="step-card">
+                    <span class="step-number">3</span>
+                    <h3>Plan for major life events</h3>
+                    <p>Add big changes before they hit your bank account.</p>
+                </article>
+                <article class="step-card">
+                    <span class="step-number">4</span>
+                    <h3>Forecast funded lifestyle months</h3>
+                    <p>See how long your current plan can support the lifestyle you want.</p>
+                </article>
+                <article class="step-card">
+                    <span class="step-number">5</span>
+                    <h3>What if I... scenario planning</h3>
+                    <p>Ask "what if I..." and compare choices for a better future.</p>
+                </article>
             </div>
         </div>
     </section>
@@ -762,7 +826,7 @@ HOME_CONTENT = """
                 <article class="info-card">
                     <span class="badge">Bank data</span>
                     <h3>Provider-based connectivity</h3>
-                    <p>Bank linking is handled through the provider authorization flow. cashflowARC does not have access to or store your financial institution username or password.</p>
+                    <p>Bank linking is handled through the provider authorization flow. cashflowARC does not see, read, or store your financial institution username or password.</p>
                 </article>
                 <article class="info-card">
                     <span class="badge">No sale</span>
@@ -843,7 +907,7 @@ SECURITY_CONTENT = """
             </article>
             <article class="policy-card">
                 <h2>Bank connectivity</h2>
-                <p>budgetARC uses a bank connectivity provider flow for account access. You authorize access through that flow. cashflowARC does not have access to or store your financial institution username or password; it uses authorized account and transaction data to power the dashboard.</p>
+                <p>budgetARC uses a bank connectivity provider flow for account access. You authorize access through that flow. cashflowARC does not see, read, or store your financial institution username or password; it uses authorized account and transaction data to power the dashboard.</p>
             </article>
             <article class="policy-card">
                 <h2>Personal information</h2>
@@ -925,7 +989,7 @@ def index() -> str:
         HOME_CONTENT,
         page="home",
         title="cashflowARC | Private Cash Flow Intelligence",
-        description="Know your current cash flow, get ideas to improve it, and predict what your cash flow will be like in the future.",
+        description="A planning engine that collects transactions and upcoming life events, then builds a living forecast of your future financial lifestyle.",
     )
 
 
