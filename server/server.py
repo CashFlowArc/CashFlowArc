@@ -159,6 +159,48 @@ BASE_PAGE = """
             color: #FFFFFF;
             outline: 0;
         }
+        .auth-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .auth-status[hidden],
+        [data-auth-login][hidden] {
+            display: none !important;
+        }
+        .auth-username {
+            color: #FFFFFF;
+            font-weight: 900;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .auth-signout {
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #FFFFFF;
+            cursor: pointer;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 850;
+        }
+        .auth-signout:hover,
+        .auth-signout:focus-visible {
+            background: rgba(20, 184, 166, 0.22);
+        }
+        .nav-links .auth-status {
+            min-height: 34px;
+            padding: 0 4px 0 8px;
+        }
+        .nav-links .auth-username {
+            max-width: 180px;
+            font-size: 12px;
+        }
+        .nav-links .auth-signout {
+            min-height: 28px;
+            padding: 0 9px;
+        }
         .hero {
             position: relative;
             min-height: calc(100svh - 150px);
@@ -386,6 +428,23 @@ BASE_PAGE = """
             flex-wrap: wrap;
             gap: 10px;
             margin-top: 28px;
+        }
+        .hero-actions .auth-status {
+            flex-wrap: wrap;
+        }
+        .hero-actions .auth-username {
+            max-width: min(420px, 70vw);
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 16px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .hero-actions .auth-signout {
+            min-height: 44px;
+            padding: 0 16px;
         }
         .hero-copy .hero-trust {
             max-width: 640px;
@@ -697,6 +756,14 @@ BASE_PAGE = """
             gap: 12px;
             white-space: nowrap;
         }
+        .footer-links .auth-username {
+            max-width: 220px;
+            font-size: 13px;
+        }
+        .footer-links .auth-signout {
+            min-height: 24px;
+            padding: 0 8px;
+        }
         @media (max-width: 1040px) {
             .dashboard-visual {
                 margin-left: 24vw;
@@ -830,7 +897,11 @@ BASE_PAGE = """
                 <a href="/#planning-workflow">whatif<span class="arc">ARC</span></a>
                 <a class="trader-nav-link" href="/trader/"><span class="trader-nav-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
-                <a href="/budget/">Sign Up/Log In</a>
+                <a href="/budget/" data-auth-login>Sign Up/Log In</a>
+                <span class="auth-status" data-auth-status hidden>
+                    <a class="auth-username" href="/budget/" data-auth-username></a>
+                    <button class="auth-signout" type="button" data-auth-signout>Sign out</button>
+                </span>
             </nav>
         </div>
     </header>
@@ -847,11 +918,95 @@ BASE_PAGE = """
                 <a href="/#planning-workflow">whatifARC</a>
                 <a href="/trader/">traderARC</a>
                 <a href="/security">Security</a>
-                <a href="/budget/">Sign Up/Log In</a>
+                <a href="/budget/" data-auth-login>Sign Up/Log In</a>
+                <span class="auth-status" data-auth-status hidden>
+                    <a class="auth-username" href="/budget/" data-auth-username></a>
+                    <button class="auth-signout" type="button" data-auth-signout>Sign out</button>
+                </span>
             </div>
         </div>
     </footer>
 </div>
+<script>
+    (function () {
+        var authState = null;
+
+        function setLoggedOut() {
+            document.querySelectorAll("[data-auth-login]").forEach(function (item) {
+                item.hidden = false;
+            });
+            document.querySelectorAll("[data-auth-status]").forEach(function (item) {
+                item.hidden = true;
+            });
+        }
+
+        function setLoggedIn(payload) {
+            var username = payload.username || payload.email || payload.displayName || "Account";
+            document.querySelectorAll("[data-auth-login]").forEach(function (item) {
+                item.hidden = true;
+            });
+            document.querySelectorAll("[data-auth-status]").forEach(function (item) {
+                item.hidden = false;
+            });
+            document.querySelectorAll("[data-auth-username]").forEach(function (item) {
+                item.textContent = username;
+                item.title = username;
+            });
+        }
+
+        async function loadAuthState() {
+            try {
+                var response = await fetch("/budget/api/session", {
+                    cache: "no-store",
+                    credentials: "same-origin"
+                });
+                if (!response.ok) {
+                    setLoggedOut();
+                    return;
+                }
+                var payload = await response.json();
+                authState = payload;
+                if (payload && payload.authenticated) {
+                    setLoggedIn(payload);
+                } else {
+                    setLoggedOut();
+                }
+            } catch (error) {
+                setLoggedOut();
+            }
+        }
+
+        async function signOut() {
+            if (!authState || !authState.csrfToken || !authState.logoutUrl) {
+                window.location.assign("/budget/login");
+                return;
+            }
+            var body = new URLSearchParams();
+            body.set("csrf_token", authState.csrfToken);
+            body.set("next", "/");
+            await fetch(authState.logoutUrl, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: body
+            });
+            window.location.assign("/");
+        }
+
+        document.addEventListener("click", function (event) {
+            var button = event.target.closest("[data-auth-signout]");
+            if (!button) {
+                return;
+            }
+            event.preventDefault();
+            signOut().catch(function () {
+                window.location.assign("/budget/login");
+            });
+        });
+
+        loadAuthState();
+    })();
+</script>
 </body>
 </html>
 """
@@ -869,7 +1024,11 @@ HOME_CONTENT = """
                 <h1>cashflow<span class="arc">ARC</span></h1>
                 <p>A planning engine that collects transactions and upcoming life events, then builds a living forecast of your future financial lifestyle.</p>
                 <div class="hero-actions">
-                    <a class="button primary" href="/budget/">Sign Up/Log In</a>
+                    <a class="button primary" href="/budget/" data-auth-login>Sign Up/Log In</a>
+                    <span class="auth-status" data-auth-status hidden>
+                        <a class="auth-username" href="/budget/" data-auth-username></a>
+                        <button class="auth-signout" type="button" data-auth-signout>Sign out</button>
+                    </span>
                 </div>
                 <p class="hero-trust">cashflowARC never sees, reads, or stores your financial institution usernames or passwords, and we do not sell your personal information. <a href="/security">Learn more about security.</a></p>
             </div>
