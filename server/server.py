@@ -1130,7 +1130,7 @@ HOME_CONTENT = """
                     <p>Ask "what if I..." and compare choices for a better future.</p>
                 </article>
             </div>
-            <div class="funded-callout">How many <span>funded lifestyle months</span> does future you have?</div>
+            <div class="funded-callout">How many <span>funded lifestyle months</span> do you have today?</div>
         </div>
     </section>
 
