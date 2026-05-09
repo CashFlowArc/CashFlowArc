@@ -127,6 +127,28 @@ BASE_PAGE = """
             font-weight: 800;
             white-space: nowrap;
         }
+        .nav-links a.trader-nav-link {
+            flex-direction: column;
+            gap: 0;
+            min-height: 42px;
+            padding: 4px 12px;
+        }
+        .trader-nav-text {
+            line-height: 1;
+        }
+        .nav-beta {
+            color: var(--red);
+            font-size: 9px;
+            font-weight: 950;
+            line-height: 1;
+            margin-top: 3px;
+            text-transform: uppercase;
+        }
+        .nav-links a:hover .nav-beta,
+        .nav-links a:focus-visible .nav-beta,
+        .nav-links a.active .nav-beta {
+            color: var(--red);
+        }
         .nav-links a:hover,
         .nav-links a:focus-visible,
         .nav-links a.active {
@@ -391,36 +413,6 @@ BASE_PAGE = """
             height: 17px;
             flex: 0 0 auto;
         }
-        .answer-strip {
-            background: #FFFFFF;
-            border-bottom: 1px solid var(--line);
-        }
-        .answer-grid {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 1px;
-            padding: 1px 0;
-            background: var(--line);
-        }
-        .answer-card {
-            min-height: 190px;
-            padding: 20px;
-            background: #FFFFFF;
-        }
-        .answer-card h2 {
-            margin: 0 0 10px;
-            color: var(--primary);
-            font-size: 18px;
-            line-height: 1.15;
-        }
-        .answer-card p {
-            margin: 0;
-            color: var(--muted);
-            font-size: 14px;
-        }
-        .answer-card strong {
-            color: var(--text);
-        }
         .band {
             padding: 72px 0;
         }
@@ -599,7 +591,6 @@ BASE_PAGE = """
                 margin-left: 24vw;
                 opacity: 0.78;
             }
-            .answer-grid,
             .card-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
@@ -648,7 +639,6 @@ BASE_PAGE = """
             .story {
                 grid-template-columns: 1fr;
             }
-            .answer-grid,
             .card-grid {
                 grid-template-columns: 1fr;
             }
@@ -671,9 +661,6 @@ BASE_PAGE = """
                 margin-left: 5vw;
                 opacity: 0.36;
             }
-            .answer-card {
-                min-height: 0;
-            }
         }
     </style>
 </head>
@@ -688,7 +675,7 @@ BASE_PAGE = """
             <nav class="nav-links" aria-label="cashflowARC navigation">
                 <a class="{{ 'active' if page == 'home' else '' }}" href="/">cashflow<span class="arc">ARC</span></a>
                 <a href="/budget/">budget<span class="arc">ARC</span></a>
-                <a href="/trader/">trader<span class="arc">ARC</span></a>
+                <a class="trader-nav-link" href="/trader/"><span class="trader-nav-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
                 <a class="{{ 'active' if page == 'privacy' else '' }}" href="/privacy">Privacy</a>
             </nav>
@@ -725,36 +712,11 @@ HOME_CONTENT = """
                 <h1>cashflow<span class="arc">ARC</span></h1>
                 <p>Know your current cash flow, get ideas to improve it, and predict what your cash flow will be like in the future.</p>
                 <div class="hero-actions">
-                    <a class="button primary" href="/budget/">Open budgetARC</a>
-                    <a class="button dark" href="/trader/">Open traderARC</a>
+                    <a class="button primary" href="/budget/">budgetARC</a>
+                    <a class="button dark" href="/trader/">traderARC</a>
                     <a class="button dark" href="/security">Security</a>
                 </div>
             </div>
-        </div>
-    </section>
-
-    <section class="answer-strip" aria-label="Trust questions answered">
-        <div class="section-inner answer-grid">
-            <article class="answer-card">
-                <h2>Is this secure?</h2>
-                <p><strong>Yes, security is a core design rule.</strong> Production traffic is served over HTTPS/SSL, bank connections use encrypted provider flows, and app secrets stay server side.</p>
-            </article>
-            <article class="answer-card">
-                <h2>Why should I trust this?</h2>
-                <p><strong>It is founder-built and privacy-first.</strong> The product exists to help you understand your own money, not to package your behavior for advertisers.</p>
-            </article>
-            <article class="answer-card">
-                <h2>What's different?</h2>
-                <p><strong>It connects today, ideas, and forecasts.</strong> cashflowARC shows current cash flow, highlights ways to improve it, and builds toward future cash flow prediction.</p>
-            </article>
-            <article class="answer-card">
-                <h2>Is my data sold?</h2>
-                <p><strong>No.</strong> cashflowARC does not sell personal data, bank data, transaction history, or app activity.</p>
-            </article>
-            <article class="answer-card">
-                <h2>How do banks connect?</h2>
-                <p><strong>You authorize through the bank connectivity provider.</strong> Your bank credentials are not stored by cashflowARC; the app receives authorized account and transaction data.</p>
-            </article>
         </div>
     </section>
 
@@ -800,7 +762,7 @@ HOME_CONTENT = """
                         <div class="mini-row"><span>Dining budget</span><strong class="amber">68%</strong></div>
                         <div class="mini-row"><span>Overspend risk</span><strong class="red">Review</strong></div>
                     </div>
-                    <div class="button">Open budgetARC</div>
+                    <div class="button">budgetARC</div>
                 </a>
                 <a class="app-card trader" href="/trader/">
                     <span class="badge">traderARC</span>
@@ -811,7 +773,7 @@ HOME_CONTENT = """
                         <div class="mini-row"><span>Gamma level</span><strong class="amber">Watch</strong></div>
                         <div class="mini-row"><span>Risk status</span><strong class="red">Defined</strong></div>
                     </div>
-                    <div class="button primary">Open traderARC</div>
+                    <div class="button primary">traderARC</div>
                 </a>
             </div>
         </div>
