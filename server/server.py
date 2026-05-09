@@ -757,14 +757,6 @@ BASE_PAGE = """
             gap: 12px;
             white-space: nowrap;
         }
-        .footer-links .auth-username {
-            max-width: 220px;
-            font-size: 13px;
-        }
-        .footer-links .auth-signout {
-            min-height: 24px;
-            padding: 0 8px;
-        }
         @media (max-width: 1040px) {
             .dashboard-visual {
                 margin-left: 24vw;
@@ -910,20 +902,15 @@ BASE_PAGE = """
     <footer class="footer">
         <div class="footer-inner">
             <div class="footer-links">
-                <a href="/">cashflowARC</a>
-                <a href="/budget/collect">collectARC</a>
-                <a href="/budget/">budgetARC</a>
-                <a href="/#planning-workflow">forecastARC</a>
-                <a href="/#planning-workflow">lifeARC</a>
-                <a href="/#planning-workflow">lifestyleARC</a>
-                <a href="/#planning-workflow">whatifARC</a>
-                <a href="/trader/">traderARC</a>
+                <a href="/">cashflow<span class="arc">ARC</span></a>
+                <a href="/budget/collect">collect<span class="arc">ARC</span></a>
+                <a href="/budget/">budget<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">forecast<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">life<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">lifestyle<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">whatif<span class="arc">ARC</span></a>
+                <a href="/trader/">trader<span class="arc">ARC</span></a>
                 <a href="/security">Security</a>
-                <a href="/budget/collect" data-auth-login>Sign Up/Log In</a>
-                <span class="auth-status" data-auth-status hidden>
-                    <a class="auth-username" href="/budget/collect" data-auth-username></a>
-                    <button class="auth-signout" type="button" data-auth-signout>Sign out</button>
-                </span>
             </div>
         </div>
     </footer>
