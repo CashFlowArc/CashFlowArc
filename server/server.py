@@ -130,13 +130,13 @@ BASE_PAGE = """
             font-weight: 800;
             white-space: nowrap;
         }
-        .nav-links a.trader-nav-link {
+        .nav-links a.nav-stacked-link {
             flex-direction: column;
             gap: 0;
             min-height: 42px;
-            padding: 4px 12px;
+            padding: 4px 10px;
         }
-        .trader-nav-text {
+        .nav-link-text {
             line-height: 1;
         }
         .nav-beta {
@@ -165,7 +165,8 @@ BASE_PAGE = """
             gap: 8px;
         }
         .auth-status[hidden],
-        [data-auth-login][hidden] {
+        [data-auth-login][hidden],
+        [data-auth-guest][hidden] {
             display: none !important;
         }
         .auth-username {
@@ -891,11 +892,11 @@ BASE_PAGE = """
                 <a class="{{ 'active' if page == 'home' else '' }}" href="/">cashflow<span class="arc">ARC</span></a>
                 <a href="/budget/collect">collect<span class="arc">ARC</span></a>
                 <a href="/budget/">budget<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">forecast<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">life<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">lifestyle<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">whatif<span class="arc">ARC</span></a>
-                <a class="trader-nav-link" href="/trader/"><span class="trader-nav-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
+                <a class="nav-stacked-link" href="/#planning-workflow"><span class="nav-link-text">forecast<span class="arc">ARC</span></span><span class="nav-beta">Coming Soon</span></a>
+                <a class="nav-stacked-link" href="/#planning-workflow"><span class="nav-link-text">life<span class="arc">ARC</span></span><span class="nav-beta">Coming Soon</span></a>
+                <a class="nav-stacked-link" href="/#planning-workflow"><span class="nav-link-text">lifestyle<span class="arc">ARC</span></span><span class="nav-beta">Coming Soon</span></a>
+                <a class="nav-stacked-link" href="/#planning-workflow"><span class="nav-link-text">whatif<span class="arc">ARC</span></span><span class="nav-beta">Coming Soon</span></a>
+                <a class="nav-stacked-link" href="/trader/"><span class="nav-link-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
                 <a href="/budget/collect" data-auth-login>Sign Up/Log In</a>
                 <span class="auth-status" data-auth-status hidden>
@@ -935,6 +936,9 @@ BASE_PAGE = """
             document.querySelectorAll("[data-auth-login]").forEach(function (item) {
                 item.hidden = false;
             });
+            document.querySelectorAll("[data-auth-guest]").forEach(function (item) {
+                item.hidden = false;
+            });
             document.querySelectorAll("[data-auth-status]").forEach(function (item) {
                 item.hidden = true;
             });
@@ -943,6 +947,9 @@ BASE_PAGE = """
         function setLoggedIn(payload) {
             var username = payload.username || payload.email || payload.displayName || "Account";
             document.querySelectorAll("[data-auth-login]").forEach(function (item) {
+                item.hidden = true;
+            });
+            document.querySelectorAll("[data-auth-guest]").forEach(function (item) {
                 item.hidden = true;
             });
             document.querySelectorAll("[data-auth-status]").forEach(function (item) {
@@ -1023,12 +1030,8 @@ HOME_CONTENT = """
                 <p class="eyebrow">Private cash flow intelligence</p>
                 <h1>cashflow<span class="arc">ARC</span></h1>
                 <p>A planning engine that collects transactions and upcoming life events, then builds a living forecast of your future financial lifestyle.</p>
-                <div class="hero-actions">
+                <div class="hero-actions" data-auth-guest>
                     <a class="button primary" href="/budget/collect" data-auth-login>Sign Up/Log In</a>
-                    <span class="auth-status" data-auth-status hidden>
-                        <a class="auth-username" href="/budget/collect" data-auth-username></a>
-                        <button class="auth-signout" type="button" data-auth-signout>Sign out</button>
-                    </span>
                 </div>
                 <p class="hero-trust">cashflowARC never sees, reads, or stores your financial institution usernames or passwords, and we do not sell your personal information. <a href="/security">Learn more about security.</a></p>
             </div>
