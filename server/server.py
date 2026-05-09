@@ -897,9 +897,9 @@ BASE_PAGE = """
                 <a href="/#planning-workflow">whatif<span class="arc">ARC</span></a>
                 <a class="trader-nav-link" href="/trader/"><span class="trader-nav-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
-                <a href="/budget/" data-auth-login>Sign Up/Log In</a>
+                <a href="/budget/collect" data-auth-login>Sign Up/Log In</a>
                 <span class="auth-status" data-auth-status hidden>
-                    <a class="auth-username" href="/budget/" data-auth-username></a>
+                    <a class="auth-username" href="/budget/collect" data-auth-username></a>
                     <button class="auth-signout" type="button" data-auth-signout>Sign out</button>
                 </span>
             </nav>
@@ -918,9 +918,9 @@ BASE_PAGE = """
                 <a href="/#planning-workflow">whatifARC</a>
                 <a href="/trader/">traderARC</a>
                 <a href="/security">Security</a>
-                <a href="/budget/" data-auth-login>Sign Up/Log In</a>
+                <a href="/budget/collect" data-auth-login>Sign Up/Log In</a>
                 <span class="auth-status" data-auth-status hidden>
-                    <a class="auth-username" href="/budget/" data-auth-username></a>
+                    <a class="auth-username" href="/budget/collect" data-auth-username></a>
                     <button class="auth-signout" type="button" data-auth-signout>Sign out</button>
                 </span>
             </div>
@@ -1024,9 +1024,9 @@ HOME_CONTENT = """
                 <h1>cashflow<span class="arc">ARC</span></h1>
                 <p>A planning engine that collects transactions and upcoming life events, then builds a living forecast of your future financial lifestyle.</p>
                 <div class="hero-actions">
-                    <a class="button primary" href="/budget/" data-auth-login>Sign Up/Log In</a>
+                    <a class="button primary" href="/budget/collect" data-auth-login>Sign Up/Log In</a>
                     <span class="auth-status" data-auth-status hidden>
-                        <a class="auth-username" href="/budget/" data-auth-username></a>
+                        <a class="auth-username" href="/budget/collect" data-auth-username></a>
                         <button class="auth-signout" type="button" data-auth-signout>Sign out</button>
                     </span>
                 </div>
