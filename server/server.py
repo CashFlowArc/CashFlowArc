@@ -384,6 +384,23 @@ BASE_PAGE = """
             gap: 10px;
             margin-top: 28px;
         }
+        .hero-copy .hero-trust {
+            max-width: 640px;
+            margin: 18px 0 0;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.14);
+            color: #CBD5E1;
+            font-size: 14px;
+            line-height: 1.55;
+        }
+        .hero-copy .hero-trust a {
+            color: #5EEAD4;
+            font-weight: 850;
+        }
+        .hero-copy .hero-trust a:hover,
+        .hero-copy .hero-trust a:focus-visible {
+            color: #99F6E4;
+        }
         .button {
             display: inline-flex;
             align-items: center;
@@ -612,7 +629,7 @@ BASE_PAGE = """
                 overflow: visible;
             }
             .nav-links a {
-                flex: 1 1 calc(33.333% - 4px);
+                flex: 1 1 calc(50% - 4px);
                 min-width: 0;
             }
             .hero {
@@ -647,6 +664,17 @@ BASE_PAGE = """
             }
         }
         @media (max-width: 520px) {
+            h1 {
+                font-size: 48px;
+            }
+            .hero-copy p {
+                max-width: 320px;
+                font-size: 18px;
+            }
+            .hero-copy .hero-trust {
+                max-width: 320px;
+                font-size: 13px;
+            }
             .hero-actions {
                 display: grid;
             }
@@ -677,7 +705,6 @@ BASE_PAGE = """
                 <a href="/budget/">budget<span class="arc">ARC</span></a>
                 <a class="trader-nav-link" href="/trader/"><span class="trader-nav-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
-                <a class="{{ 'active' if page == 'privacy' else '' }}" href="/privacy">Privacy</a>
             </nav>
         </div>
     </header>
@@ -690,7 +717,6 @@ BASE_PAGE = """
                 <a href="/budget/">budgetARC</a>
                 <a href="/trader/">traderARC</a>
                 <a href="/security">Security</a>
-                <a href="/privacy">Privacy</a>
             </div>
         </div>
     </footer>
@@ -716,6 +742,7 @@ HOME_CONTENT = """
                     <a class="button dark" href="/trader/">traderARC</a>
                     <a class="button dark" href="/security">Security</a>
                 </div>
+                <p class="hero-trust">cashflowARC never accesses or stores your financial institution usernames or passwords, and we do not sell your personal information. <a href="/security">Learn more about security.</a></p>
             </div>
         </div>
     </section>
@@ -724,7 +751,7 @@ HOME_CONTENT = """
         <div class="section-inner">
             <div class="section-heading">
                 <h2>Security and privacy are visible, not hidden.</h2>
-                <p>The landing page now puts the trust answers up front, then gives you dedicated Security and Privacy pages for the details.</p>
+                <p>The landing page puts the trust answers up front, then gives you one Security page for the details.</p>
             </div>
             <div class="card-grid">
                 <article class="info-card">
@@ -735,7 +762,7 @@ HOME_CONTENT = """
                 <article class="info-card">
                     <span class="badge">Bank data</span>
                     <h3>Provider-based connectivity</h3>
-                    <p>budgetARC bank linking is handled through Teller-style authorization. Credentials stay with the bank/provider flow, while cashflowARC uses the authorized data needed to run the app.</p>
+                    <p>Bank linking is handled through the provider authorization flow. cashflowARC does not have access to or store your financial institution username or password.</p>
                 </article>
                 <article class="info-card">
                     <span class="badge">No sale</span>
@@ -816,7 +843,11 @@ SECURITY_CONTENT = """
             </article>
             <article class="policy-card">
                 <h2>Bank connectivity</h2>
-                <p>budgetARC uses a bank connectivity provider flow for account access. You authorize access through that flow. cashflowARC does not need to store your bank password; it uses authorized account and transaction data to power the dashboard.</p>
+                <p>budgetARC uses a bank connectivity provider flow for account access. You authorize access through that flow. cashflowARC does not have access to or store your financial institution username or password; it uses authorized account and transaction data to power the dashboard.</p>
+            </article>
+            <article class="policy-card">
+                <h2>Personal information</h2>
+                <p>cashflowARC does not sell your personal information, financial data, transaction history, balances, app activity, or forecasts. The product is not built around advertising profiles or data broker resale.</p>
             </article>
             <article class="policy-card">
                 <h2>Data access</h2>
