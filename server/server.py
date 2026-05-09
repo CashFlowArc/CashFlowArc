@@ -626,13 +626,6 @@ BASE_PAGE = """
         .funded-callout span {
             color: #5EEAD4;
         }
-        .pro-note {
-            max-width: 820px;
-            margin: 18px auto 0;
-            color: var(--muted);
-            font-size: 15px;
-            text-align: center;
-        }
         .badge {
             display: inline-flex;
             align-items: center;
@@ -668,7 +661,10 @@ BASE_PAGE = """
         }
         .security-heading h2 {
             white-space: nowrap;
-            font-size: clamp(34px, 4vw, 52px);
+            font-size: clamp(32px, 3.6vw, 48px);
+        }
+        .security-section .section-inner {
+            width: min(100% - 40px, 1280px);
         }
         .policy-stack {
             display: grid;
@@ -687,10 +683,7 @@ BASE_PAGE = """
             padding: 28px 0;
         }
         .footer-inner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 18px;
+            display: block;
             font-size: 13px;
         }
         .footer a {
@@ -699,8 +692,10 @@ BASE_PAGE = """
         }
         .footer-links {
             display: flex;
-            flex-wrap: wrap;
-            gap: 14px;
+            flex-wrap: nowrap;
+            justify-content: center;
+            gap: 12px;
+            white-space: nowrap;
         }
         @media (max-width: 1040px) {
             .dashboard-visual {
@@ -724,6 +719,11 @@ BASE_PAGE = """
             .footer-inner {
                 align-items: flex-start;
                 flex-direction: column;
+            }
+            .footer-links {
+                flex-wrap: wrap;
+                justify-content: flex-start;
+                white-space: normal;
             }
             .nav-links {
                 width: 100%;
@@ -785,9 +785,6 @@ BASE_PAGE = """
                 font-size: 28px;
                 text-align: left;
             }
-            .pro-note {
-                text-align: left;
-            }
             .hero-actions {
                 display: grid;
             }
@@ -833,14 +830,13 @@ BASE_PAGE = """
                 <a href="/#planning-workflow">whatif<span class="arc">ARC</span></a>
                 <a class="trader-nav-link" href="/trader/"><span class="trader-nav-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
-                <a href="/budget/login">Log In</a>
+                <a href="/budget/login">Sign Up/Log In</a>
             </nav>
         </div>
     </header>
     {{ content|safe }}
     <footer class="footer">
         <div class="footer-inner">
-            <span>cashflow<span class="arc">ARC</span> protects the arc between money today, decisions tomorrow, and long-term direction.</span>
             <div class="footer-links">
                 <a href="/">cashflowARC</a>
                 <a href="/#planning-workflow">collectARC</a>
@@ -851,7 +847,7 @@ BASE_PAGE = """
                 <a href="/#planning-workflow">whatifARC</a>
                 <a href="/trader/">traderARC</a>
                 <a href="/security">Security</a>
-                <a href="/budget/login">Log In</a>
+                <a href="/budget/login">Sign Up/Log In</a>
             </div>
         </div>
     </footer>
@@ -873,11 +869,7 @@ HOME_CONTENT = """
                 <h1>cashflow<span class="arc">ARC</span></h1>
                 <p>A planning engine that collects transactions and upcoming life events, then builds a living forecast of your future financial lifestyle.</p>
                 <div class="hero-actions">
-                    <a class="button primary" href="/budget/register">Sign Up</a>
-                    <a class="button dark" href="/budget/login">Log In</a>
-                    <a class="button dark" href="/budget/">budgetARC</a>
-                    <a class="button dark" href="/trader/">traderARC</a>
-                    <a class="button dark" href="/security">Security</a>
+                    <a class="button primary" href="/budget/login">Sign Up/Log In</a>
                 </div>
                 <p class="hero-trust">cashflowARC never sees, reads, or stores your financial institution usernames or passwords, and we do not sell your personal information. <a href="/security">Learn more about security.</a></p>
             </div>
@@ -891,7 +883,6 @@ HOME_CONTENT = """
         <div class="section-inner">
             <div class="section-heading">
                 <h2>Plan the next version of your financial life.</h2>
-                <p>One login powers every ARC module and identifies which transactions each one can use.</p>
             </div>
             <div class="step-grid">
                 <article class="step-card">
@@ -950,11 +941,10 @@ HOME_CONTENT = """
                 </article>
             </div>
             <div class="funded-callout">How many <span>funded lifestyle months</span> does future you have?</div>
-            <p class="pro-note">collectARC and budgetARC are free. forecastARC, lifeARC, lifestyleARC, and whatifARC are in development for a Pro monthly plan.</p>
         </div>
     </section>
 
-    <section class="band white" aria-label="Security and privacy commitments">
+    <section class="band white security-section" aria-label="Security and privacy commitments">
         <div class="section-inner">
             <div class="section-heading security-heading">
                 <h2>Security and privacy are visible, not hidden.</h2>
