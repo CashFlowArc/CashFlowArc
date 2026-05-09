@@ -66,7 +66,7 @@ BASE_PAGE = """
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 18px;
+            gap: 14px;
             padding: 12px 0;
         }
         .brand {
@@ -77,8 +77,8 @@ BASE_PAGE = """
             font-weight: 850;
         }
         .brand img {
-            width: 46px;
-            height: 46px;
+            width: 42px;
+            height: 42px;
             flex: 0 0 auto;
             border-radius: 8px;
             background: #FFFFFF;
@@ -109,7 +109,10 @@ BASE_PAGE = """
         .nav-links {
             display: inline-flex;
             align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
             gap: 4px;
+            max-width: 920px;
             padding: 4px;
             border: 1px solid rgba(255, 255, 255, 0.10);
             border-radius: 8px;
@@ -120,10 +123,10 @@ BASE_PAGE = """
             align-items: center;
             justify-content: center;
             min-height: 34px;
-            padding: 0 12px;
+            padding: 0 8px;
             border-radius: 6px;
             color: #CBD5E1;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 800;
             white-space: nowrap;
         }
@@ -508,7 +511,7 @@ BASE_PAGE = """
         }
         .step-grid {
             display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 14px;
         }
         .info-card,
@@ -560,14 +563,52 @@ BASE_PAGE = """
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
+            width: 26px;
+            height: 26px;
+            flex: 0 0 26px;
             margin-bottom: 16px;
             border-radius: 999px;
             background: var(--accent);
             color: #FFFFFF;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 900;
+        }
+        .step-top {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+        .step-top .step-number {
+            margin-bottom: 0;
+        }
+        .step-module,
+        .step-status {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            padding: 0 6px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+        .step-module {
+            background: #CCFBF1;
+            color: #0F766E;
+        }
+        .step-status {
+            margin-left: auto;
+            background: #E2E8F0;
+            color: #334155;
+        }
+        .step-status.free {
+            background: rgba(34, 197, 94, 0.14);
+            color: #15803D;
+        }
+        .step-status.pro {
+            background: rgba(245, 158, 11, 0.14);
+            color: #B45309;
         }
         .funded-callout {
             margin-top: 28px;
@@ -584,6 +625,13 @@ BASE_PAGE = """
         }
         .funded-callout span {
             color: #5EEAD4;
+        }
+        .pro-note {
+            max-width: 820px;
+            margin: 18px auto 0;
+            color: var(--muted);
+            font-size: 15px;
+            text-align: center;
         }
         .badge {
             display: inline-flex;
@@ -614,6 +662,13 @@ BASE_PAGE = """
         }
         .page-hero {
             padding: 70px 0 42px;
+        }
+        .security-heading {
+            max-width: none;
+        }
+        .security-heading h2 {
+            white-space: nowrap;
+            font-size: clamp(34px, 4vw, 52px);
         }
         .policy-stack {
             display: grid;
@@ -706,6 +761,9 @@ BASE_PAGE = """
             .card-grid {
                 grid-template-columns: 1fr;
             }
+            .security-heading h2 {
+                white-space: normal;
+            }
             .band {
                 padding: 54px 0;
             }
@@ -725,6 +783,9 @@ BASE_PAGE = """
             .funded-callout {
                 padding: 20px;
                 font-size: 28px;
+                text-align: left;
+            }
+            .pro-note {
                 text-align: left;
             }
             .hero-actions {
@@ -764,9 +825,15 @@ BASE_PAGE = """
             </a>
             <nav class="nav-links" aria-label="cashflowARC navigation">
                 <a class="{{ 'active' if page == 'home' else '' }}" href="/">cashflow<span class="arc">ARC</span></a>
-                <a href="/budget/">budget<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">collect<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">budget<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">forecast<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">life<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">lifestyle<span class="arc">ARC</span></a>
+                <a href="/#planning-workflow">whatif<span class="arc">ARC</span></a>
                 <a class="trader-nav-link" href="/trader/"><span class="trader-nav-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
+                <a href="/budget/login">Log In</a>
             </nav>
         </div>
     </header>
@@ -776,9 +843,15 @@ BASE_PAGE = """
             <span>cashflow<span class="arc">ARC</span> protects the arc between money today, decisions tomorrow, and long-term direction.</span>
             <div class="footer-links">
                 <a href="/">cashflowARC</a>
-                <a href="/budget/">budgetARC</a>
+                <a href="/#planning-workflow">collectARC</a>
+                <a href="/#planning-workflow">budgetARC</a>
+                <a href="/#planning-workflow">forecastARC</a>
+                <a href="/#planning-workflow">lifeARC</a>
+                <a href="/#planning-workflow">lifestyleARC</a>
+                <a href="/#planning-workflow">whatifARC</a>
                 <a href="/trader/">traderARC</a>
                 <a href="/security">Security</a>
+                <a href="/budget/login">Log In</a>
             </div>
         </div>
     </footer>
@@ -801,6 +874,7 @@ HOME_CONTENT = """
                 <p>A planning engine that collects transactions and upcoming life events, then builds a living forecast of your future financial lifestyle.</p>
                 <div class="hero-actions">
                     <a class="button primary" href="/budget/register">Sign Up</a>
+                    <a class="button dark" href="/budget/login">Log In</a>
                     <a class="button dark" href="/budget/">budgetARC</a>
                     <a class="button dark" href="/trader/">traderARC</a>
                     <a class="button dark" href="/security">Security</a>
@@ -817,54 +891,84 @@ HOME_CONTENT = """
         <div class="section-inner">
             <div class="section-heading">
                 <h2>Plan the next version of your financial life.</h2>
-                <p>cashflowARC turns today's activity, tomorrow's obligations, and major life changes into a living cash flow forecast.</p>
+                <p>One login powers every ARC module and identifies which transactions each one can use.</p>
             </div>
             <div class="step-grid">
                 <article class="step-card">
-                    <span class="step-number">1</span>
+                    <div class="step-top">
+                        <span class="step-number">1</span>
+                        <span class="step-module">collectARC</span>
+                        <span class="step-status free">Free</span>
+                    </div>
                     <h3>Collect transactions</h3>
                     <p>Bring spending, income, and account activity into one planning view.</p>
                 </article>
                 <article class="step-card">
-                    <span class="step-number">2</span>
-                    <h3>Set budget and forecast 12 months of cash flow</h3>
-                    <p>Build a 12-month cash flow forecast around your actual habits.</p>
+                    <div class="step-top">
+                        <span class="step-number">2</span>
+                        <span class="step-module">budgetARC</span>
+                        <span class="step-status free">Free</span>
+                    </div>
+                    <h3>Set budget</h3>
+                    <p>Define the spending plan that future forecasts should respect.</p>
                 </article>
                 <article class="step-card">
-                    <span class="step-number">3</span>
+                    <div class="step-top">
+                        <span class="step-number">3</span>
+                        <span class="step-module">forecastARC</span>
+                        <span class="step-status pro">Pro</span>
+                    </div>
+                    <h3>Forecast budget for next 12 months</h3>
+                    <p>Project your budget against expected income, expenses, and timing.</p>
+                </article>
+                <article class="step-card">
+                    <div class="step-top">
+                        <span class="step-number">4</span>
+                        <span class="step-module">lifeARC</span>
+                        <span class="step-status pro">Pro</span>
+                    </div>
                     <h3>Plan for major life events</h3>
                     <p>Add big changes before they hit your bank account.</p>
                 </article>
                 <article class="step-card">
-                    <span class="step-number">4</span>
+                    <div class="step-top">
+                        <span class="step-number">5</span>
+                        <span class="step-module">lifestyleARC</span>
+                        <span class="step-status pro">Pro</span>
+                    </div>
                     <h3>Forecast funded lifestyle months</h3>
                     <p>See how long your current plan can support the lifestyle you want.</p>
                 </article>
                 <article class="step-card">
-                    <span class="step-number">5</span>
+                    <div class="step-top">
+                        <span class="step-number">6</span>
+                        <span class="step-module">whatifARC</span>
+                        <span class="step-status pro">Pro</span>
+                    </div>
                     <h3>What if I... scenario planning</h3>
                     <p>Ask "what if I..." and compare choices for a better future.</p>
                 </article>
             </div>
             <div class="funded-callout">How many <span>funded lifestyle months</span> does future you have?</div>
+            <p class="pro-note">collectARC and budgetARC are free. forecastARC, lifeARC, lifestyleARC, and whatifARC are in development for a Pro monthly plan.</p>
         </div>
     </section>
 
     <section class="band white" aria-label="Security and privacy commitments">
         <div class="section-inner">
-            <div class="section-heading">
+            <div class="section-heading security-heading">
                 <h2>Security and privacy are visible, not hidden.</h2>
             </div>
             <div class="card-grid">
                 <a class="info-card" href="/security">
                     <span class="badge">SSL and TLS</span>
                     <h3>Encrypted in transit</h3>
-                    <p>cashflowARC is intended to run behind HTTPS in production so sensitive pages are protected by modern TLS between the browser and the site.</p>
+                    <p>cashflowARC communications are encrypted end to end, meaning that no one can listen in and capture your personal data.</p>
                 </a>
                 <a class="info-card" href="/security">
                     <span class="badge">Bank data</span>
                     <h3>Provider-based connectivity</h3>
-                    <p>Bank linking is handled through the provider authorization flow. cashflowARC does not see, read, or store your financial institution username or password.</p>
+                    <p>cashflowARC does not see, read, or store your financial institution username or password.</p>
                 </a>
                 <a class="info-card" href="/security">
                     <span class="badge">No sale</span>
@@ -879,11 +983,10 @@ HOME_CONTENT = """
         <div class="section-inner story">
             <div class="section-heading">
                 <h2>Founder story</h2>
-                <p>cashflowARC started from a simple frustration: financial tools were either pretty but shallow, or powerful but scattered.</p>
+                <p>In the end, financial tools were good at showing where money was going, but not what lifestyle I could afford in the future.</p>
             </div>
             <div class="story-panel">
-                <p>The founder wanted one private place to answer practical questions every week: how much cash is available, what is changing, which habits are helping, and what the next month could look like. budgetARC grew from that need.</p>
-                <p>That is the arc: know where money is now, find better choices, and make the next decision with more clarity.</p>
+                <p>The founder wanted one private place to answer practical questions every week: how much cash is available, what is changing, which habits are helping, and what the next month could look like.</p>
             </div>
         </div>
     </section>
@@ -908,7 +1011,7 @@ SECURITY_CONTENT = """
             </article>
             <article class="policy-card">
                 <h2>Encryption messaging</h2>
-                <p>Bank and app traffic is handled over encrypted connections. Sensitive service credentials and provider tokens are kept server side and should not be exposed in browser code or public repositories.</p>
+                <p>cashflowARC communications are encrypted end to end, meaning that no one can listen in and capture your personal data. Sensitive service credentials and provider tokens are kept server side and should not be exposed in browser code or public repositories.</p>
             </article>
             <article class="policy-card">
                 <h2>Bank connectivity</h2>
