@@ -153,16 +153,22 @@ BASE_PAGE = """
             position: absolute;
             inset: 0;
             z-index: 0;
-            display: grid;
-            grid-template-columns: 250px minmax(760px, 1fr);
-            width: min(1320px, 108vw);
-            min-height: 620px;
+            display: block;
+            width: min(1420px, 112vw);
+            height: 620px;
             margin-left: max(26vw, 240px);
             transform: rotate(-1deg) translateY(24px);
             transform-origin: center;
             border: 1px solid rgba(255, 255, 255, 0.16);
             background: #FFFFFF;
             box-shadow: 0 34px 80px rgba(0, 0, 0, 0.28);
+            overflow: hidden;
+        }
+        .dashboard-visual img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: left top;
         }
         .mock-sidebar {
             background: var(--primary);
@@ -626,7 +632,7 @@ BASE_PAGE = """
                 padding: 44px 0 56px;
             }
             .dashboard-visual {
-                grid-template-columns: 170px minmax(580px, 1fr);
+                height: 620px;
                 margin-left: 18vw;
                 transform: rotate(-1deg) translateY(56px);
                 opacity: 0.52;
@@ -661,6 +667,7 @@ BASE_PAGE = """
                 font-size: 18px;
             }
             .dashboard-visual {
+                height: 620px;
                 margin-left: 5vw;
                 opacity: 0.36;
             }
@@ -710,52 +717,7 @@ HOME_CONTENT = """
 <main>
     <section class="hero" aria-label="cashflowARC landing">
         <div class="dashboard-visual" aria-hidden="true">
-            <aside class="mock-sidebar">
-                <div class="mock-brand">
-                    <img src="{{ url_for('static', filename='favicon.svg') }}" alt="">
-                    <span>budget<span class="arc">ARC</span></span>
-                </div>
-                <div class="mock-nav">
-                    <span>Dashboard</span>
-                    <span>Accounts</span>
-                    <span>Transactions</span>
-                    <span>Cash Flow</span>
-                    <span>Insights</span>
-                </div>
-            </aside>
-            <div class="mock-main">
-                <div class="mock-top">
-                    <div class="mock-title">
-                        <h2>Good morning, Alex</h2>
-                        <p>Here is what is happening with your money today.</p>
-                    </div>
-                    <div class="mock-pill">May 12 - May 18</div>
-                </div>
-                <div class="mock-kpis">
-                    <div class="mock-kpi"><span>Net Cash Flow</span><strong>$2,450</strong><b>+12%</b></div>
-                    <div class="mock-kpi"><span>Income</span><strong>$6,850</strong><b>+8%</b></div>
-                    <div class="mock-kpi"><span>Expenses</span><strong>$4,400</strong><b style="color: var(--red)">+5%</b></div>
-                    <div class="mock-kpi"><span>Investments</span><strong>$25,430</strong><b>+15%</b></div>
-                </div>
-                <div class="mock-grid">
-                    <div class="mock-panel">
-                        <span>Cash Flow Overview</span>
-                        <div class="mock-chart">
-                            <i style="height: 38%"></i><i style="height: 62%"></i><i style="height: 52%"></i><i style="height: 74%"></i>
-                            <i style="height: 46%"></i><i style="height: 58%"></i><i style="height: 67%"></i><i style="height: 49%"></i>
-                        </div>
-                    </div>
-                    <div class="mock-panel">
-                        <span>Budget Progress</span>
-                        <div class="mock-bars">
-                            <div class="mock-bar"><span>Housing</span><div><i style="width: 80%"></i></div></div>
-                            <div class="mock-bar"><span>Food</span><div><i style="width: 68%"></i></div></div>
-                            <div class="mock-bar"><span>Transportation</span><div><i style="width: 64%"></i></div></div>
-                            <div class="mock-bar"><span>Entertainment</span><div><i style="width: 40%; background: var(--amber)"></i></div></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <img src="{{ url_for('static', filename='budgetarc-dashboard-bg.png', v='1') }}" alt="">
         </div>
         <div class="hero-inner">
             <div class="hero-copy">
