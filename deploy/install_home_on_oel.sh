@@ -31,6 +31,7 @@ if [[ -f "$NGINX_CONF" ]]; then
 
   TMP_NGINX="$(sudo mktemp)"
   sudo python3 - "$NGINX_CONF" "$TMP_NGINX" <<'PY'
+import re
 from pathlib import Path
 import sys
 
@@ -38,9 +39,10 @@ source = Path(sys.argv[1])
 target = Path(sys.argv[2])
 text = source.read_text()
 
-if "server_tokens off;" not in text:
-    text = text.replace("server {\n", "server {\n    server_tokens off;\n", 1)
-    print("Disabled nginx version tokens for the CashFlowArc server block.")
+updated_text = re.sub(r"server\s*\{\n(?!\s*server_tokens off;)", "server {\n    server_tokens off;\n", text)
+if updated_text != text:
+    text = updated_text
+    print("Disabled nginx version tokens for CashFlowArc server blocks.")
 
 routes = []
 if "127.0.0.1:8788" not in text:
