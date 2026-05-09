@@ -2,10 +2,40 @@ from __future__ import annotations
 
 import os
 
-from flask import Flask, render_template_string, send_from_directory
+from flask import Flask, Response, render_template_string, request, send_from_directory
 
 
 app = Flask(__name__)
+
+SECURITY_TXT = """Contact: https://cashflowarc.com/security
+Policy: https://cashflowarc.com/security
+Canonical: https://cashflowarc.com/.well-known/security.txt
+Expires: 2027-05-09T00:00:00Z
+Preferred-Languages: en
+"""
+
+
+@app.after_request
+def add_security_headers(response: Response) -> Response:
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "connect-src 'self'; "
+        "img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "font-src 'self'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'self'; "
+        "object-src 'none'",
+    )
+    if request.is_secure or request.headers.get("X-Forwarded-Proto", "").lower() == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return response
 
 
 BASE_PAGE = """
@@ -1273,6 +1303,27 @@ def privacy() -> str:
     )
 
 
+@app.route("/robots.txt")
+def robots_txt() -> tuple[str, int, dict[str, str]]:
+    body = "\n".join(
+        [
+            "User-agent: *",
+            "Disallow: /trader/",
+            "Disallow: /budget/",
+            "Allow: /$",
+            "Allow: /security",
+            "Allow: /privacy",
+            "",
+        ]
+    )
+    return body, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+@app.route("/.well-known/security.txt")
+def security_txt() -> tuple[str, int, dict[str, str]]:
+    return SECURITY_TXT, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
 @app.route("/healthz")
 def healthz() -> tuple[str, int]:
     return "ok", 200
@@ -1287,5 +1338,5 @@ if __name__ == "__main__":
     app.run(
         host=os.getenv("HOME_WEB_HOST", "0.0.0.0"),
         port=int(os.getenv("HOME_WEB_PORT", "5000")),
-        debug=True,
+        debug=os.getenv("HOME_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"},
     )

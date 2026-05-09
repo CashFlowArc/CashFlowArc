@@ -38,6 +38,10 @@ source = Path(sys.argv[1])
 target = Path(sys.argv[2])
 text = source.read_text()
 
+if "server_tokens off;" not in text:
+    text = text.replace("server {\n", "server {\n    server_tokens off;\n", 1)
+    print("Disabled nginx version tokens for the CashFlowArc server block.")
+
 routes = []
 if "127.0.0.1:8788" not in text:
     routes.append("""    location = /budget {
