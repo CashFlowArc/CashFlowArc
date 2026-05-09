@@ -401,6 +401,51 @@ BASE_PAGE = """
         .hero-copy .hero-trust a:focus-visible {
             color: #99F6E4;
         }
+        .scroll-cue {
+            position: absolute;
+            left: 50%;
+            bottom: 18px;
+            z-index: 3;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border: 1px solid rgba(20, 184, 166, 0.48);
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.72);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+            transform: translateX(-50%);
+            animation: scrollCueBob 1.9s ease-in-out infinite;
+        }
+        .scroll-cue:before {
+            content: "";
+            position: absolute;
+            inset: -7px;
+            border: 1px solid rgba(20, 184, 166, 0.22);
+            border-radius: inherit;
+        }
+        .scroll-cue:hover,
+        .scroll-cue:focus-visible {
+            background: rgba(20, 184, 166, 0.20);
+            outline: 0;
+        }
+        .scroll-cue-arrow {
+            width: 13px;
+            height: 13px;
+            border-right: 3px solid #5EEAD4;
+            border-bottom: 3px solid #5EEAD4;
+            transform: rotate(45deg) translate(-2px, -2px);
+        }
+        @keyframes scrollCueBob {
+            0%,
+            100% {
+                transform: translate(-50%, 0);
+            }
+            50% {
+                transform: translate(-50%, 7px);
+            }
+        }
         .button {
             display: inline-flex;
             align-items: center;
@@ -468,7 +513,6 @@ BASE_PAGE = """
         }
         .info-card,
         .step-card,
-        .app-card,
         .policy-card {
             border: 1px solid var(--line);
             border-radius: 8px;
@@ -480,10 +524,22 @@ BASE_PAGE = """
         .policy-card {
             padding: 22px;
         }
+        a.info-card {
+            display: block;
+            color: inherit;
+            text-decoration: none;
+            transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+        }
+        a.info-card:hover,
+        a.info-card:focus-visible {
+            border-color: rgba(20, 184, 166, 0.58);
+            box-shadow: 0 24px 54px rgba(15, 23, 42, 0.14);
+            outline: 0;
+            transform: translateY(-2px);
+        }
         .info-card h3,
         .step-card h3,
-        .policy-card h2,
-        .app-card h3 {
+        .policy-card h2 {
             margin: 0 0 10px;
             color: var(--primary);
             font-size: 21px;
@@ -492,8 +548,7 @@ BASE_PAGE = """
         .info-card p,
         .step-card p,
         .policy-card p,
-        .policy-card li,
-        .app-card p {
+        .policy-card li {
             color: var(--muted);
         }
         .info-card p,
@@ -514,6 +569,22 @@ BASE_PAGE = """
             font-size: 13px;
             font-weight: 900;
         }
+        .funded-callout {
+            margin-top: 28px;
+            padding: 24px 28px;
+            border: 1px solid rgba(20, 184, 166, 0.34);
+            border-radius: 8px;
+            background: var(--primary);
+            color: #FFFFFF;
+            box-shadow: var(--shadow);
+            font-size: clamp(28px, 4vw, 50px);
+            font-weight: 950;
+            line-height: 1.04;
+            text-align: center;
+        }
+        .funded-callout span {
+            color: #5EEAD4;
+        }
         .badge {
             display: inline-flex;
             align-items: center;
@@ -527,56 +598,6 @@ BASE_PAGE = """
             font-weight: 850;
             text-transform: uppercase;
         }
-        .app-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 18px;
-        }
-        .app-card {
-            min-height: 330px;
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            padding: 24px;
-            overflow: hidden;
-        }
-        .app-card.trader {
-            background: var(--primary);
-            color: #FFFFFF;
-            border-color: var(--primary);
-        }
-        .app-card.trader h3,
-        .app-card.trader p {
-            color: #FFFFFF;
-        }
-        .mini-screen {
-            display: grid;
-            gap: 10px;
-            margin: 18px 0 22px;
-        }
-        .mini-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 14px;
-            padding: 12px 14px;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            background: #FFFFFF;
-        }
-        .trader .mini-row {
-            border-color: rgba(255, 255, 255, 0.12);
-            background: rgba(255, 255, 255, 0.06);
-        }
-        .mini-row span {
-            color: var(--muted);
-            font-size: 13px;
-            font-weight: 800;
-        }
-        .trader .mini-row span {
-            color: #CBD5E1;
-        }
-        .mini-row strong.green { color: var(--green); }
-        .mini-row strong.amber { color: var(--amber); }
-        .mini-row strong.red { color: var(--red); }
         .story {
             display: grid;
             grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
@@ -678,7 +699,6 @@ BASE_PAGE = """
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
             .mock-grid,
-            .app-grid,
             .step-grid,
             .story {
                 grid-template-columns: 1fr;
@@ -702,8 +722,18 @@ BASE_PAGE = """
                 max-width: 320px;
                 font-size: 13px;
             }
+            .funded-callout {
+                padding: 20px;
+                font-size: 28px;
+                text-align: left;
+            }
             .hero-actions {
                 display: grid;
+            }
+            .scroll-cue {
+                bottom: 12px;
+                width: 40px;
+                height: 40px;
             }
             .button {
                 width: 100%;
@@ -715,6 +745,11 @@ BASE_PAGE = """
                 height: 620px;
                 margin-left: 5vw;
                 opacity: 0.36;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .scroll-cue {
+                animation: none;
             }
         }
     </style>
@@ -773,9 +808,12 @@ HOME_CONTENT = """
                 <p class="hero-trust">cashflowARC never sees, reads, or stores your financial institution usernames or passwords, and we do not sell your personal information. <a href="/security">Learn more about security.</a></p>
             </div>
         </div>
+        <a class="scroll-cue" href="#planning-workflow" aria-label="Scroll to planning workflow">
+            <span class="scroll-cue-arrow" aria-hidden="true"></span>
+        </a>
     </section>
 
-    <section class="band white" aria-label="Planning workflow">
+    <section id="planning-workflow" class="band white" aria-label="Planning workflow">
         <div class="section-inner">
             <div class="section-heading">
                 <h2>Plan the next version of your financial life.</h2>
@@ -808,6 +846,7 @@ HOME_CONTENT = """
                     <p>Ask "what if I..." and compare choices for a better future.</p>
                 </article>
             </div>
+            <div class="funded-callout">How many <span>funded lifestyle months</span> does future you have?</div>
         </div>
     </section>
 
@@ -815,56 +854,22 @@ HOME_CONTENT = """
         <div class="section-inner">
             <div class="section-heading">
                 <h2>Security and privacy are visible, not hidden.</h2>
-                <p>The landing page puts the trust answers up front, then gives you one Security page for the details.</p>
             </div>
             <div class="card-grid">
-                <article class="info-card">
+                <a class="info-card" href="/security">
                     <span class="badge">SSL and TLS</span>
                     <h3>Encrypted in transit</h3>
                     <p>cashflowARC is intended to run behind HTTPS in production so sensitive pages are protected by modern TLS between the browser and the site.</p>
-                </article>
-                <article class="info-card">
+                </a>
+                <a class="info-card" href="/security">
                     <span class="badge">Bank data</span>
                     <h3>Provider-based connectivity</h3>
                     <p>Bank linking is handled through the provider authorization flow. cashflowARC does not see, read, or store your financial institution username or password.</p>
-                </article>
-                <article class="info-card">
+                </a>
+                <a class="info-card" href="/security">
                     <span class="badge">No sale</span>
                     <h3>We never sell your data</h3>
                     <p>Personal finance data is used to power your dashboard, categorization, planning, and forecasts. It is not sold to advertisers or data brokers.</p>
-                </article>
-            </div>
-        </div>
-    </section>
-
-    <section class="band" aria-label="Application previews">
-        <div class="section-inner">
-            <div class="section-heading">
-                <h2>One palette across both apps.</h2>
-                <p>budgetARC and traderARC now share the same navy, teal, green, amber, red, light gray, white card, and near-black text system.</p>
-            </div>
-            <div class="app-grid">
-                <a class="app-card" href="/budget/">
-                    <span class="badge">budgetARC</span>
-                    <h3>Cash flow, budgets, transactions, and net worth</h3>
-                    <p>A calm operating dashboard for account-connected personal finance.</p>
-                    <div class="mini-screen">
-                        <div class="mini-row"><span>Net cash flow</span><strong class="green">$2,450</strong></div>
-                        <div class="mini-row"><span>Dining budget</span><strong class="amber">68%</strong></div>
-                        <div class="mini-row"><span>Overspend risk</span><strong class="red">Review</strong></div>
-                    </div>
-                    <div class="button">budgetARC</div>
-                </a>
-                <a class="app-card trader" href="/trader/">
-                    <span class="badge">traderARC</span>
-                    <h3>SPX terminal, GEX, option chain, and simulator</h3>
-                    <p>Market context uses the same decision colors while keeping the data density traders expect.</p>
-                    <div class="mini-screen">
-                        <div class="mini-row"><span>Session bias</span><strong class="green">Constructive</strong></div>
-                        <div class="mini-row"><span>Gamma level</span><strong class="amber">Watch</strong></div>
-                        <div class="mini-row"><span>Risk status</span><strong class="red">Defined</strong></div>
-                    </div>
-                    <div class="button primary">traderARC</div>
                 </a>
             </div>
         </div>
@@ -877,7 +882,7 @@ HOME_CONTENT = """
                 <p>cashflowARC started from a simple frustration: financial tools were either pretty but shallow, or powerful but scattered.</p>
             </div>
             <div class="story-panel">
-                <p>The founder wanted one private place to answer practical questions every week: how much cash is available, what is changing, which habits are helping, and what the next month could look like. budgetARC grew from that need. traderARC followed the same principle for market decisions: make the important signal visible without burying it in noise.</p>
+                <p>The founder wanted one private place to answer practical questions every week: how much cash is available, what is changing, which habits are helping, and what the next month could look like. budgetARC grew from that need.</p>
                 <p>That is the arc: know where money is now, find better choices, and make the next decision with more clarity.</p>
             </div>
         </div>
