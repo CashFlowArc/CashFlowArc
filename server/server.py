@@ -757,6 +757,17 @@ BASE_PAGE = """
             gap: 12px;
             white-space: nowrap;
         }
+        .footer-links a.footer-stacked-link {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            line-height: 1;
+        }
+        .footer-links a.footer-stacked-link .nav-beta {
+            margin-top: 3px;
+        }
         @media (max-width: 1040px) {
             .dashboard-visual {
                 margin-left: 24vw;
@@ -905,11 +916,11 @@ BASE_PAGE = """
                 <a href="/">cashflow<span class="arc">ARC</span></a>
                 <a href="/budget/collect">collect<span class="arc">ARC</span></a>
                 <a href="/budget/">budget<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">forecast<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">life<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">lifestyle<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">whatif<span class="arc">ARC</span></a>
-                <a href="/trader/">trader<span class="arc">ARC</span></a>
+                <a class="footer-stacked-link" href="/#planning-workflow"><span class="nav-link-text">forecast<span class="arc">ARC</span></span><span class="nav-beta">Coming Soon</span></a>
+                <a class="footer-stacked-link" href="/#planning-workflow"><span class="nav-link-text">life<span class="arc">ARC</span></span><span class="nav-beta">Coming Soon</span></a>
+                <a class="footer-stacked-link" href="/#planning-workflow"><span class="nav-link-text">lifestyle<span class="arc">ARC</span></span><span class="nav-beta">Coming Soon</span></a>
+                <a class="footer-stacked-link" href="/#planning-workflow"><span class="nav-link-text">whatif<span class="arc">ARC</span></span><span class="nav-beta">Coming Soon</span></a>
+                <a class="footer-stacked-link" href="/trader/"><span class="nav-link-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a href="/security">Security</a>
             </div>
         </div>
