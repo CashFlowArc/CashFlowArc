@@ -89,6 +89,23 @@ BASE_PAGE = """
             line-height: 1;
             white-space: nowrap;
         }
+        .arc {
+            color: var(--accent);
+            font-weight: 950;
+            letter-spacing: 0;
+        }
+        .brand .arc,
+        h1 .arc {
+            color: #5EEAD4;
+        }
+        .nav-links a .arc {
+            color: #5EEAD4;
+        }
+        .nav-links a.active .arc,
+        .nav-links a:hover .arc,
+        .nav-links a:focus-visible .arc {
+            color: #FFFFFF;
+        }
         .nav-links {
             display: inline-flex;
             align-items: center;
@@ -657,28 +674,29 @@ BASE_PAGE = """
 <div class="shell">
     <header class="site-header">
         <div class="header-inner">
-            <a class="brand" href="/" aria-label="CashFlowArc home">
+            <a class="brand" href="/" aria-label="cashflowARC home">
                 <img src="{{ url_for('static', filename='favicon.svg') }}" alt="">
-                <span>CashFlowArc</span>
+                <span>cashflow<span class="arc">ARC</span></span>
             </a>
-            <nav class="nav-links" aria-label="CashFlowArc navigation">
-                <a class="{{ 'active' if page == 'home' else '' }}" href="/">Home</a>
+            <nav class="nav-links" aria-label="cashflowARC navigation">
+                <a class="{{ 'active' if page == 'home' else '' }}" href="/">cashflow<span class="arc">ARC</span></a>
+                <a href="/budget/">budget<span class="arc">ARC</span></a>
+                <a href="/trader/">trader<span class="arc">ARC</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
                 <a class="{{ 'active' if page == 'privacy' else '' }}" href="/privacy">Privacy</a>
-                <a href="/budget/">Budget</a>
-                <a href="/trader/">Trader</a>
             </nav>
         </div>
     </header>
     {{ content|safe }}
     <footer class="footer">
         <div class="footer-inner">
-            <span>CashFlowArc protects the arc between money today, decisions tomorrow, and long-term direction.</span>
+            <span>cashflow<span class="arc">ARC</span> protects the arc between money today, decisions tomorrow, and long-term direction.</span>
             <div class="footer-links">
+                <a href="/">cashflowARC</a>
+                <a href="/budget/">budgetARC</a>
+                <a href="/trader/">traderARC</a>
                 <a href="/security">Security</a>
                 <a href="/privacy">Privacy</a>
-                <a href="/budget/">Budget</a>
-                <a href="/trader/">Trader</a>
             </div>
         </div>
     </footer>
@@ -690,12 +708,12 @@ BASE_PAGE = """
 
 HOME_CONTENT = """
 <main>
-    <section class="hero" aria-label="CashFlowArc landing">
+    <section class="hero" aria-label="cashflowARC landing">
         <div class="dashboard-visual" aria-hidden="true">
             <aside class="mock-sidebar">
                 <div class="mock-brand">
                     <img src="{{ url_for('static', filename='favicon.svg') }}" alt="">
-                    <span>BudgetArc</span>
+                    <span>budget<span class="arc">ARC</span></span>
                 </div>
                 <div class="mock-nav">
                     <span>Dashboard</span>
@@ -742,11 +760,11 @@ HOME_CONTENT = """
         <div class="hero-inner">
             <div class="hero-copy">
                 <p class="eyebrow">Private cash flow intelligence</p>
-                <h1>CashFlowArc</h1>
+                <h1>cashflow<span class="arc">ARC</span></h1>
                 <p>Know your current cash flow, get ideas to improve it, and predict what your cash flow will be like in the future.</p>
                 <div class="hero-actions">
-                    <a class="button primary" href="/budget/">Open BudgetArc</a>
-                    <a class="button dark" href="/trader/">Open Trader</a>
+                    <a class="button primary" href="/budget/">Open budgetARC</a>
+                    <a class="button dark" href="/trader/">Open traderARC</a>
                     <a class="button dark" href="/security">Security</a>
                 </div>
             </div>
@@ -765,15 +783,15 @@ HOME_CONTENT = """
             </article>
             <article class="answer-card">
                 <h2>What's different?</h2>
-                <p><strong>It connects today, ideas, and forecasts.</strong> CashFlowArc shows current cash flow, highlights ways to improve it, and builds toward future cash flow prediction.</p>
+                <p><strong>It connects today, ideas, and forecasts.</strong> cashflowARC shows current cash flow, highlights ways to improve it, and builds toward future cash flow prediction.</p>
             </article>
             <article class="answer-card">
                 <h2>Is my data sold?</h2>
-                <p><strong>No.</strong> CashFlowArc does not sell personal data, bank data, transaction history, or app activity.</p>
+                <p><strong>No.</strong> cashflowARC does not sell personal data, bank data, transaction history, or app activity.</p>
             </article>
             <article class="answer-card">
                 <h2>How do banks connect?</h2>
-                <p><strong>You authorize through the bank connectivity provider.</strong> Your bank credentials are not stored by CashFlowArc; the app receives authorized account and transaction data.</p>
+                <p><strong>You authorize through the bank connectivity provider.</strong> Your bank credentials are not stored by cashflowARC; the app receives authorized account and transaction data.</p>
             </article>
         </div>
     </section>
@@ -788,12 +806,12 @@ HOME_CONTENT = """
                 <article class="info-card">
                     <span class="badge">SSL and TLS</span>
                     <h3>Encrypted in transit</h3>
-                    <p>CashFlowArc is intended to run behind HTTPS in production so sensitive pages are protected by modern TLS between the browser and the site.</p>
+                    <p>cashflowARC is intended to run behind HTTPS in production so sensitive pages are protected by modern TLS between the browser and the site.</p>
                 </article>
                 <article class="info-card">
                     <span class="badge">Bank data</span>
                     <h3>Provider-based connectivity</h3>
-                    <p>BudgetArc bank linking is handled through Teller-style authorization. Credentials stay with the bank/provider flow, while CashFlowArc uses the authorized data needed to run the app.</p>
+                    <p>budgetARC bank linking is handled through Teller-style authorization. Credentials stay with the bank/provider flow, while cashflowARC uses the authorized data needed to run the app.</p>
                 </article>
                 <article class="info-card">
                     <span class="badge">No sale</span>
@@ -808,11 +826,11 @@ HOME_CONTENT = """
         <div class="section-inner">
             <div class="section-heading">
                 <h2>One palette across both apps.</h2>
-                <p>BudgetArc and Trader now share the same navy, teal, green, amber, red, light gray, white card, and near-black text system.</p>
+                <p>budgetARC and traderARC now share the same navy, teal, green, amber, red, light gray, white card, and near-black text system.</p>
             </div>
             <div class="app-grid">
                 <a class="app-card" href="/budget/">
-                    <span class="badge">BudgetArc</span>
+                    <span class="badge">budgetARC</span>
                     <h3>Cash flow, budgets, transactions, and net worth</h3>
                     <p>A calm operating dashboard for account-connected personal finance.</p>
                     <div class="mini-screen">
@@ -820,10 +838,10 @@ HOME_CONTENT = """
                         <div class="mini-row"><span>Dining budget</span><strong class="amber">68%</strong></div>
                         <div class="mini-row"><span>Overspend risk</span><strong class="red">Review</strong></div>
                     </div>
-                    <div class="button">Open BudgetArc</div>
+                    <div class="button">Open budgetARC</div>
                 </a>
                 <a class="app-card trader" href="/trader/">
-                    <span class="badge">Trader</span>
+                    <span class="badge">traderARC</span>
                     <h3>SPX terminal, GEX, option chain, and simulator</h3>
                     <p>Market context uses the same decision colors while keeping the data density traders expect.</p>
                     <div class="mini-screen">
@@ -831,7 +849,7 @@ HOME_CONTENT = """
                         <div class="mini-row"><span>Gamma level</span><strong class="amber">Watch</strong></div>
                         <div class="mini-row"><span>Risk status</span><strong class="red">Defined</strong></div>
                     </div>
-                    <div class="button primary">Open Trader</div>
+                    <div class="button primary">Open traderARC</div>
                 </a>
             </div>
         </div>
@@ -841,10 +859,10 @@ HOME_CONTENT = """
         <div class="section-inner story">
             <div class="section-heading">
                 <h2>Founder story</h2>
-                <p>CashFlowArc started from a simple frustration: financial tools were either pretty but shallow, or powerful but scattered.</p>
+                <p>cashflowARC started from a simple frustration: financial tools were either pretty but shallow, or powerful but scattered.</p>
             </div>
             <div class="story-panel">
-                <p>The founder wanted one private place to answer practical questions every week: how much cash is available, what is changing, which habits are helping, and what the next month could look like. BudgetArc grew from that need. Trader followed the same principle for market decisions: make the important signal visible without burying it in noise.</p>
+                <p>The founder wanted one private place to answer practical questions every week: how much cash is available, what is changing, which habits are helping, and what the next month could look like. budgetARC grew from that need. traderARC followed the same principle for market decisions: make the important signal visible without burying it in noise.</p>
                 <p>That is the arc: know where money is now, find better choices, and make the next decision with more clarity.</p>
             </div>
         </div>
@@ -859,14 +877,14 @@ SECURITY_CONTENT = """
         <div class="section-inner">
             <p class="eyebrow">Security</p>
             <h1>Security built around private financial data.</h1>
-            <p>CashFlowArc is designed for sensitive money workflows. The goal is clear: encrypted connections, minimal exposure, and plain-language controls.</p>
+            <p>cashflowARC is designed for sensitive money workflows. The goal is clear: encrypted connections, minimal exposure, and plain-language controls.</p>
         </div>
     </section>
     <section class="band white">
         <div class="section-inner policy-stack">
             <article class="policy-card">
                 <h2>HTTPS, SSL, and TLS</h2>
-                <p>Production traffic for CashFlowArc should be served through HTTPS so browser sessions are encrypted in transit. Local development URLs such as 127.0.0.1 may use HTTP, but the public site should use TLS.</p>
+                <p>Production traffic for cashflowARC should be served through HTTPS so browser sessions are encrypted in transit. Local development URLs such as 127.0.0.1 may use HTTP, but the public site should use TLS.</p>
             </article>
             <article class="policy-card">
                 <h2>Encryption messaging</h2>
@@ -874,7 +892,7 @@ SECURITY_CONTENT = """
             </article>
             <article class="policy-card">
                 <h2>Bank connectivity</h2>
-                <p>BudgetArc uses a bank connectivity provider flow for account access. You authorize access through that flow. CashFlowArc does not need to store your bank password; it uses authorized account and transaction data to power the dashboard.</p>
+                <p>budgetARC uses a bank connectivity provider flow for account access. You authorize access through that flow. cashflowARC does not need to store your bank password; it uses authorized account and transaction data to power the dashboard.</p>
             </article>
             <article class="policy-card">
                 <h2>Data access</h2>
@@ -882,7 +900,7 @@ SECURITY_CONTENT = """
             </article>
             <article class="policy-card">
                 <h2>What security does not mean</h2>
-                <p>No website can promise zero risk. CashFlowArc should be used with strong passwords, secure devices, HTTPS, and careful access control. If you notice suspicious behavior, stop using the affected connection and contact the site owner through the channel that provided your access.</p>
+                <p>No website can promise zero risk. cashflowARC should be used with strong passwords, secure devices, HTTPS, and careful access control. If you notice suspicious behavior, stop using the affected connection and contact the site owner through the channel that provided your access.</p>
             </article>
         </div>
     </section>
@@ -896,35 +914,35 @@ PRIVACY_CONTENT = """
         <div class="section-inner">
             <p class="eyebrow">Privacy Policy</p>
             <h1>We never sell your data.</h1>
-            <p>Last updated May 9, 2026. CashFlowArc is built for private personal finance workflows, not ad targeting or data resale.</p>
+            <p>Last updated May 9, 2026. cashflowARC is built for private personal finance workflows, not ad targeting or data resale.</p>
         </div>
     </section>
     <section class="band white">
         <div class="section-inner policy-stack">
             <article class="policy-card">
                 <h2>What data is used</h2>
-                <p>Depending on the app features you use, CashFlowArc may process account names, balances, transactions, categories, budgets, net worth records, preferences, and market dashboard settings.</p>
+                <p>Depending on the app features you use, cashflowARC may process account names, balances, transactions, categories, budgets, net worth records, preferences, and market dashboard settings.</p>
             </article>
             <article class="policy-card">
                 <h2>How data is used</h2>
                 <ul>
                     <li>To show current cash flow, spending, income, budgets, accounts, and net worth.</li>
                     <li>To generate insights, planning ideas, and future cash flow projections.</li>
-                    <li>To operate the Trader dashboard, including symbols, watchlists, simulations, and market views.</li>
+                    <li>To operate the traderARC dashboard, including symbols, watchlists, simulations, and market views.</li>
                     <li>To maintain security, troubleshoot errors, and keep the service reliable.</li>
                 </ul>
             </article>
             <article class="policy-card">
                 <h2>No sale of data</h2>
-                <p>CashFlowArc does not sell personal data, bank data, transaction history, balances, app activity, or forecasts. The product is not built around advertising profiles or data broker resale.</p>
+                <p>cashflowARC does not sell personal data, bank data, transaction history, balances, app activity, or forecasts. The product is not built around advertising profiles or data broker resale.</p>
             </article>
             <article class="policy-card">
                 <h2>Bank connectivity</h2>
-                <p>When bank linking is enabled, authorization is handled through the bank connectivity provider. CashFlowArc receives the authorized data needed to operate the app and should not collect or store your online banking password.</p>
+                <p>When bank linking is enabled, authorization is handled through the bank connectivity provider. cashflowARC receives the authorized data needed to operate the app and should not collect or store your online banking password.</p>
             </article>
             <article class="policy-card">
                 <h2>Sharing</h2>
-                <p>Data may be processed by service providers that are necessary to run the site, such as hosting, database, security, or bank connectivity providers. CashFlowArc should share only what is needed for those services to operate.</p>
+                <p>Data may be processed by service providers that are necessary to run the site, such as hosting, database, security, or bank connectivity providers. cashflowARC should share only what is needed for those services to operate.</p>
             </article>
             <article class="policy-card">
                 <h2>Your choices</h2>
@@ -951,7 +969,7 @@ def index() -> str:
     return render_page(
         HOME_CONTENT,
         page="home",
-        title="CashFlowArc | Private Cash Flow Intelligence",
+        title="cashflowARC | Private Cash Flow Intelligence",
         description="Know your current cash flow, get ideas to improve it, and predict what your cash flow will be like in the future.",
     )
 
@@ -962,8 +980,8 @@ def security() -> str:
     return render_page(
         SECURITY_CONTENT,
         page="security",
-        title="Security | CashFlowArc",
-        description="CashFlowArc security, SSL, encryption, and bank connectivity details.",
+        title="Security | cashflowARC",
+        description="cashflowARC security, SSL, encryption, and bank connectivity details.",
     )
 
 
@@ -973,8 +991,8 @@ def privacy() -> str:
     return render_page(
         PRIVACY_CONTENT,
         page="privacy",
-        title="Privacy Policy | CashFlowArc",
-        description="CashFlowArc privacy policy. We never sell your data.",
+        title="Privacy Policy | cashflowARC",
+        description="cashflowARC privacy policy. We never sell your data.",
     )
 
 
