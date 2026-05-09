@@ -822,15 +822,15 @@ BASE_PAGE = """
             </a>
             <nav class="nav-links" aria-label="cashflowARC navigation">
                 <a class="{{ 'active' if page == 'home' else '' }}" href="/">cashflow<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">collect<span class="arc">ARC</span></a>
-                <a href="/#planning-workflow">budget<span class="arc">ARC</span></a>
+                <a href="/budget/collect">collect<span class="arc">ARC</span></a>
+                <a href="/budget/">budget<span class="arc">ARC</span></a>
                 <a href="/#planning-workflow">forecast<span class="arc">ARC</span></a>
                 <a href="/#planning-workflow">life<span class="arc">ARC</span></a>
                 <a href="/#planning-workflow">lifestyle<span class="arc">ARC</span></a>
                 <a href="/#planning-workflow">whatif<span class="arc">ARC</span></a>
                 <a class="trader-nav-link" href="/trader/"><span class="trader-nav-text">trader<span class="arc">ARC</span></span><span class="nav-beta">BETA</span></a>
                 <a class="{{ 'active' if page == 'security' else '' }}" href="/security">Security</a>
-                <a href="/budget/login">Sign Up/Log In</a>
+                <a href="/budget/">Sign Up/Log In</a>
             </nav>
         </div>
     </header>
@@ -839,15 +839,15 @@ BASE_PAGE = """
         <div class="footer-inner">
             <div class="footer-links">
                 <a href="/">cashflowARC</a>
-                <a href="/#planning-workflow">collectARC</a>
-                <a href="/#planning-workflow">budgetARC</a>
+                <a href="/budget/collect">collectARC</a>
+                <a href="/budget/">budgetARC</a>
                 <a href="/#planning-workflow">forecastARC</a>
                 <a href="/#planning-workflow">lifeARC</a>
                 <a href="/#planning-workflow">lifestyleARC</a>
                 <a href="/#planning-workflow">whatifARC</a>
                 <a href="/trader/">traderARC</a>
                 <a href="/security">Security</a>
-                <a href="/budget/login">Sign Up/Log In</a>
+                <a href="/budget/">Sign Up/Log In</a>
             </div>
         </div>
     </footer>
@@ -869,7 +869,7 @@ HOME_CONTENT = """
                 <h1>cashflow<span class="arc">ARC</span></h1>
                 <p>A planning engine that collects transactions and upcoming life events, then builds a living forecast of your future financial lifestyle.</p>
                 <div class="hero-actions">
-                    <a class="button primary" href="/budget/login">Sign Up/Log In</a>
+                    <a class="button primary" href="/budget/">Sign Up/Log In</a>
                 </div>
                 <p class="hero-trust">cashflowARC never sees, reads, or stores your financial institution usernames or passwords, and we do not sell your personal information. <a href="/security">Learn more about security.</a></p>
             </div>
