@@ -39,15 +39,66 @@ source = Path(sys.argv[1])
 target = Path(sys.argv[2])
 text = source.read_text()
 
+rate_limit_zones = """limit_req_zone $binary_remote_addr zone=cfa_auth:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=cfa_trader:10m rate=60r/m;
+limit_req_status 429;
+"""
+
+if "zone=cfa_auth:10m" not in text:
+    text = rate_limit_zones + "\n" + text.lstrip()
+    print("Installed CashFlowArc nginx rate limit zones.")
+
 updated_text = re.sub(r"server\s*\{\n(?!\s*server_tokens off;)", "server {\n    server_tokens off;\n", text)
 if updated_text != text:
     text = updated_text
     print("Disabled nginx version tokens for CashFlowArc server blocks.")
 
+budget_auth_block = """    location ~ ^/budget/(login|register|forgot-password)$ {
+        limit_req zone=cfa_auth burst=20 nodelay;
+        proxy_pass http://127.0.0.1:8788;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
+    }
+
+"""
+
+if "location ~ ^/budget/(login|register|forgot-password)$" not in text:
+    marker = "    location /budget/ {"
+    if marker in text:
+        text = text.replace(marker, budget_auth_block + marker, 1)
+        print("Installed BudgetArc auth endpoint rate limits.")
+
+if "location /trader/ {" in text and "limit_req zone=cfa_trader" not in text:
+    text = text.replace(
+        "    location /trader/ {\n",
+        "    location /trader/ {\n        limit_req zone=cfa_trader burst=30 nodelay;\n",
+        1,
+    )
+    print("Installed Trader route rate limits.")
+
 routes = []
 if "127.0.0.1:8788" not in text:
     routes.append("""    location = /budget {
         return 301 /budget/;
+    }
+
+    location ~ ^/budget/(login|register|forgot-password)$ {
+        limit_req zone=cfa_auth burst=20 nodelay;
+        proxy_pass http://127.0.0.1:8788;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 180s;
     }
 
     location /budget/ {
@@ -70,6 +121,7 @@ if "127.0.0.1:8790" not in text:
     }
 
     location /trader/ {
+        limit_req zone=cfa_trader burst=30 nodelay;
         proxy_pass http://127.0.0.1:8790;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
